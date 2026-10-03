@@ -1,0 +1,87 @@
+Running 20 test file(s)
+
+__tests__\acceptance-workflow.test.js
+
+__tests__\additional-language-analyzers.test.js
+
+__tests__\agent-activity-context.test.js
+
+__tests__\ai-fixer.test.js
+
+__tests__\auto-fix-engine.test.js
+
+__tests__\batch-fixing.test.js
+
+__tests__\build-monitor.test.js
+
+__tests__\csharp.test.js
+
+__tests__\diff-review-system.test.js
+
+__tests__\extension.test.js
+
+__tests__\file-watcher.test.js
+
+__tests__\integration.test.js
+
+__tests__\multi-issue-selection.test.js
+
+__tests__\phase11-integration.test.js
+
+__tests__\pipeline-catalog.test.js
+
+__tests__\pipeline-implementations.test.js
+
+__tests__\provider-model-selector.test.js
+
+__tests__\security-scan-button.test.js
+
+__tests__\streaming-conversation.test.js
+
+__tests__\workspace-linter-config.test.js
+
+  ✗ AcceptanceWorkflow › Workflow Execution › should execute complete workflow successfully
+      path is not defined
+  ✗ AcceptanceWorkflow › Workflow Execution › should track workflow stages
+      path is not defined
+  ✗ AcceptanceWorkflow › Fabrication Checks › should detect fabricated tool calls
+      path is not defined
+  ✗ AcceptanceWorkflow › Fabrication Checks › should fail on invalid task data
+      path is not defined
+  ✗ AcceptanceWorkflow › Acceptance Criteria › should extract criteria from task deliverables
+      path is not defined
+  ✗ AcceptanceWorkflow › Cancellation › should allow workflow cancellation
+      path is not defined
+
+============================================================
+🏗️  Build Monitor Started
+============================================================
+  CI: Local
+  Build: #1790871266085
+============================================================
+
+  ✗ FileDiff › should generate unified diff format
+      expected --- a//test/file.js
++++ b//test/file.js
+@@ -3,3 +3,4 @@
++  console.log('Welcome!');
+ }
+ 
+ function goodbye() {
+@@ -1,0 +10,4 @@
++function newFunction() {
++  console.log('I am new!');
++}
++ to contain --- a/test/file.js
+  ✗ SecurityScanPipeline › should check URL permissions
+      pipeline.isUrlAllowed is not a function
+  ✗ BackupManager › should throw error when backup not found
+      expect(...).toThrow is not a function
+  ✗ DiffReviewSystem › should present diffs for review
+      expected 2 to be 1
+  ✗ DiffReviewSystem › should reject diff
+      Diff already applied
+  ✗ DiffReviewSystem › should reject all pending diffs
+      expected 8 to be 2
+  ✗ DiffReviewSystem › should generate summary report
+      expected 14 to be 1

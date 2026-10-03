@@ -1,0 +1,133 @@
+{
+  "phase": "phase5",
+  "name": "Additional Language Support",
+  "priority": "LOW",
+  "estimatedHours": 120,
+  "status": "COMPLETED",
+  "completionPercentage": "100%",
+  "reconciledOn": "2026-09-28",
+  "reconciliationNote": "Reconciled against the shipped language analyzers on 2026-09-28. Python support was already present; Go, Rust, PHP, and Ruby adapters now share the external-tool normalization pipeline. Java remains explicitly archived and is excluded from active support.",
+  "completedIds": ["P5-T001", "P5-T003", "P5-T004", "P5-T005", "P5-T006"],
+  "tasks": {
+    "pending": [
+      {
+        "id": "P5-T001",
+        "name": "Add Python support",
+        "description": "Integrate Pylint, Flake8, Black, mypy",
+        "status": "COMPLETED",
+        "completedDate": "2026-09-28",
+        "artifacts": ["src/languages/python-analyzer.js"],
+        "priority": "MEDIUM",
+        "estimatedHours": 24,
+        "value": 80,
+        "assignee": "UNASSIGNED",
+        "dependencies": [
+          "P2-T006"
+        ],
+        "tags": [
+          "python",
+          "integration",
+          "linting"
+        ]
+      },
+      {
+        "id": "P5-T002",
+        "name": "Add Java support",
+        "description": "Integrate Checkstyle, PMD, SpotBugs. Prototype analyzer archived at archive/languages/java-analyzer.js; not part of the active pipeline. Active support is limited to TypeScript/JavaScript, C#, and Python.",
+        "status": "ARCHIVED",
+        "priority": "MEDIUM",
+        "estimatedHours": 24,
+        "value": 75,
+        "assignee": "UNASSIGNED",
+        "dependencies": [
+          "P2-T006"
+        ],
+        "tags": [
+          "java",
+          "integration",
+          "linting"
+        ]
+      },
+      {
+        "id": "P5-T003",
+        "name": "Add Go support",
+        "description": "Integrate golint, gofmt, go vet",
+        "status": "COMPLETED",
+        "completedDate": "2026-09-28",
+        "artifacts": ["src/languages/go-analyzer.js", "src/languages/external-language-analyzer.js"],
+        "priority": "LOW",
+        "estimatedHours": 20,
+        "value": 65,
+        "assignee": "UNASSIGNED",
+        "dependencies": [
+          "P2-T006"
+        ],
+        "tags": [
+          "go",
+          "integration",
+          "linting"
+        ]
+      },
+      {
+        "id": "P5-T004",
+        "name": "Add Rust support",
+        "description": "Integrate Clippy, rustfmt",
+        "status": "COMPLETED",
+        "completedDate": "2026-09-28",
+        "artifacts": ["src/languages/rust-analyzer.js", "src/languages/external-language-analyzer.js"],
+        "priority": "LOW",
+        "estimatedHours": 20,
+        "value": 60,
+        "assignee": "UNASSIGNED",
+        "dependencies": [
+          "P2-T006"
+        ],
+        "tags": [
+          "rust",
+          "integration",
+          "linting"
+        ]
+      },
+      {
+        "id": "P5-T005",
+        "name": "Add PHP support",
+        "description": "Integrate PHP_CodeSniffer, PHPMD, PHPStan",
+        "status": "COMPLETED",
+        "completedDate": "2026-09-28",
+        "artifacts": ["src/languages/php-analyzer.js", "src/languages/external-language-analyzer.js"],
+        "priority": "LOW",
+        "estimatedHours": 20,
+        "value": 65,
+        "assignee": "UNASSIGNED",
+        "dependencies": [
+          "P2-T006"
+        ],
+        "tags": [
+          "php",
+          "integration",
+          "linting"
+        ]
+      },
+      {
+        "id": "P5-T006",
+        "name": "Add Ruby support",
+        "description": "Integrate RuboCop, Reek",
+        "status": "COMPLETED",
+        "completedDate": "2026-09-28",
+        "artifacts": ["src/languages/ruby-analyzer.js", "src/languages/external-language-analyzer.js"],
+        "priority": "LOW",
+        "estimatedHours": 16,
+        "value": 55,
+        "assignee": "UNASSIGNED",
+        "dependencies": [
+          "P2-T006"
+        ],
+        "tags": [
+          "ruby",
+          "integration",
+          "linting"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "id": "session-1790871266351-1912149d",
+  "workspace": "/workspace",
+  "model": null,
+  "provider": null,
+  "createdAt": 1790871266351,
+  "updatedAt": 1790871266352,
+  "events": [
+    {
+      "id": "1ac4942272e923941c3eb4b837bebf61",
+      "type": "session-start",
+      "timestamp": 1790871266351,
+      "data": {
+        "sessionId": "session-1790871266351-1912149d",
+        "workspace": "/workspace"
+      }
+    },
+    {
+      "id": "e0eb5406a0c0184c1bc3f009eddbd8ad",
+      "type": "model-complete",
+      "timestamp": 1790871266352,
+      "data": {
+        "text": "full text",
+        "tokens": 10
+      }
+    }
+  ],
+  "context": {
+    "task": null,
+    "files": [],
+    "references": []
+  },
+  "changes": {
+    "applied": [],
+    "rejected": [],
+    "failed": []
+  },
+  "status": "active",
+  "metadata": {}
+}

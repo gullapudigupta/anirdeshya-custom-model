@@ -1,0 +1,50 @@
+{
+  "name": "advanced-quality-tool",
+  "version": "0.4.0",
+  "description": "Advanced code quality analysis and auto-fix tool with AI integration",
+  "main": "cli.js",
+  "bin": {
+    "aqt": "./cli.js"
+  },
+  "scripts": {
+    "analyze": "node cli.js analyze",
+    "fix": "node cli.js fix",
+    "watch": "node cli.js watch",
+    "ui": "node cli.js ui",
+    "test": "node test/run.js",
+    "example:detect": "node examples/detect-linters.js",
+    "example:analyze": "node examples/run-analysis.js",
+    "example:categorize": "node examples/categorize-issues.js"
+  },
+  "keywords": [
+    "code-analysis",
+    "linting",
+    "auto-fix",
+    "ai",
+    "sonarqube",
+    "eslint",
+    "typescript",
+    "angular",
+    "code-quality"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "chokidar": "^3.5.3",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "eslint": "^8.50.0",
+    "@typescript-eslint/eslint-plugin": "^6.7.0",
+    "@typescript-eslint/parser": "^6.7.0",
+    "prettier": "^3.0.3",
+    "stylelint": "^15.10.3"
+  },
+  "optionalDependencies": {
+    "openai": "^4.20.0",
+    "@anthropic-ai/sdk": "^0.9.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

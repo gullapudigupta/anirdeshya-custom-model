@@ -1,0 +1,94 @@
+# ─────────────────────────────────────────────────────────────────
+# Advanced Quality Tool — docker-compose.yml
+#
+# Services:
+#   aqt-ui      : Web UI + WebSocket server (port 3000)
+#   aqt-analyze : One-shot analysis runner (exits after completion)
+#   aqt-watch   : Continuous file watcher mode
+#
+# Usage:
+#   docker compose up aqt-ui          # Start the dashboard UI
+#   docker compose run --rm aqt-analyze  # Run a one-shot analysis
+#   docker compose up aqt-watch       # Watch for file changes
+#
+# Environment variables:
+#   Copy .env.example to .env and fill in your values.
+# ─────────────────────────────────────────────────────────────────
+
+version: "3.9"
+
+# ── Shared defaults ────────────────────────────────────────────────
+x-aqt-base: &aqt-base
+  build:
+    context: .
+    dockerfile: Dockerfile
+    target: runner
+  image: advanced-quality-tool:latest
+  restart: "no"
+  env_file:
+    - .env.example
+  volumes:
+    # Mount the project to analyse (override with your own path)
+    - ${AQT_PROJECT_PATH:-./}:/workspace:ro
+    # Persist reports and cache across runs
+    - aqt-reports:/app/.aqt-reports
+    - aqt-cache:/app/.aqt-cache
+    - aqt-history:/app/.aqt-history
+    - aqt-rules:/app/.quality-tool
+  environment:
+    - NODE_ENV=production
+    - AQT_PROJECT_PATH=/workspace
+
+services:
+
+  # ── Dashboard UI ────────────────────────────────────────────────
+  aqt-ui:
+    <<: *aqt-base
+    container_name: aqt-ui
+    command: ["ui", "--port", "3000"]
+    restart: unless-stopped
+    ports:
+      - "${AQT_UI_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', r => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "com.advanced-quality-tool.service=ui"
+
+  # ── One-shot analysis ───────────────────────────────────────────
+  aqt-analyze:
+    <<: *aqt-base
+    container_name: aqt-analyze
+    command: ["analyze", "/workspace", "--output", "json", "--report-dir", "/app/.aqt-reports"]
+    profiles:
+      - analysis
+
+  # ── Continuous watcher ──────────────────────────────────────────
+  aqt-watch:
+    <<: *aqt-base
+    container_name: aqt-watch
+    # Remove :ro flag for the workspace so watcher can react to edits
+    volumes:
+      - ${AQT_PROJECT_PATH:-./}:/workspace
+      - aqt-reports:/app/.aqt-reports
+      - aqt-cache:/app/.aqt-cache
+      - aqt-history:/app/.aqt-history
+      - aqt-rules:/app/.quality-tool
+    command: ["watch", "/workspace"]
+    restart: unless-stopped
+    profiles:
+      - watch
+
+# ── Named volumes ──────────────────────────────────────────────────
+volumes:
+  aqt-reports:
+    driver: local
+  aqt-cache:
+    driver: local
+  aqt-history:
+    driver: local
+  aqt-rules:
+    driver: local

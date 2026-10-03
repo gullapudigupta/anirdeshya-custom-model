@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "change-request-index",
+  "description": "Master index for change request and tweak records. Details live in the linked shard files.",
+  "recordIdFormat": "CR-### (globally increasing across shards)",
+  "maxRecordsPerShard": 100,
+  "requiredPhaseLink": ["phaseTaskId", "phaseTaskFile"],
+  "phaseLinkRule": "Each CR or tweak must point to the exact existing task in a phase1-tasks.json through phase9-tasks.json file. If no exact task exists, add it to the appropriate phase file before logging the CR.",
+  "shards": [
+    {
+      "file": "./cr-tasks.json",
+      "recordCount": 2,
+      "firstId": "CR-001",
+      "lastId": "CR-002"
+    }
+  ]
+}

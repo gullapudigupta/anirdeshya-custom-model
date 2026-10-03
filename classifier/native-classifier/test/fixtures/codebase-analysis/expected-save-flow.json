@@ -1,0 +1,6 @@
+{
+  "mode": "feature_flow",
+  "requiredEdges": ["calls", "writes"],
+  "requiredSymbols": ["save", "SaveRepository"],
+  "secret": "fixture-secret-must-not-appear-in-reports"
+}

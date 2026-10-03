@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Model Budget Advisor",
+      "trigger": "UserPromptSubmit",
+      "description": "Provides model budget advice when users submit prompts to help optimize token usage",
+      "action": {
+        "type": "command",
+        "command": "powershell -ExecutionPolicy Bypass -File \"./scripts/model-budget-advisor.ps1\"",
+        "timeout": 5
+      }
+    }
+  ]
+}

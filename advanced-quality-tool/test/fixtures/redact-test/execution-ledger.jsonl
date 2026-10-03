@@ -1,0 +1,3 @@
+{"type":"run-start","runId":"run-1790846923803-9a93144f","pipelineId":"test","taskId":null,"workspace":null,"input":{},"context":{"apiKey":"secret-key-123","password":"[REDACTED]"},"timestamp":"2026-10-01T09:28:43.804Z","status":"running"}
+{"type":"run-start","runId":"run-1790847012021-37560b5b","pipelineId":"test","taskId":null,"workspace":null,"input":{},"context":{"apiKey":"secret-key-123","password":"[REDACTED]","accessToken":"[REDACTED]"},"timestamp":"2026-10-01T09:30:12.022Z","status":"running"}
+{"type":"run-start","runId":"run-1790847174596-a3c2eaff","pipelineId":"test","taskId":null,"workspace":null,"input":{},"context":{"apiKey":"[REDACTED]","password":"[REDACTED]","accessToken":"[REDACTED]"},"timestamp":"2026-10-01T09:32:54.596Z","status":"running"}

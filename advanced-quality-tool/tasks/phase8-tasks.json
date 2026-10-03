@@ -1,0 +1,157 @@
+{
+  "phase": "phase8",
+  "name": "Multi-Interface Access and UI Modularization",
+  "priority": "HIGH",
+  "estimatedHours": 148,
+  "status": "COMPLETED",
+  "completionPercentage": "100%",
+  "statusSummary": {
+    "completed": 7,
+    "pending": 0
+  },
+  "description": "Expose the shared application through independent MCP, orchestration-tool, CLI, and API access points, document each interface, and modularize the UI assets.",
+  "tasks": [
+    {
+      "id": "P8-T001",
+      "name": "Shared Core and Interface Adapter Architecture",
+      "status": "COMPLETED",
+      "completedDate": "2026-09-30",
+      "artifacts": ["src/core/shared-app-services.js", "src/core/interface-adapter.js"],
+      "priority": "CRITICAL",
+      "estimatedHours": 24,
+      "value": 100,
+      "dependencies": ["P1-T001", "P1-T008", "P6-T012"],
+      "deliverables": [
+        "Define stable shared application services independent of any transport or user interface",
+        "Define interface adapter contracts for configuration, inputs, outputs, errors, and lifecycle",
+        "Create separate application access points that reuse the shared core without duplicating business logic",
+        "Propagate model-required and provider-unavailable outcomes consistently across interfaces",
+        "Add adapter-level contract tests and configuration isolation"
+      ],
+      "tags": ["architecture", "adapters", "interfaces", "shared-core"]
+    },
+    {
+      "id": "P8-T002",
+      "name": "Model Context Protocol Server",
+      "status": "COMPLETED",
+      "completedDate": "2026-09-30",
+      "artifacts": ["src/integrations/mcp-server.js"],
+      "priority": "HIGH",
+      "estimatedHours": 24,
+      "value": 95,
+      "dependencies": ["P8-T001"],
+      "deliverables": [
+        "Add a standalone MCP server entry point over the shared application services",
+        "Expose supported operations with validated input schemas and structured results",
+        "Return actionable protocol errors for missing configuration, unavailable models, and failed operations",
+        "Support documented startup, configuration, and shutdown behavior",
+        "Add offline protocol and tool-contract tests"
+      ],
+      "tags": ["mcp", "server", "protocol", "integration"]
+    },
+    {
+      "id": "P8-T003",
+      "name": "Orchestration Tool Adapter",
+      "status": "COMPLETED",
+      "completedDate": "2026-09-30",
+      "artifacts": ["src/integrations/orchestration-adapter.js"],
+      "priority": "HIGH",
+      "estimatedHours": 24,
+      "value": 90,
+      "dependencies": ["P8-T001"],
+      "deliverables": [
+        "Expose the application as a callable tool for orchestration systems through a separate adapter",
+        "Define machine-readable capabilities, input/output contracts, and error states",
+        "Support cancellation, timeouts, and correlation identifiers where the host protocol permits",
+        "Propagate model requirements and external-provider restrictions without silent fallback",
+        "Add adapter contract tests and a runnable integration example"
+      ],
+      "tags": ["orchestration", "tool-adapter", "integration", "contracts"]
+    },
+    {
+      "id": "P8-T004",
+      "name": "Standalone CLI Access Point",
+      "status": "COMPLETED",
+      "completedDate": "2026-09-30",
+      "artifacts": [
+        "src/commands/standalone-cli.js",
+        "bin/aqt.js",
+        "src/commands/__tests__/standalone-cli.test.js",
+        "docs/interfaces/CLI.md"
+      ],
+      "priority": "HIGH",
+      "estimatedHours": 16,
+      "value": 90,
+      "dependencies": ["P8-T001"],
+      "deliverables": [
+        "Provide a dedicated CLI entry point for supported application workflows",
+        "Define command, option, configuration, exit-code, and machine-readable output behavior",
+        "Report required or unavailable models with actionable messages and non-success exit status",
+        "Add command-level tests and examples"
+      ],
+      "tags": ["cli", "commands", "entrypoint", "automation"]
+    },
+    {
+      "id": "P8-T005",
+      "name": "HTTP API Access Point",
+      "status": "COMPLETED",
+      "completedDate": "2026-09-30",
+      "artifacts": ["src/integrations/http-api-server.js"],
+      "priority": "HIGH",
+      "estimatedHours": 32,
+      "value": 95,
+      "dependencies": ["P8-T001"],
+      "deliverables": [
+        "Provide a separately startable HTTP API over the shared application services",
+        "Define versioned request and response schemas with OpenAPI documentation",
+        "Implement input validation, consistent error responses, and configurable authentication and request limits",
+        "Return structured model-required/provider-unavailable states without claiming an operation succeeded",
+        "Add API contract and endpoint tests"
+      ],
+      "tags": ["api", "http", "openapi", "validation"]
+    },
+    {
+      "id": "P8-T006",
+      "name": "Interface Documentation and Integration Guides",
+      "status": "COMPLETED",
+      "completedDate": "2026-09-30",
+      "artifacts": [
+        "docs/interfaces/MCP.md",
+        "docs/interfaces/ORCHESTRATION.md", 
+        "docs/interfaces/CLI.md",
+        "docs/interfaces/API.md",
+        "docs/interfaces/SHARED-CONFIG.md"
+      ],
+      "priority": "HIGH",
+      "estimatedHours": 20,
+      "value": 90,
+      "dependencies": ["P8-T002", "P8-T003", "P8-T004", "P8-T005"],
+      "deliverables": [
+        "Document MCP setup, configuration, available tools, examples, and troubleshooting",
+        "Document orchestration adapter contracts, lifecycle, examples, and host integration",
+        "Document CLI installation, commands, options, configuration, exit codes, and examples",
+        "Document API setup, authentication, endpoint schemas, errors, and runnable examples",
+        "Document shared configuration, privacy behavior, and model-required responses across interfaces"
+      ],
+      "tags": ["documentation", "mcp", "orchestration", "cli", "api"]
+    },
+    {
+      "id": "P8-T007",
+      "name": "UI Asset Separation",
+      "status": "COMPLETED",
+      "completedDate": "2026-09-30",
+      "artifacts": ["src/ui/chat-ui.html"],
+      "priority": "MEDIUM",
+      "estimatedHours": 8,
+      "value": 75,
+      "dependencies": ["P8-T001"],
+      "deliverables": [
+        "Separate the existing UI HTML entry document from its stylesheet and browser-side JavaScript",
+        "Move inline styles and scripts into dedicated CSS and JavaScript files",
+        "Update asset references and verify the UI behavior remains unchanged",
+        "Add a smoke check for loading the separated assets"
+      ],
+      "tags": ["ui", "html", "css", "javascript", "modularization"]
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "name": "advanced-quality-tool-vscode",
+  "displayName": "Advanced Quality Tool",
+  "description": "AI-powered code quality analysis and auto-fix, inside VS Code.",
+  "version": "0.4.0",
+  "publisher": "advanced-quality-tool",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Linters",
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "code-quality",
+    "linting",
+    "auto-fix",
+    "eslint",
+    "prettier",
+    "stylelint",
+    "csharp"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onStartupFinished",
+    "workspaceContains:**/package.json"
+  ],
+  "contributes": {
+    "commands": [
+      { "command": "aqt.analyze", "title": "AQT: Analyze Workspace" },
+      { "command": "aqt.fixAll", "title": "AQT: Fix All Auto-fixable" },
+      { "command": "aqt.fixIssue", "title": "AQT: Fix This Issue" },
+      { "command": "aqt.openPanel", "title": "AQT: Open Quality Panel" },
+      { "command": "aqt.clear", "title": "AQT: Clear Diagnostics" }
+    ],
+    "menus": {
+      "commandPalette": [
+        { "command": "aqt.fixIssue", "when": "false" }
+      ],
+      "editor/context": [
+        { "command": "aqt.analyze", "group": "aqt@1" },
+        { "command": "aqt.fixAll", "group": "aqt@2" }
+      ]
+    },
+    "configuration": {
+      "title": "Advanced Quality Tool",
+      "properties": {
+        "advancedQualityTool.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Advanced Quality Tool extension."
+        },
+        "advancedQualityTool.runOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Re-analyze the workspace when a file is saved."
+        },
+        "advancedQualityTool.linters": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["eslint", "typescript-eslint", "prettier", "stylelint"]
+          },
+          "default": [],
+          "description": "Linters to run. Empty means all available linters."
+        },
+        "advancedQualityTool.fixStrategy": {
+          "type": "string",
+          "enum": ["rule-only", "ai-only", "three-tier"],
+          "default": "rule-only",
+          "description": "Auto-fix strategy. 'rule-only' keeps fixes deterministic and offline."
+        },
+        "advancedQualityTool.minConfidence": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Minimum confidence threshold for AI-generated fixes."
+        },
+        "advancedQualityTool.backup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Create a backup before applying fixes."
+        },
+        "advancedQualityTool.severityFloor": {
+          "type": "string",
+          "enum": ["CRITICAL", "ERROR", "WARNING", "INFO", "SUGGESTION"],
+          "default": "SUGGESTION",
+          "description": "Lowest severity to surface as a diagnostic."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "echo \"No bundling step; extension ships plain JS.\"",
+    "package": "vsce package --no-dependencies",
+    "publish": "vsce publish --no-dependencies"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^2.21.0"
+  }
+}

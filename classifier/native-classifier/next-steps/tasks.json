@@ -1,0 +1,664 @@
+{
+  "project": "native-classifiers-codebase-analysis",
+  "version": "1.0.0",
+  "source": "codebase-analysis-pipeline.md",
+  "target": "../src",
+  "statusValues": ["pending", "in_progress", "blocked", "completed"],
+  "executionPolicy": {
+    "implementationAgent": "another_agent",
+    "workMode": "incremental",
+    "defaultBehavior": "read_only",
+    "taskSelection": "Select the lowest-numbered pending task whose dependencies are completed.",
+    "completionRule": "Mark a task completed only after all acceptance criteria pass and every listed validation has been run.",
+    "compatibility": "Preserve existing public exports and AgentInput behavior unless a task explicitly introduces a validated extension.",
+    "scope": [
+      "Implement deliverables under native-classifiers/src unless another path is explicitly listed.",
+      "Add focused tests under native-classifiers/test for every behavior change.",
+      "Do not implement edit, build, test, shell, or other mutating analysis handlers.",
+      "Do not expose secrets found while inventorying, searching, reading, or reporting repository content.",
+      "Do not claim a code relationship unless it is represented by captured evidence or clearly labeled as inferred."
+    ]
+  },
+  "tasks": [
+    {
+      "id": "CA-001",
+      "phase": 1,
+      "title": "Define analysis entities and request contracts",
+      "status": "completed",
+      "priority": "critical",
+      "dependsOn": [],
+      "objective": "Convert analyze, explain, and code-search classifications into a strict request describing the requested analysis mode, targets, scope, constraints, and output options.",
+      "deliverables": [
+        "src/extraction/analysis-entities.ts",
+        "src/extraction/feature-terms.ts",
+        "src/analysis/analysis-request.ts",
+        "Zod schemas and exported TypeScript types for AnalysisEntity and AnalysisRequest"
+      ],
+      "acceptanceCriteria": [
+        "Supports architecture, feature_flow, symbol_usage, data_flow, dependency, and error_path modes",
+        "Extracts unknown feature phrases from patterns such as how X works, where X is implemented, trace X, and who calls X",
+        "Preserves quoted and code-formatted symbols with higher confidence than unquoted feature terms",
+        "Defaults analysis constraints to read_only and excludes node_modules, dist, coverage, and .git",
+        "Rejects invalid modes, empty questions, unsafe paths, and malformed output options",
+        "Existing classifyIntent and AgentInput exports remain backward compatible"
+      ],
+      "validation": [
+        "Unit tests for request construction from analyze this codebase, find how save works, trace the save flow, and who calls a quoted symbol",
+        "Schema tests for invalid modes, empty targets, and unsafe scope paths",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-002",
+      "phase": 1,
+      "title": "Implement repository inventory and ignore policy",
+      "status": "completed",
+      "priority": "critical",
+      "dependsOn": ["CA-001"],
+      "objective": "Discover repository shape without traversing dependencies, generated output, secrets, or paths outside the requested workspace.",
+      "deliverables": [
+        "src/repository/repository-inventory.ts",
+        "src/repository/project-detector.ts",
+        "src/repository/ignore-policy.ts",
+        "RepositoryInventory schema and inventory service interface"
+      ],
+      "acceptanceCriteria": [
+        "Inventory reports root, languages, frameworks, source roots, test roots, ignored paths, and detected architectural layers",
+        "Project detection reads common package, workspace, TypeScript, Angular, and Node.js metadata",
+        "All resolved paths remain inside the validated workspace root",
+        "Default and repository ignore rules exclude dependencies, generated output, coverage, and version-control metadata",
+        "Inventory is bounded by configurable file and directory limits"
+      ],
+      "validation": [
+        "Fixture tests for TypeScript, Angular, Node.js, monorepo, and empty repositories",
+        "Traversal tests for parent paths, symlinks, ignored directories, and limit enforcement",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-003",
+      "phase": 1,
+      "title": "Define read-only tool contracts",
+      "status": "completed",
+      "priority": "critical",
+      "dependsOn": ["CA-001", "CA-002"],
+      "objective": "Introduce validated inputs and evidence-bearing outputs for every repository analysis operation.",
+      "deliverables": [
+        "src/search/tool-contracts.ts",
+        "Schemas for list_repository, list_files, search_code, find_symbol, find_references, find_implementations, read_file, get_project_metadata, get_diagnostics, and respond",
+        "Read-only analysis tool registry interface"
+      ],
+      "acceptanceCriteria": [
+        "Every input schema validates workspace-relative paths, include and exclude patterns, and result limits",
+        "Every result can identify its tool, query, file, region or symbol, and evidence text where applicable",
+        "Tool names are integrated without authorizing edit_file, run_build, run_tests, or arbitrary process execution for analysis",
+        "Existing router behavior remains compatible for non-analysis intents",
+        "Malformed handler results fail validation"
+      ],
+      "validation": [
+        "Contract tests for valid and invalid inputs and outputs for every tool",
+        "Router policy tests proving analysis cannot invoke mutating tools",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-004",
+      "phase": 2,
+      "title": "Implement bounded file and text search handlers",
+      "status": "completed",
+      "priority": "critical",
+      "dependsOn": ["CA-002", "CA-003"],
+      "objective": "Provide real repository listing, file discovery, focused reading, and lexical search behind the validated read-only contracts.",
+      "deliverables": [
+        "src/search/file-search.ts",
+        "src/search/text-search.ts",
+        "src/repository/read-file.ts",
+        "Handlers for list_repository, list_files, search_code, and read_file"
+      ],
+      "acceptanceCriteria": [
+        "Search supports exact text and regular expressions with explicit include, exclude, and result limits",
+        "File discovery supports filename globs and uses the shared ignore policy",
+        "File reads require bounded line ranges and reject binary or out-of-workspace paths",
+        "Results include line locations and snippets suitable for evidence capture",
+        "Generated and ignored paths are never returned by default",
+        "No handler modifies repository state"
+      ],
+      "validation": [
+        "Integration tests against a fixture repository with source, generated, ignored, binary, and out-of-root files",
+        "Limit and cancellation tests for listing, searching, and reading",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-005",
+      "phase": 2,
+      "title": "Implement symbol and reference search",
+      "status": "completed",
+      "priority": "high",
+      "dependsOn": ["CA-003", "CA-004"],
+      "objective": "Resolve TypeScript definitions, references, implementations, imports, and exports through an adapter that can use a language server or TypeScript AST index.",
+      "deliverables": [
+        "src/search/symbol-search.ts",
+        "src/search/reference-search.ts",
+        "TypeScript symbol-provider interface and default implementation",
+        "Handlers for find_symbol, find_references, and find_implementations"
+      ],
+      "acceptanceCriteria": [
+        "Finds function, method, class, variable, and property definitions",
+        "Distinguishes definitions from references and optionally includes the definition",
+        "Resolves imports, re-exports, interfaces, and concrete implementations when statically available",
+        "Returns an explicit unresolved result instead of inventing dynamic relationships",
+        "All results remain bounded and inside workspace scope"
+      ],
+      "validation": [
+        "Fixture tests for direct calls, aliases, barrel exports, interface implementations, overrides, and missing symbols",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-006",
+      "phase": 2,
+      "title": "Generate framework-aware search queries",
+      "status": "completed",
+      "priority": "high",
+      "dependsOn": ["CA-001", "CA-002"],
+      "objective": "Expand feature and symbol targets into deterministic query families appropriate to the detected repository technologies.",
+      "deliverables": [
+        "src/search/query-generator.ts",
+        "Query-family schema for direct terms, related actions, UI triggers, API patterns, persistence patterns, and symbol lookups"
+      ],
+      "acceptanceCriteria": [
+        "A save feature produces direct, submit, persist, create, update, upsert, commit, write, and store variants",
+        "Angular inventories add template, form, service, observable, signal, and NgRx patterns",
+        "Node.js inventories add route, controller, middleware, service, repository, and ORM patterns",
+        "Exact target symbols remain exact queries and are not synonym-expanded",
+        "Queries are deduplicated, ordered deterministically, and capped by configuration"
+      ],
+      "validation": [
+        "Snapshot tests for generic, Angular, Node.js, and mixed full-stack query generation",
+        "Tests for quoted symbols, duplicate terms, and query limits",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-007",
+      "phase": 2,
+      "title": "Implement deterministic result ranking",
+      "status": "completed",
+      "priority": "high",
+      "dependsOn": ["CA-004", "CA-005", "CA-006"],
+      "objective": "Combine lexical, file, and symbol results into explainable candidates before focused reading.",
+      "deliverables": [
+        "src/search/result-ranker.ts",
+        "SearchCandidate schema",
+        "Scoring reason and penalty definitions"
+      ],
+      "acceptanceCriteria": [
+        "Exact symbols and executable definitions rank above phrase matches, comments, documentation, fixtures, generated code, and re-exports",
+        "UI-trigger, route, framework-location, and connected-candidate proximity contribute explicit scoring reasons",
+        "Candidates have stable tie-breaking and deterministic order",
+        "Duplicate locations from different query families are merged without losing reasons",
+        "Ranking never treats a filename match alone as proof of relevance"
+      ],
+      "validation": [
+        "Hand-scored ranking tests for definitions, comments, generated files, tests, routes, and exact symbols",
+        "Determinism and duplicate-merge tests",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-008",
+      "phase": 3,
+      "title": "Build evidence graph and focused evidence capture",
+      "status": "completed",
+      "priority": "critical",
+      "dependsOn": ["CA-004", "CA-005", "CA-007"],
+      "objective": "Represent repository facts and discovered relationships explicitly so later tracing and reporting cannot outrun the evidence.",
+      "deliverables": [
+        "src/tracing/evidence-graph.ts",
+        "src/analysis/evidence-capture.ts",
+        "EvidenceNode, EvidenceEdge, EvidenceGraph, and unresolved-link schemas"
+      ],
+      "acceptanceCriteria": [
+        "Supports file, symbol, route, event, database, and external_api nodes",
+        "Supports calls, imports, emits, handles, reads, writes, routes_to, and injects edges",
+        "Every node and edge retains source evidence and a verified or inferred status",
+        "Focused reads capture containing symbol, inputs, outputs, dependencies, side effects, async behavior, and errors when present",
+        "Duplicate evidence merges deterministically without discarding source locations"
+      ],
+      "validation": [
+        "Graph tests for node and edge insertion, merging, provenance, confidence, and unresolved links",
+        "Focused-read tests proving evidence is captured only from returned source regions",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-009",
+      "phase": 3,
+      "title": "Implement TypeScript call and data-flow tracing",
+      "status": "completed",
+      "priority": "critical",
+      "dependsOn": ["CA-005", "CA-008"],
+      "objective": "Trace ordered calls and important data transformations through TypeScript code using symbol evidence.",
+      "deliverables": [
+        "src/tracing/call-graph.ts",
+        "src/tracing/data-flow.ts",
+        "Trace-step schemas for arguments, transformations, side effects, asynchronous behavior, and error behavior"
+      ],
+      "acceptanceCriteria": [
+        "Call edges identify source symbol, target symbol, arguments, and sync or async behavior",
+        "Data-flow steps record mapping, validation, defaults, generated fields, serialization, and dropped fields when statically visible",
+        "Callbacks, higher-order functions, imports, aliases, and interface implementations use symbol-provider evidence",
+        "Dynamic or external calls remain unresolved or inferred rather than verified",
+        "Tracing respects depth, node, file, and line budgets"
+      ],
+      "validation": [
+        "Fixture tests for direct calls, async calls, DTO mapping, callbacks, interface dispatch, and unresolved dynamic dispatch",
+        "Budget and cycle-detection tests",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-010",
+      "phase": 3,
+      "title": "Resolve Angular and Node.js framework relationships",
+      "status": "completed",
+      "priority": "high",
+      "dependsOn": ["CA-002", "CA-008", "CA-009"],
+      "objective": "Add evidence-backed resolvers for framework indirection common in Angular frontends and Node.js backends.",
+      "deliverables": [
+        "src/tracing/framework-resolvers.ts",
+        "src/tracing/angular-resolver.ts",
+        "src/tracing/node-resolver.ts"
+      ],
+      "acceptanceCriteria": [
+        "Angular resolver connects template events, outputs, dependency injection, observables, signals, route resolvers, guards, interceptors, and common NgRx flows when statically visible",
+        "Node.js resolver connects route registration, prefixes, middleware, controllers, services, repositories, event emitters, queues, and ORM calls when statically visible",
+        "Route prefixes and endpoint paths combine deterministically",
+        "Resolvers add provenance-bearing graph edges and do not replace stronger symbol evidence",
+        "Unsupported framework patterns create explicit unresolved links"
+      ],
+      "validation": [
+        "Angular fixture tests for template-to-component, service injection, interceptor, and NgRx action flows",
+        "Node.js fixture tests for route-to-controller-to-service-to-repository flows and route prefix composition",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-011",
+      "phase": 3,
+      "title": "Implement gap detection and targeted follow-up search",
+      "status": "completed",
+      "priority": "critical",
+      "dependsOn": ["CA-006", "CA-008", "CA-009", "CA-010"],
+      "objective": "Detect missing links after each tracing pass and generate narrow searches that can resolve them.",
+      "deliverables": [
+        "src/tracing/gap-detector.ts",
+        "Gap classification and follow-up query generation"
+      ],
+      "acceptanceCriteria": [
+        "Detects unresolved implementations, route prefixes, event handlers, dependency injection bindings, external repository methods, and dynamic dispatch",
+        "Each gap records why it matters, its source evidence, and the query or tool capable of resolving it",
+        "Follow-up queries target the missing symbol or relationship instead of repeating broad searches",
+        "Repeated unresolved queries are deduplicated",
+        "External and genuinely unresolvable links remain explicitly marked"
+      ],
+      "validation": [
+        "Fixture tests for every supported gap type and its generated follow-up action",
+        "Tests preventing duplicate and broad-query loops",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-012",
+      "phase": 4,
+      "title": "Implement bounded analysis state and completion policy",
+      "status": "completed",
+      "priority": "critical",
+      "dependsOn": ["CA-003", "CA-007", "CA-008", "CA-011"],
+      "objective": "Track iterative analysis progress and stop predictably when evidence is sufficient, clarification is required, or a resource budget is exhausted.",
+      "deliverables": [
+        "src/analysis/analysis-state.ts",
+        "src/analysis/completion-policy.ts",
+        "Analysis limits and status transition schemas"
+      ],
+      "acceptanceCriteria": [
+        "State tracks request, inventory, pending and executed queries, candidates, graph, files read, iteration, status, and consumed budgets",
+        "Limits cover iterations, searches, files, lines, result count, duration, and graph size",
+        "Completion distinguishes completed, incomplete, needs_clarification, and running states",
+        "Architecture mode stops at a bounded overview while feature_flow mode requires supported initiation, side effect, and response paths where present",
+        "State transitions are deterministic, validated, and cancellation-aware"
+      ],
+      "validation": [
+        "State-machine tests for success, ambiguity, no result, external gap, cancellation, and every exhausted budget",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-013",
+      "phase": 4,
+      "title": "Build the analysis orchestrator",
+      "status": "completed",
+      "priority": "critical",
+      "dependsOn": ["CA-002", "CA-004", "CA-005", "CA-006", "CA-007", "CA-008", "CA-009", "CA-010", "CA-011", "CA-012"],
+      "objective": "Compose request creation, inventory, query generation, search, ranking, focused reads, tracing, gap resolution, and completion into one cancellable read-only service.",
+      "deliverables": [
+        "src/analysis/analysis-orchestrator.ts",
+        "Analysis service interface",
+        "Integration with classifyIntent and routeTool without breaking existing callers"
+      ],
+      "acceptanceCriteria": [
+        "Broad architecture analysis inventories and summarizes bounded repository structure",
+        "Feature analysis iterates from entry point through control flow, data transformations, side effect, response, and error path when evidence exists",
+        "Ambiguous repositories or multiple unrelated feature flows return a specific clarification request",
+        "Each iteration uses pending gaps and never repeats an executed query without new evidence",
+        "Only validated read-only handlers can be invoked",
+        "Abort signals and all completion limits are honored"
+      ],
+      "validation": [
+        "End-to-end fixture test for analyze this codebase",
+        "End-to-end full-stack save-flow test from Angular trigger through Node.js persistence and frontend response",
+        "Integration tests for ambiguity, no result, unresolved external adapter, cancellation, and budget exhaustion",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-014",
+      "phase": 4,
+      "title": "Generate grounded reports and redact secrets",
+      "status": "completed",
+      "priority": "critical",
+      "dependsOn": ["CA-008", "CA-009", "CA-012", "CA-013"],
+      "objective": "Turn completed or incomplete evidence graphs into concise reports whose claims are traceable to real repository evidence and safe to expose.",
+       "deliverables": [
+        "src/reporting/analysis-report.ts",
+        "src/reporting/evidence-citations.ts",
+        "src/reporting/secret-redactor.ts",
+        "Structured AnalysisReport schema"
+      ],
+      "acceptanceCriteria": [
+        "Reports include a short summary, ordered control flow, data transformations, validation and error behavior, relevant files and symbols, and unresolved uncertainty",
+        "Every factual claim references one or more evidence nodes or edges",
+        "Inferred relationships are visibly distinct from verified relationships",
+        "Credentials, tokens, private keys, connection strings, and common secret formats are redacted from snippets and reports",
+        "Reports do not predict filenames or symbols absent from evidence",
+        "Incomplete and clarification reports explain the exact limiting gap"
+      ],
+      "validation": [
+        "Golden report tests for architecture, complete feature flow, incomplete feature flow, no result, and ambiguity",
+        "Redaction tests with representative secrets in configuration, source, snippets, URLs, and error messages",
+        "Invariant test that every report claim resolves to graph evidence",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-015",
+      "phase": 5,
+      "title": "Add evaluation fixtures and release gates",
+      "status": "completed",
+      "priority": "critical",
+      "dependsOn": ["CA-013", "CA-014"],
+      "objective": "Measure whether the analyzer finds correct entry points and evidence paths while preserving read-only, bounded, and secret-safe behavior.",
+      "deliverables": [
+        "test/fixtures/codebase-analysis",
+        "test/analysis-evaluation.test.ts",
+        "Expected evidence-path manifests",
+        "README documentation for invoking and extending codebase analysis"
+      ],
+      "acceptanceCriteria": [
+        "Fixtures cover architecture, feature flow, symbol usage, data flow, dependency, and error-path modes",
+        "Known save flows have expected ordered evidence paths across frontend, API, service, persistence, response, and error handling",
+        "Evaluation measures entry-point accuracy, required-edge coverage, unsupported-claim count, unresolved-link accuracy, and deterministic repeatability",
+        "Safety gates prove no analysis path invokes mutating handlers, escapes workspace scope, exceeds configured limits, or exposes fixture secrets",
+        "All existing native-classifier tests continue to pass",
+        "Documentation describes supported modes, limits, tool contracts, extension points, and known limitations"
+      ],
+      "validation": [
+        "Run npm run typecheck",
+        "Run npm test",
+        "Run the analysis evaluation twice and verify byte-for-byte deterministic structured results",
+        "Intentionally break a known evidence edge and verify the release gate fails"
+      ]
+    },
+    {
+      "id": "CA-016",
+      "phase": 6,
+      "title": "Integrate with the native classifier boundary",
+      "status": "completed",
+      "priority": "critical",
+      "dependsOn": ["CA-015"],
+      "objective": "Connect analysis-request creation to the existing native classifier and router without changing non-analysis behavior or mutating-tool authorization.",
+      "deliverables": [
+        "Compatibility adapter for classifyIntent and AgentInput",
+        "Analysis-aware routeTool integration",
+        "Backward-compatibility tests for existing intents and tool packets"
+      ],
+      "acceptanceCriteria": [
+        "Existing classifyIntent and AgentInput exports remain source- and behavior-compatible",
+        "Analysis intents produce a validated AnalysisRequest without duplicating classifier state",
+        "Non-analysis intents route exactly as before",
+        "Analysis requests can invoke only the read-only analysis registry",
+        "Mutating tools remain unavailable even when requested in the same message",
+        "Clarification and fallback results preserve the existing response shape"
+      ],
+      "validation": [
+        "Compatibility tests against existing classifier fixtures",
+        "Router policy tests for mixed analysis and mutation requests",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-017",
+      "phase": 6,
+      "title": "Upgrade symbol resolution with the TypeScript language service",
+      "status": "blocked",
+      "priority": "critical",
+      "dependsOn": ["CA-016"],
+      "objective": "Replace text-based symbol relationships with compiler-backed definitions, references, imports, aliases, exports, overrides, and interface dispatch where project configuration permits.",
+      "deliverables": [
+        "Language-service symbol provider adapter",
+        "Configured tsconfig project loader",
+        "AST fallback and explicit unresolved-result policy"
+      ],
+      "acceptanceCriteria": [
+        "Resolves aliases, barrel exports, path mappings, and re-exports",
+        "Distinguishes declarations, references, overrides, and implementations",
+        "Supports multiple tsconfig projects without crossing workspace boundaries",
+        "Compiler diagnostics do not cause analysis to execute arbitrary code",
+        "Dynamic dispatch and missing project metadata remain explicitly unresolved",
+        "All results retain source file, line, symbol, and evidence provenance"
+      ],
+      "validation": [
+        "Fixtures for aliases, barrels, path mappings, overloads, overrides, and interface dispatch",
+        "Missing-tsconfig and malformed-project tests",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-018",
+      "phase": 6,
+      "title": "Complete framework relationship coverage",
+      "status": "pending",
+      "priority": "high",
+      "dependsOn": ["CA-017"],
+      "objective": "Expand evidence-backed Angular and Node.js resolution to the framework relationships required for full-stack feature tracing.",
+      "deliverables": [
+        "Angular template, router, guard, interceptor, observable, signal, and NgRx resolvers",
+        "Node middleware, controller, service, queue, event, ORM, and repository resolvers",
+        "Full-stack Angular-to-Node fixture manifests"
+      ],
+      "acceptanceCriteria": [
+        "Template events and outputs resolve to component methods and consumers",
+        "Angular dependency injection, route guards, resolvers, interceptors, signals, and NgRx actions retain provenance",
+        "Node route prefixes, middleware order, controllers, services, queues, events, and ORM operations resolve when statically visible",
+        "Unsupported decorators, generated clients, and runtime registration produce unresolved links",
+        "Framework edges never overwrite stronger compiler-backed symbol evidence"
+      ],
+      "validation": [
+        "Angular fixture suite for template, router, guard, interceptor, signal, and NgRx flows",
+        "Node fixture suite for middleware, queue, event, ORM, and repository flows",
+        "End-to-end save-flow evidence-path evaluation",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-019",
+      "phase": 7,
+      "title": "Strengthen data-flow and error-path analysis",
+      "status": "pending",
+      "priority": "high",
+      "dependsOn": ["CA-017", "CA-018"],
+      "objective": "Track transformations, validation, serialization, dropped fields, errors, retries, and response mapping across connected symbols.",
+      "deliverables": [
+        "Cross-file data-flow propagation",
+        "DTO and schema transformation detector",
+        "Error, retry, timeout, and response-path trace steps"
+      ],
+      "acceptanceCriteria": [
+        "Records field mappings, defaults, generated fields, validation, serialization, and dropped fields with source evidence",
+        "Connects thrown, rejected, caught, retried, and translated errors where statically visible",
+        "Separates verified transformations from inferred transformations",
+        "Stops at external or dynamic boundaries with explicit unresolved links",
+        "Honors line, node, file, depth, cycle, and duration budgets"
+      ],
+      "validation": [
+        "Fixtures for DTO mapping, schema validation, serialization, dropped fields, retries, and error translation",
+        "Cycle, depth, and budget tests",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-020",
+      "phase": 7,
+      "title": "Make cancellation and resource limits end-to-end",
+      "status": "pending",
+      "priority": "critical",
+      "dependsOn": ["CA-016", "CA-019"],
+      "objective": "Guarantee that every inventory, search, read, symbol, trace, report, and orchestration operation honors cancellation and configured resource budgets.",
+      "deliverables": [
+        "Shared budget and cancellation utility",
+        "Abort-aware handlers and language-service operations",
+        "Budget telemetry in AnalysisState and reports"
+      ],
+      "acceptanceCriteria": [
+        "Abort signals stop work promptly at every asynchronous boundary",
+        "Duration, search, file, line, result, graph, iteration, and memory limits are enforced consistently",
+        "Partial results are marked incomplete and never reported as completed",
+        "Budget exhaustion identifies the exact limiting resource",
+        "No background operation continues after cancellation"
+      ],
+      "validation": [
+        "Cancellation tests during inventory, search, read, symbol, trace, and report stages",
+        "One test for every exhausted budget",
+        "Repeated-run test proving no leaked work remains",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-021",
+      "phase": 7,
+      "title": "Harden secret discovery and report redaction",
+      "status": "pending",
+      "priority": "critical",
+      "dependsOn": ["CA-016", "CA-020"],
+      "objective": "Prevent credentials and sensitive repository content from entering evidence, diagnostics, logs, evaluation artifacts, or reports.",
+      "deliverables": [
+        "Central secret classification policy",
+        "Redaction coverage for source, configuration, URLs, diagnostics, and stack traces",
+        "Secret-safety release gate"
+      ],
+      "acceptanceCriteria": [
+        "Private keys, credentials, tokens, cookies, connection strings, cloud keys, and common secret formats are redacted",
+        "Redaction preserves enough structure for evidence without exposing secret values",
+        "Secrets are not written to logs, snapshots, fixtures, or error messages",
+        "False positives are documented and tested",
+        "Reports remain evidence-backed after redaction"
+      ],
+      "validation": [
+        "Representative secret corpus tests across supported file and message formats",
+        "Snapshot scan proving no fixture secret appears in generated reports",
+        "Run security and quality gates",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-022",
+      "phase": 8,
+      "title": "Add CI quality and security release gates",
+      "status": "pending",
+      "priority": "critical",
+      "dependsOn": ["CA-018", "CA-019", "CA-020", "CA-021"],
+      "objective": "Make analysis correctness, safety, determinism, dependency hygiene, and maintainability enforceable in continuous integration.",
+      "deliverables": [
+        "Native-classifier CI workflow",
+        "Determinism, boundary, mutation, secret, and budget gates",
+        "Dependency and vulnerability checks"
+      ],
+      "acceptanceCriteria": [
+        "CI runs typecheck, focused tests, full tests, evaluation twice, security checks, and quality checks",
+        "CI fails on unsupported claims, escaped paths, mutating tool invocation, exposed secrets, nondeterministic output, or budget violations",
+        "Dependency vulnerabilities and license policy violations are reported",
+        "Failure output identifies the task, fixture, evidence edge, or invariant that failed",
+        "The workflow is runnable from a clean checkout"
+      ],
+      "validation": [
+        "Run the workflow or an equivalent local release script from a clean install",
+        "Intentionally break a known edge, safety rule, and determinism assertion and verify each gate fails",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-023",
+      "phase": 8,
+      "title": "Refactor maintainability hotspots",
+      "status": "pending",
+      "priority": "medium",
+      "dependsOn": ["CA-022"],
+      "objective": "Reduce analyzer-reported complexity and long-method debt without changing analysis behavior or evidence contracts.",
+      "deliverables": [
+        "Extracted inventory traversal and layer-detection helpers",
+        "Extracted orchestrator phases and report-building helpers",
+        "Updated maintainability baseline"
+      ],
+      "acceptanceCriteria": [
+        "Major long-method and nested-callback findings in the native-classifier source are resolved or explicitly baselined",
+        "Public exports and serialized schemas remain unchanged",
+        "No duplicate safety policy is introduced during extraction",
+        "Coverage remains at least the pre-refactor level",
+        "Deterministic evaluation output is byte-for-byte unchanged"
+      ],
+      "validation": [
+        "Run code-analyzer smell and quality checks",
+        "Run byte-for-byte evaluation comparison before and after refactoring",
+        "Run npm run typecheck and npm test"
+      ]
+    },
+    {
+      "id": "CA-024",
+      "phase": 8,
+      "title": "Publish versioned contracts and operational documentation",
+      "status": "pending",
+      "priority": "high",
+      "dependsOn": ["CA-022", "CA-023"],
+      "objective": "Document and version the analysis API, evidence semantics, limits, extension points, and known unsupported patterns for future agents and maintainers.",
+      "deliverables": [
+        "Versioned AnalysisRequest, ToolResult, EvidenceGraph, AnalysisState, and AnalysisReport contracts",
+        "Operator guide for limits, cancellation, diagnostics, and failures",
+        "Extension guide for new frameworks, tools, and evidence types"
+      ],
+      "acceptanceCriteria": [
+        "Every public schema and status transition is documented",
+        "Verified, inferred, and unresolved semantics are explained with examples",
+        "Supported and unsupported framework patterns are listed",
+        "Compatibility and migration guidance is provided for classifier and router consumers",
+        "Documentation examples pass the release evaluation"
+      ],
+      "validation": [
+        "Documentation link and example checks",
+        "Contract snapshot review",
+        "Run npm run typecheck and npm test"
+      ]
+    }
+  ]
+}
+

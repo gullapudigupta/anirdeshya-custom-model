@@ -1,0 +1,605 @@
+{
+  "project": "native-classifiers-broad-english",
+  "version": "1.0.0",
+  "source": "broad-english-classification-roadmap.md",
+  "statusValues": ["pending", "in_progress", "blocked", "completed"],
+  "tasks": [
+    {
+      "id": "NC-001",
+      "phase": 1,
+      "title": "Define the closed intent taxonomy",
+      "status": "pending",
+      "priority": "critical",
+      "dependsOn": [],
+      "objective": "Create precise, reviewable definitions for every supported intent and the unknown outcome.",
+      "deliverables": [
+        "knowledge store/intents.json",
+        "Zod schema for intent definitions"
+      ],
+      "acceptanceCriteria": [
+        "Every existing intent has include, exclude, confusableWith, allowedFirstTools, and risk fields",
+        "Every referenced tool exists in the tool-name schema",
+        "Unknown input behavior is documented without authorizing a tool",
+        "Duplicate and unknown intent IDs fail validation"
+      ],
+      "validation": ["Unit tests for valid and invalid taxonomy files"]
+    },
+    {
+      "id": "NC-002",
+      "phase": 1,
+      "title": "Define knowledge-store schemas",
+      "status": "pending",
+      "priority": "critical",
+      "dependsOn": ["NC-001"],
+      "objective": "Define strict Zod contracts for all externalized language knowledge.",
+      "deliverables": [
+        "src/knowledge/schemas.ts",
+        "Schemas for phrases, domains, entities, constraints, abbreviations, confusing pairs, thresholds, datasets, and manifests"
+      ],
+      "acceptanceCriteria": [
+        "All knowledge files use strict schemas",
+        "Unknown fields are rejected",
+        "Cross-file IDs can be checked by the loader",
+        "Regex source and flags are represented as data rather than executable code"
+      ],
+      "validation": ["Schema fixture tests for each knowledge type"]
+    },
+    {
+      "id": "NC-003",
+      "phase": 1,
+      "title": "Implement explicit unknown and ambiguity decisions",
+      "status": "pending",
+      "priority": "critical",
+      "dependsOn": ["NC-001"],
+      "objective": "Make unsupported and ambiguous requests reliably use the existing clarification fallback.",
+      "deliverables": [
+        "Unknown decision policy",
+        "Absolute-score and candidate-margin checks",
+        "Structured fallback reasons"
+      ],
+      "acceptanceCriteria": [
+        "No-match input routes to ask_clarification",
+        "Tied or near-tied candidates route to ask_clarification",
+        "Unsupported domains route to ask_clarification",
+        "The public AgentInput schema remains backward compatible in phase 1"
+      ],
+      "validation": ["Unit tests for no-match, tie, unsupported-domain, and clear-intent cases"]
+    },
+    {
+      "id": "NC-004",
+      "phase": 1,
+      "title": "Define the utterance dataset contract",
+      "status": "pending",
+      "priority": "critical",
+      "dependsOn": ["NC-001", "NC-002"],
+      "objective": "Create a versioned JSONL format for labeled English requests.",
+      "deliverables": [
+        "Dataset record schema",
+        "Dataset validation command",
+        "Source and split metadata conventions"
+      ],
+      "acceptanceCriteria": [
+        "Records include ID, text, intent, entities, constraints, source, and split",
+        "Duplicate record IDs are rejected",
+        "Unknown intents and invalid splits are rejected",
+        "Validation reports line numbers for malformed JSONL"
+      ],
+      "validation": ["Tests with valid, malformed, duplicate, and unknown-intent records"]
+    },
+    {
+      "id": "NC-005",
+      "phase": 1,
+      "title": "Create balanced baseline datasets",
+      "status": "pending",
+      "priority": "high",
+      "dependsOn": ["NC-004"],
+      "objective": "Establish training, validation, and untouched test sets before expanding classification rules.",
+      "deliverables": [
+        "knowledge store/examples/training.jsonl",
+        "knowledge store/examples/validation.jsonl",
+        "knowledge store/examples/test.jsonl"
+      ],
+      "acceptanceCriteria": [
+        "Every intent has direct, polite, fragment, long-form, typo, negative, and near-neighbor examples",
+        "Unknown and clarification examples are included",
+        "No record appears in more than one split",
+        "The test set is marked immutable for the release cycle"
+      ],
+      "validation": ["Dataset distribution and duplicate-content report"]
+    },
+    {
+      "id": "NC-006",
+      "phase": 1,
+      "title": "Build the baseline evaluator",
+      "status": "pending",
+      "priority": "critical",
+      "dependsOn": ["NC-003", "NC-005"],
+      "objective": "Measure the current rule classifier before changing its language coverage.",
+      "deliverables": [
+        "src/evaluation/evaluator.ts",
+        "src/evaluation/metrics.ts",
+        "Machine-readable baseline report"
+      ],
+      "acceptanceCriteria": [
+        "Reports precision, recall, F1, and confusion matrix by intent",
+        "Reports unknown precision and recall, fallback rate, and incorrect routing rate",
+        "Evaluation is deterministic for a fixed release",
+        "Command exits nonzero when configured release gates fail"
+      ],
+      "validation": ["Metric tests using a small dataset with hand-calculated expected results"]
+    },
+    {
+      "id": "NC-007",
+      "phase": 2,
+      "title": "Implement technical-span protection",
+      "status": "pending",
+      "priority": "high",
+      "dependsOn": ["NC-002"],
+      "objective": "Detect spans that normalization must not rewrite.",
+      "deliverables": [
+        "src/normalization/protected-spans.ts",
+        "Extractors for files, directories, URLs, quotes, symbols, errors, and stack traces"
+      ],
+      "acceptanceCriteria": [
+        "Every span includes type, value, start, and end offsets",
+        "Overlapping spans resolve deterministically",
+        "Windows and POSIX paths are supported",
+        "Original offsets remain valid after detection"
+      ],
+      "validation": ["Table-driven tests for each span type and overlap case"]
+    },
+    {
+      "id": "NC-008",
+      "phase": 2,
+      "title": "Implement safe English normalization",
+      "status": "pending",
+      "priority": "high",
+      "dependsOn": ["NC-007"],
+      "objective": "Create comparison text without losing technical meaning.",
+      "deliverables": [
+        "src/normalization/normalize.ts",
+        "Unicode, whitespace, casing, contraction, and abbreviation normalization"
+      ],
+      "acceptanceCriteria": [
+        "Original input is preserved exactly",
+        "Comparison text uses Unicode NFKC and normalized whitespace",
+        "Safe contractions expand only outside protected spans",
+        "Code identifiers, paths, URLs, and errors are not rewritten"
+      ],
+      "validation": ["Golden tests containing prose mixed with technical spans"]
+    },
+    {
+      "id": "NC-009",
+      "phase": 2,
+      "title": "Implement the validated knowledge loader",
+      "status": "pending",
+      "priority": "critical",
+      "dependsOn": ["NC-002"],
+      "objective": "Load one complete knowledge-store release and reject inconsistent data.",
+      "deliverables": [
+        "src/knowledge/loader.ts",
+        "Cross-reference validation",
+        "Compiled safe regular expressions"
+      ],
+      "acceptanceCriteria": [
+        "All files validate before the release becomes available",
+        "Duplicate IDs, invalid regexes, unknown intents, and unknown tools fail startup",
+        "Loader returns immutable data",
+        "Errors identify the file and offending record"
+      ],
+      "validation": ["Integration tests with valid and intentionally corrupt releases"]
+    },
+    {
+      "id": "NC-010",
+      "phase": 2,
+      "title": "Externalize existing classifier knowledge",
+      "status": "pending",
+      "priority": "high",
+      "dependsOn": ["NC-009"],
+      "objective": "Move intent phrases, domains, entities, and constraints out of classifier.ts.",
+      "deliverables": [
+        "knowledge store/intent-phrases.json",
+        "knowledge store/domains.json",
+        "knowledge store/entities.json",
+        "knowledge store/constraints.json",
+        "knowledge store/abbreviations.json",
+        "knowledge store/confusing-pairs.json"
+      ],
+      "acceptanceCriteria": [
+        "No language phrase table remains hard-coded in classifier.ts",
+        "Existing classifier regression tests still pass",
+        "Knowledge changes do not require TypeScript recompilation",
+        "Every knowledge file declares a version"
+      ],
+      "validation": ["Snapshot comparison of old and externalized classifier results"]
+    },
+    {
+      "id": "NC-011",
+      "phase": 2,
+      "title": "Implement evidence-producing phrase scoring",
+      "status": "pending",
+      "priority": "critical",
+      "dependsOn": ["NC-008", "NC-010"],
+      "objective": "Replace opaque regex totals with phrase-family scoring and inspectable evidence.",
+      "deliverables": [
+        "src/classification/rule-engine.ts",
+        "IntentEvidence contract",
+        "Candidate score report"
+      ],
+      "acceptanceCriteria": [
+        "Complete phrases can outweigh generic words",
+        "Every score contribution references a rule ID and source span",
+        "Repeated synonyms cannot inflate scores unless configured",
+        "Scoring order is deterministic"
+      ],
+      "validation": ["Unit tests for specificity, repetition, tie, and conflicting-evidence cases"]
+    },
+    {
+      "id": "NC-012",
+      "phase": 3,
+      "title": "Implement negation detection",
+      "status": "pending",
+      "priority": "critical",
+      "dependsOn": ["NC-011"],
+      "objective": "Prevent prohibited actions from being classified as requested actions.",
+      "deliverables": [
+        "src/classification/negation.ts",
+        "Negated-action constraints"
+      ],
+      "acceptanceCriteria": [
+        "Do not run tests does not route to run_tests",
+        "Do not edit becomes a prohibition constraint",
+        "Negation scope handles coordinated clauses in the supported grammar",
+        "False negation from unrelated words is covered by tests"
+      ],
+      "validation": ["Positive and negative minimal-pair tests"]
+    },
+    {
+      "id": "NC-013",
+      "phase": 3,
+      "title": "Implement modality detection",
+      "status": "pending",
+      "priority": "high",
+      "dependsOn": ["NC-011"],
+      "objective": "Distinguish requested actions from hypothetical, optional, future, and permitted actions.",
+      "deliverables": ["src/classification/modality.ts"],
+      "acceptanceCriteria": [
+        "Direct commands retain full weight",
+        "Hypothetical and future actions receive configured discounts",
+        "Permission statements do not automatically become commands",
+        "Only explain is represented as a routing constraint"
+      ],
+      "validation": ["Minimal-pair tests across direct, optional, hypothetical, and future wording"]
+    },
+    {
+      "id": "NC-014",
+      "phase": 3,
+      "title": "Implement typed entity extractors",
+      "status": "pending",
+      "priority": "high",
+      "dependsOn": ["NC-007", "NC-010"],
+      "objective": "Extract typed technical entities while preserving compatibility with string entities.",
+      "deliverables": [
+        "src/extraction/entities.ts",
+        "TypedEntity contract",
+        "Extractors for paths, symbols, frameworks, languages, errors, URLs, packages, and versions"
+      ],
+      "acceptanceCriteria": [
+        "Entities include type, value, confidence, and available spans",
+        "Duplicate entities are merged deterministically",
+        "Existing entities string array remains populated",
+        "Entity extraction metrics can be computed from dataset labels"
+      ],
+      "validation": ["Entity fixtures and precision/recall evaluation"]
+    },
+    {
+      "id": "NC-015",
+      "phase": 3,
+      "title": "Implement structured constraint extraction",
+      "status": "pending",
+      "priority": "high",
+      "dependsOn": ["NC-010", "NC-012", "NC-013"],
+      "objective": "Extract scope, compatibility, prohibition, approval, and validation constraints.",
+      "deliverables": ["src/extraction/constraints.ts"],
+      "acceptanceCriteria": [
+        "Negated actions become explicit constraints",
+        "Minimal-change and preserve-behavior language is recognized",
+        "Only and without constructions are covered",
+        "Unknown constraints are preserved as unhandled evidence rather than discarded"
+      ],
+      "validation": ["Constraint extraction tests for each supported category"]
+    },
+    {
+      "id": "NC-016",
+      "phase": 3,
+      "title": "Implement clause splitting",
+      "status": "pending",
+      "priority": "high",
+      "dependsOn": ["NC-008", "NC-012"],
+      "objective": "Split coordinated requests into ordered clauses without breaking protected spans.",
+      "deliverables": ["src/planning/clause-splitter.ts"],
+      "acceptanceCriteria": [
+        "And, then, after, before, and punctuation sequences are supported",
+        "Quoted text and code expressions are not split",
+        "Negation scope is retained per clause",
+        "Clause order matches user order"
+      ],
+      "validation": ["Golden tests for single and multi-clause requests"]
+    },
+    {
+      "id": "NC-017",
+      "phase": 3,
+      "title": "Implement ordered multi-intent planning",
+      "status": "pending",
+      "priority": "critical",
+      "dependsOn": ["NC-011", "NC-015", "NC-016"],
+      "objective": "Represent primary and secondary requested actions without silently discarding work.",
+      "deliverables": [
+        "src/planning/action-plan.ts",
+        "Versioned action-plan schema proposal",
+        "Backward-compatible AgentInput projection"
+      ],
+      "acceptanceCriteria": [
+        "Each clause is classified and validated independently",
+        "Primary intent and nextAction remain compatible with the existing router",
+        "Secondary actions retain order and constraints",
+        "Schema-version migration is documented before exposing actions publicly"
+      ],
+      "validation": ["Tests for find-fix-test, explain-only, and mixed prohibited actions"]
+    },
+    {
+      "id": "NC-018",
+      "phase": 3,
+      "title": "Calibrate confidence thresholds",
+      "status": "pending",
+      "priority": "critical",
+      "dependsOn": ["NC-006", "NC-011", "NC-017"],
+      "objective": "Replace intuitive confidence formulas with validation-derived thresholds.",
+      "deliverables": [
+        "src/classification/confidence.ts",
+        "knowledge store/thresholds.json",
+        "Calibration report"
+      ],
+      "acceptanceCriteria": [
+        "Thresholds are configurable by intent and risk",
+        "Absolute score and top-two margin are calibrated",
+        "Calibration error is reported",
+        "High-risk actions require stricter thresholds than read-only actions"
+      ],
+      "validation": ["Validation-set calibration test and threshold regression report"]
+    },
+    {
+      "id": "NC-019",
+      "phase": 3,
+      "title": "Build the classification orchestrator",
+      "status": "pending",
+      "priority": "critical",
+      "dependsOn": ["NC-014", "NC-015", "NC-017", "NC-018"],
+      "objective": "Compose normalization, rules, extraction, planning, confidence, validation, and fallback behind classifyIntent.",
+      "deliverables": [
+        "Refactored src/classifier.ts",
+        "Stable classification service interface"
+      ],
+      "acceptanceCriteria": [
+        "All outputs pass agentInputSchema",
+        "Unknown and ambiguous input never bypasses fallback",
+        "Classification includes traceable evidence in diagnostics",
+        "Existing public imports remain compatible or have a documented migration"
+      ],
+      "validation": ["End-to-end classifier tests across the validation dataset"]
+    },
+    {
+      "id": "NC-020",
+      "phase": 3,
+      "title": "Strengthen router policy checks",
+      "status": "pending",
+      "priority": "critical",
+      "dependsOn": ["NC-003", "NC-015", "NC-019"],
+      "objective": "Keep authorization independent from classification and enforce risk-aware routing.",
+      "deliverables": [
+        "Required-entity checks",
+        "Prohibited-constraint checks",
+        "Approval policy hook",
+        "Structured policy fallback reasons"
+      ],
+      "acceptanceCriteria": [
+        "Classifier confidence cannot bypass intent/tool allowlists",
+        "Missing required entities force clarification",
+        "Prohibited actions are not executed",
+        "Tool arguments are validated by tool-specific schemas"
+      ],
+      "validation": ["Router security and policy matrix tests"]
+    },
+    {
+      "id": "NC-021",
+      "phase": 4,
+      "title": "Add regression and release quality gates",
+      "status": "pending",
+      "priority": "critical",
+      "dependsOn": ["NC-006", "NC-018", "NC-020"],
+      "objective": "Prevent classifier and routing quality from silently regressing.",
+      "deliverables": [
+        "Automated evaluation script",
+        "Release-gate configuration",
+        "Production-misclassification regression suite"
+      ],
+      "acceptanceCriteria": [
+        "Automatically executed intents reach at least 95 percent precision",
+        "All routed packets pass schema validation",
+        "No high-risk action occurs below threshold",
+        "Regressions fail CI unless explicitly approved"
+      ],
+      "validation": ["Run release gates against baseline and intentionally degraded classifiers"]
+    },
+    {
+      "id": "NC-022",
+      "phase": 4,
+      "title": "Implement privacy-safe classification telemetry",
+      "status": "pending",
+      "priority": "high",
+      "dependsOn": ["NC-019"],
+      "objective": "Capture evidence needed for improvement without storing secrets or private code.",
+      "deliverables": [
+        "src/telemetry/events.ts",
+        "src/telemetry/redaction.ts",
+        "Retention and disable controls"
+      ],
+      "acceptanceCriteria": [
+        "Events include release version, candidates, matched rule IDs, fallback reason, and correction ID",
+        "Credentials and tokens are redacted before persistence",
+        "Raw source code is not stored",
+        "Telemetry can be disabled"
+      ],
+      "validation": ["Redaction tests with representative secret formats and code snippets"]
+    },
+    {
+      "id": "NC-023",
+      "phase": 4,
+      "title": "Implement the correction review workflow",
+      "status": "pending",
+      "priority": "medium",
+      "dependsOn": ["NC-005", "NC-022"],
+      "objective": "Turn reviewed low-confidence and corrected requests into safe dataset improvements.",
+      "deliverables": [
+        "Correction export format",
+        "Human review checklist",
+        "Dataset promotion command"
+      ],
+      "acceptanceCriteria": [
+        "Production logs never enter datasets automatically",
+        "Promoted examples record reviewer, source, and consent metadata",
+        "Duplicates and split leakage are detected",
+        "Every promoted regression receives a test"
+      ],
+      "validation": ["Workflow test from redacted event through reviewed dataset record"]
+    },
+    {
+      "id": "NC-024",
+      "phase": 4,
+      "title": "Define the immutable release manifest",
+      "status": "pending",
+      "priority": "critical",
+      "dependsOn": ["NC-002", "NC-006"],
+      "objective": "Bind compatible knowledge, thresholds, datasets, metrics, and optional model artifacts into one release.",
+      "deliverables": [
+        "knowledge store/manifest.json",
+        "src/knowledge/release.ts",
+        "Checksum generation and validation"
+      ],
+      "acceptanceCriteria": [
+        "Manifest records every component version and checksum",
+        "Incomplete or mixed releases are rejected",
+        "Previous rollback version is recorded",
+        "Evaluation report checksum is included"
+      ],
+      "validation": ["Manifest validation and tamper-detection tests"]
+    },
+    {
+      "id": "NC-025",
+      "phase": 4,
+      "title": "Implement atomic release loading and rollback",
+      "status": "pending",
+      "priority": "critical",
+      "dependsOn": ["NC-009", "NC-024"],
+      "objective": "Switch complete classifier releases without serving partial state.",
+      "deliverables": [
+        "Atomic release activation",
+        "Previous-release fallback",
+        "Release health status"
+      ],
+      "acceptanceCriteria": [
+        "A classifier instance uses exactly one release version",
+        "Failed validation leaves the active release unchanged",
+        "Rollback restores the previous verified release",
+        "Concurrent classifications never observe partial updates"
+      ],
+      "validation": ["Concurrency, corrupt-release, activation, and rollback integration tests"]
+    },
+    {
+      "id": "NC-026",
+      "phase": 5,
+      "title": "Benchmark self-hosted statistical baselines",
+      "status": "pending",
+      "priority": "medium",
+      "dependsOn": ["NC-005", "NC-006", "NC-021"],
+      "objective": "Determine whether a local model improves paraphrase and unknown coverage over deterministic rules.",
+      "deliverables": [
+        "TF-IDF plus logistic-regression benchmark",
+        "fastText benchmark",
+        "Latency, memory, size, and quality comparison"
+      ],
+      "acceptanceCriteria": [
+        "All models use identical dataset splits",
+        "Results are compared against the released rule baseline",
+        "Unknown detection and calibration are evaluated",
+        "No model is selected solely by aggregate accuracy"
+      ],
+      "validation": ["Reproducible benchmark report on the untouched test set"]
+    },
+    {
+      "id": "NC-027",
+      "phase": 5,
+      "title": "Implement the local model interface",
+      "status": "pending",
+      "priority": "medium",
+      "dependsOn": ["NC-026"],
+      "objective": "Isolate optional self-hosted inference behind a replaceable contract.",
+      "deliverables": [
+        "src/models/local-model.ts",
+        "Selected local model adapter",
+        "Model artifact checksum validation"
+      ],
+      "acceptanceCriteria": [
+        "Adapter returns ranked intent candidates only",
+        "Model version is exposed",
+        "Inference has timeout and resource limits",
+        "Classifier operates in rule-only mode when the model is absent"
+      ],
+      "validation": ["Adapter contract, missing-model, timeout, and deterministic-fixture tests"]
+    },
+    {
+      "id": "NC-028",
+      "phase": 5,
+      "title": "Implement and evaluate hybrid decisions",
+      "status": "pending",
+      "priority": "high",
+      "dependsOn": ["NC-018", "NC-021", "NC-027"],
+      "objective": "Combine rules and local model candidates without weakening deterministic safety behavior.",
+      "deliverables": [
+        "src/classification/hybrid-classifier.ts",
+        "Hybrid thresholds",
+        "Rule-only versus hybrid evaluation report"
+      ],
+      "acceptanceCriteria": [
+        "Safety and negation rules remain authoritative",
+        "Model output cannot bypass validation or router policy",
+        "Hybrid mode improves agreed test metrics over rule-only mode",
+        "Unknown detection does not regress beyond the approved limit"
+      ],
+      "validation": ["Full release evaluation in rule-only and hybrid modes"]
+    },
+    {
+      "id": "NC-029",
+      "phase": 5,
+      "title": "Document operations and release procedures",
+      "status": "pending",
+      "priority": "medium",
+      "dependsOn": ["NC-021", "NC-023", "NC-025", "NC-028"],
+      "objective": "Provide repeatable guidance for knowledge updates, evaluation, deployment, monitoring, and rollback.",
+      "deliverables": [
+        "Knowledge authoring guide",
+        "Evaluation runbook",
+        "Release and rollback runbook",
+        "Known limitations document"
+      ],
+      "acceptanceCriteria": [
+        "A new contributor can validate and package a release from the documentation",
+        "Rollback steps are tested",
+        "Privacy and approval requirements are explicit",
+        "Current supported and unsupported language patterns are listed"
+      ],
+      "validation": ["Dry-run a complete release and rollback using only the runbooks"]
+    }
+  ]
+}
+

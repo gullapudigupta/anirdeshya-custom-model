@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "change-request-records",
+  "maxRecords": 100,
+  "recordFields": {
+    "id": "Globally unique CR-### identifier",
+    "title": "Short change or tweak summary",
+    "description": "Requested change and intended outcome",
+    "status": "OPEN, IN_PROGRESS, or CLOSED",
+    "priority": "CRITICAL, HIGH, MEDIUM, or LOW",
+    "createdOn": "YYYY-MM-DD",
+    "phaseTaskId": "Exact ID of the related task in a phase task file",
+    "phaseTaskFile": "Relative phase filename, for example ../phase4-tasks.json"
+  },
+  "records": [
+    {
+      "id": "CR-001",
+      "title": "Use live project data for chat issues and fixes",
+      "description": "Replace fabricated issue and fix data with workspace analysis results and source-backed fix previews and application, including backup and stale-source protection.",
+      "status": "CLOSED",
+      "priority": "HIGH",
+      "createdOn": "2026-09-29",
+      "phaseTaskId": "P1-T011",
+      "phaseTaskFile": "../phase1-tasks.json"
+    },
+    {
+      "id": "CR-002",
+      "title": "Load task JSON files in the chat UI",
+      "description": "Add a task-file picker and Tasks view that reads task arrays and grouped task records, including the Phase 8 task file.",
+      "status": "CLOSED",
+      "priority": "MEDIUM",
+      "createdOn": "2026-09-29",
+      "phaseTaskId": "P1-T011",
+      "phaseTaskFile": "../phase1-tasks.json"
+    }
+  ]
+}

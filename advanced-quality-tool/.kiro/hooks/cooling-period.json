@@ -1,0 +1,13 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Cooling Period Every 3 Tasks",
+      "trigger": "PostTaskExec",
+      "action": {
+        "type": "command",
+        "command": "$counterFile = 'c:\\sarah laptop\\first app\\mobileapp\\parikrama_todo\\tools\\advanced-quality-tool\\.kiro\\hooks\\.cooling-counter'; if (Test-Path $counterFile) { $count = [int](Get-Content $counterFile) } else { $count = 0 }; $count++; Set-Content -Path $counterFile -Value $count; $remaining = 3 - ($count % 3); if ($remaining -eq 3) { Write-Host \"⏸️ Cooling period started: 10 minutes...\"; Start-Sleep -Seconds 600; Write-Host \"✅ Cooling period complete. Resuming work.\" } else { Write-Host \"🔄 Task $count completed. $remaining tasks until cooling period.\" }"
+      }
+    }
+  ]
+}

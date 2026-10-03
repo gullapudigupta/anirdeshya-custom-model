@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# Build outputs
+dist/
+build/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Results
+.aqt-results/
+*.results.json
+*.report.html
+*.report.md
+
+# Temporary files
+*.tmp
+.cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# AI models (local)
+models/
+*.gguf
+*.bin
+
+
+.aqt-cache
+.aqt-history
+.aqt-reports

@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "bug-records",
+  "maxRecords": 100,
+  "recordFields": {
+    "id": "Globally unique BUG-### identifier",
+    "title": "Short bug summary",
+    "description": "Observed behavior and expected behavior",
+    "status": "OPEN, IN_PROGRESS, or CLOSED",
+    "priority": "CRITICAL, HIGH, MEDIUM, or LOW",
+    "createdOn": "YYYY-MM-DD",
+    "phaseTaskId": "Exact ID of the related task in a phase task file",
+    "phaseTaskFile": "Relative phase filename, for example ../phase4-tasks.json"
+  },
+  "records": [
+    {
+      "id": "BUG-001",
+      "title": "Chat action buttons do not invoke their handlers",
+      "description": "Apply Fix, Reject, and Explain buttons render, but clicking them throws a TypeError because their inline handler keys are created with a different timestamp than the stored callbacks. Each button should invoke its corresponding action.",
+      "status": "CLOSED",
+      "priority": "HIGH",
+      "createdOn": "2026-09-29",
+      "phaseTaskId": "P1-T011",
+      "phaseTaskFile": "../phase1-tasks.json"
+    },
+    {
+      "id": "BUG-002",
+      "title": "Issue actions use the latest selection instead of their issue",
+      "description": "Fix It and Explain actions created for an issue read the mutable selectedIssue state when clicked, so selecting another issue first can make the earlier action target the wrong item. Actions should remain bound to the issue that created them.",
+      "status": "CLOSED",
+      "priority": "MEDIUM",
+      "createdOn": "2026-09-29",
+      "phaseTaskId": "P1-T011",
+      "phaseTaskFile": "../phase1-tasks.json"
+    },
+    {
+      "id": "BUG-003",
+      "title": "Proposed fix preview is identical for every issue",
+      "description": "The chat UI uses one hardcoded before/after snippet for every selected issue. Generate a distinct proposal based on the selected issue rule, with an issue-specific fallback for unsupported rules.",
+      "status": "CLOSED",
+      "priority": "HIGH",
+      "createdOn": "2026-09-29",
+      "phaseTaskId": "P1-T011",
+      "phaseTaskFile": "../phase1-tasks.json"
+    },
+    {
+      "id": "BUG-004",
+      "title": "Chat UI displays mock issues instead of live project data",
+      "description": "The chat UI and WebSocket load path seed fabricated issues and fixes. Replace them with project analysis results, source-backed fix previews, and a task JSON loader.",
+      "status": "CLOSED",
+      "priority": "HIGH",
+      "createdOn": "2026-09-29",
+      "phaseTaskId": "P1-T011",
+      "phaseTaskFile": "../phase1-tasks.json"
+    }
+  ]
+}

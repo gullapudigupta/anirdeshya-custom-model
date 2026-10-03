@@ -1,0 +1,1528 @@
+openapi: 3.0.3
+info:
+  title: Advanced Quality Tool API
+  description: |
+    REST API for Advanced Quality Tool (AQT) - a comprehensive code quality analysis, 
+    auto-fixing, and AI-powered code generation platform.
+    
+    ## Features
+    
+    - **Code Analysis**: Analyze code quality, complexity, and security issues
+    - **Auto-Fixing**: Automatically fix code issues using rules and AI
+    - **Agent System**: Autonomous agent for complex code tasks
+    - **Pipeline System**: Orchestrate multi-step quality workflows
+    - **AI Generation**: Generate code, tests, and documentation with AI
+    - **Security Scanning**: Detect vulnerabilities, secrets, and dependency issues
+    
+    ## Authentication
+    
+    Most endpoints require an API key. Set the `Authorization` header with a Bearer token:
+    ```
+    Authorization: Bearer YOUR_API_KEY
+    ```
+    
+    ## Rate Limiting
+    
+    - Per-user: 100 requests per 15 minutes
+    - Global: 1000 requests per 15 minutes
+    
+    Rate limit headers are included in responses:
+    - `X-RateLimit-Limit`: Maximum requests allowed
+    - `X-RateLimit-Remaining`: Remaining requests in window
+    - `X-RateLimit-Reset`: Time when the window resets
+  version: 1.0.0
+  contact:
+    name: AQT Support
+    email: support@aqt.dev
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000
+    description: Development server
+  - url: http://localhost:3030
+    description: UI WebSocket server
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Analysis
+    description: Code analysis operations
+  - name: Fixes
+    description: Auto-fix operations
+  - name: Reports
+    description: Quality reports
+  - name: Workspace
+    description: Workspace management
+  - name: Agent
+    description: Autonomous agent operations
+  - name: Pipelines
+    description: Pipeline execution and management
+  - name: AI
+    description: AI-powered code generation
+  - name: Security
+    description: Security scanning operations
+
+paths:
+  # ============================================================================
+  # Health Endpoints
+  # ============================================================================
+  
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Returns the health status of the API server
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                    format: date-time
+                  version:
+                    type: string
+                    example: 1.0.0
+
+  /api/info:
+    get:
+      tags: [Health]
+      summary: API information
+      description: Returns API metadata and available endpoints
+      responses:
+        '200':
+          description: API information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    example: Advanced Quality Tool API
+                  version:
+                    type: string
+                    example: 1.0.0
+                  endpoints:
+                    type: array
+                    items:
+                      type: string
+
+  # ============================================================================
+  # Analysis Endpoints
+  # ============================================================================
+  
+  /api/analyze:
+    post:
+      tags: [Analysis]
+      summary: Analyze code
+      description: Analyze code quality in a workspace or specific files
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - workspacePath
+              properties:
+                workspacePath:
+                  type: string
+                  description: Path to the workspace root
+                  example: /path/to/project
+                files:
+                  type: array
+                  items:
+                    type: string
+                  description: Specific files to analyze (optional)
+                options:
+                  type: object
+                  properties:
+                    includeMetrics:
+                      type: boolean
+                      default: true
+                    includeSecurity:
+                      type: boolean
+                      default: true
+                    includePerformance:
+                      type: boolean
+                      default: true
+                    languages:
+                      type: array
+                      items:
+                        type: string
+      responses:
+        '200':
+          description: Analysis completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      issues:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Issue'
+                      summary:
+                        $ref: '#/components/schemas/AnalysisSummary'
+                      stats:
+                        $ref: '#/components/schemas/AnalysisStats'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Analysis failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ============================================================================
+  # Fix Endpoints
+  # ============================================================================
+  
+  /api/fix:
+    post:
+      tags: [Fixes]
+      summary: Fix a single issue
+      description: Apply an auto-fix to a specific issue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - workspacePath
+                - issueId
+              properties:
+                workspacePath:
+                  type: string
+                  description: Path to the workspace
+                issueId:
+                  type: string
+                  description: ID of the issue to fix
+                fixType:
+                  type: string
+                  enum: [auto, rule, ai]
+                  default: auto
+                options:
+                  type: object
+                  properties:
+                    dryRun:
+                      type: boolean
+                      default: false
+                    backup:
+                      type: boolean
+                      default: true
+                    verification:
+                      type: boolean
+                      default: true
+      responses:
+        '200':
+          description: Fix applied successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      applied:
+                        type: boolean
+                      backupPath:
+                        type: string
+                      changes:
+                        type: array
+                        items:
+                          type: object
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/generate-fixes:
+    post:
+      tags: [Fixes]
+      summary: Generate fixes for multiple issues
+      description: Generate fixes for a batch of issues
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - workspacePath
+                - issues
+              properties:
+                workspacePath:
+                  type: string
+                issues:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Issue'
+                options:
+                  type: object
+                  properties:
+                    maxFixes:
+                      type: integer
+                      default: 50
+                    priority:
+                      type: string
+                      enum: [critical, high, medium, low]
+                    includeAI:
+                      type: boolean
+                      default: true
+      responses:
+        '200':
+          description: Fixes generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      fixes:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Fix'
+
+  # ============================================================================
+  # Reports Endpoints
+  # ============================================================================
+  
+  /api/reports:
+    get:
+      tags: [Reports]
+      summary: List reports
+      description: Get a list of quality reports
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [analysis, fix, security, metrics]
+      responses:
+        '200':
+          description: List of reports
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Report'
+
+  /api/reports/{id}:
+    get:
+      tags: [Reports]
+      summary: Get a specific report
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, html, markdown, sarif]
+            default: json
+      responses:
+        '200':
+          description: Report content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+            text/html:
+              schema:
+                type: string
+        '404':
+          description: Report not found
+
+  # ============================================================================
+  # Workspace Endpoints
+  # ============================================================================
+  
+  /api/workspace/config:
+    post:
+      tags: [Workspace]
+      summary: Update workspace configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - workspacePath
+                - config
+              properties:
+                workspacePath:
+                  type: string
+                config:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '200':
+          description: Configuration updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /api/workspace/status:
+    get:
+      tags: [Workspace]
+      summary: Get workspace status
+      parameters:
+        - name: workspacePath
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Workspace status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/WorkspaceStatus'
+
+  # ============================================================================
+  # Agent Endpoints (P11-T004)
+  # ============================================================================
+  
+  /api/agent/start:
+    post:
+      tags: [Agent]
+      summary: Start agent work
+      description: Start an autonomous agent to perform code tasks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - description
+              properties:
+                description:
+                  type: string
+                  description: Description of the work to perform
+                  example: "Fix the authentication bug in login.js"
+                workspace:
+                  type: string
+                  description: Workspace path
+                files:
+                  type: array
+                  items:
+                    type: string
+                  description: Files to include
+                priority:
+                  type: string
+                  enum: [critical, high, medium, low]
+                  default: medium
+                maxFiles:
+                  type: integer
+                  default: 50
+                autoApprove:
+                  type: boolean
+                  default: false
+                deliverables:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Agent work started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      workId:
+                        type: string
+                      status:
+                        type: string
+                        enum: [started]
+                      description:
+                        type: string
+                      workspace:
+                        type: string
+
+  /api/agent:
+    get:
+      tags: [Agent]
+      summary: List agent work
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [queued, planning, awaiting_approval, working, verifying, completed, failed, cancelled, blocked]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: List of agent work items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AgentWork'
+
+  /api/agent/{id}:
+    get:
+      tags: [Agent]
+      summary: Get agent work status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent work status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/AgentWork'
+        '404':
+          description: Work item not found
+
+  /api/agent/{id}:
+    delete:
+      tags: [Agent]
+      summary: Cancel agent work
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Work cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      status:
+                        type: string
+                        enum: [cancelled]
+        '404':
+          description: Work item not found
+
+  /api/agent/{id}/approve:
+    post:
+      tags: [Agent]
+      summary: Approve agent work
+      description: Approve high-risk agent operations
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Work approved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      status:
+                        type: string
+                        enum: [approved]
+        '400':
+          description: Work is not awaiting approval
+        '404':
+          description: Work item not found
+
+  /api/agent/{id}/logs:
+    get:
+      tags: [Agent]
+      summary: Get agent work logs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Work logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      logs:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/LogEntry'
+                      active:
+                        type: boolean
+
+  # ============================================================================
+  # Pipeline Endpoints (P11-T005)
+  # ============================================================================
+  
+  /api/pipelines:
+    get:
+      tags: [Pipelines]
+      summary: List available pipelines
+      responses:
+        '200':
+          description: List of pipelines
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Pipeline'
+                  count:
+                    type: integer
+
+  /api/pipelines/{name}:
+    get:
+      tags: [Pipelines]
+      summary: Get pipeline details
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Pipeline details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Pipeline'
+        '404':
+          description: Pipeline not found
+
+  /api/pipelines/{name}/execute:
+    post:
+      tags: [Pipelines]
+      summary: Execute a pipeline
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                input:
+                  type: object
+                  additionalProperties: true
+                workspace:
+                  type: string
+                taskId:
+                  type: string
+                stageHandlers:
+                  type: object
+                  additionalProperties: true
+                watch:
+                  type: boolean
+                  default: false
+      responses:
+        '200':
+          description: Pipeline execution started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      runId:
+                        type: string
+                      pipelineId:
+                        type: string
+                      status:
+                        type: string
+                        enum: [started]
+                      workspace:
+                        type: string
+                      taskId:
+                        type: string
+
+  /api/pipelines/executions:
+    get:
+      tags: [Pipelines]
+      summary: List pipeline executions
+      parameters:
+        - name: pipelineId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [queued, running, completed, failed, cancelled]
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: List of executions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PipelineExecution'
+                  count:
+                    type: integer
+
+  /api/pipelines/executions/{id}:
+    get:
+      tags: [Pipelines]
+      summary: Get pipeline execution status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Execution status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/PipelineExecution'
+        '404':
+          description: Execution not found
+
+  /api/pipelines/executions/{id}/replay:
+    post:
+      tags: [Pipelines]
+      summary: Replay a pipeline execution
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                stubs:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '200':
+          description: Replay information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      originalRunId:
+                        type: string
+                      pipelineId:
+                        type: string
+                      originalInput:
+                        type: object
+                      message:
+                        type: string
+
+  # ============================================================================
+  # AI Endpoints (P11-T059)
+  # ============================================================================
+  
+  /api/ai/generate/code:
+    post:
+      tags: [AI]
+      summary: Generate code
+      description: Generate code from a natural language description
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - description
+              properties:
+                description:
+                  type: string
+                  description: What code to generate
+                  example: "Create a function that validates email addresses"
+                language:
+                  type: string
+                  default: javascript
+                  enum: [javascript, typescript, python, java, csharp, go, rust]
+                framework:
+                  type: string
+                  example: react
+                provider:
+                  type: string
+                  enum: [openai, anthropic, google, ollama]
+                model:
+                  type: string
+                options:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '200':
+          description: Code generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                      language:
+                        type: string
+                      cost:
+                        type: number
+                      cached:
+                        type: boolean
+
+  /api/ai/generate/test:
+    post:
+      tags: [AI]
+      summary: Generate tests
+      description: Generate unit tests for a file
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - filePath
+              properties:
+                filePath:
+                  type: string
+                content:
+                  type: string
+                framework:
+                  type: string
+                  enum: [jest, mocha, vitest, pytest, junit]
+                  default: jest
+                provider:
+                  type: string
+                options:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '200':
+          description: Tests generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      tests:
+                        type: string
+                      framework:
+                        type: string
+                      cost:
+                        type: number
+
+  /api/ai/generate/doc:
+    post:
+      tags: [AI]
+      summary: Generate documentation
+      description: Generate documentation for a file
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - filePath
+              properties:
+                filePath:
+                  type: string
+                content:
+                  type: string
+                format:
+                  type: string
+                  enum: [markdown, jsdoc, jsdoc-markdown]
+                  default: markdown
+                provider:
+                  type: string
+                options:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '200':
+          description: Documentation generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      documentation:
+                        type: string
+                      format:
+                        type: string
+                      cost:
+                        type: number
+
+  /api/ai/fix:
+    post:
+      tags: [AI]
+      summary: AI fix for issue
+      description: Generate an AI fix for a specific issue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                issue:
+                  $ref: '#/components/schemas/Issue'
+                issueId:
+                  type: string
+                dryRun:
+                  type: boolean
+                  default: false
+                provider:
+                  type: string
+                options:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '200':
+          description: Fix generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      fix:
+                        type: string
+                      originalCode:
+                        type: string
+                      fixedCode:
+                        type: string
+                      confidence:
+                        type: number
+                      cost:
+                        type: number
+
+  /api/ai/refactor:
+    post:
+      tags: [AI]
+      summary: Refactor code
+      description: Refactor code with AI assistance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - filePath
+                - description
+              properties:
+                filePath:
+                  type: string
+                content:
+                  type: string
+                description:
+                  type: string
+                  example: "Extract the validation logic into a separate function"
+                autoApply:
+                  type: boolean
+                  default: false
+                provider:
+                  type: string
+                options:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '200':
+          description: Refactoring generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      refactoredCode:
+                        type: string
+                      changes:
+                        type: array
+                        items:
+                          type: object
+                      cost:
+                        type: number
+
+  /api/ai/configure:
+    post:
+      tags: [AI]
+      summary: Configure AI provider
+      description: Configure AI provider settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                provider:
+                  type: string
+                  enum: [openai, anthropic, google, ollama]
+                model:
+                  type: string
+                maxCost:
+                  type: number
+                monthlyBudget:
+                  type: number
+      responses:
+        '200':
+          description: Configuration updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      provider:
+                        type: string
+                      model:
+                        type: string
+                      configured:
+                        type: boolean
+
+  /api/ai/cost:
+    get:
+      tags: [AI]
+      summary: Get cost tracking
+      description: Get AI cost tracking information
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [day, week, month]
+            default: month
+      responses:
+        '200':
+          description: Cost tracking data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      period:
+                        type: string
+                      totalCost:
+                        type: number
+                      requestCount:
+                        type: integer
+                      tokensUsed:
+                        type: integer
+                      breakdown:
+                        type: object
+                        additionalProperties: true
+
+components:
+  schemas:
+    # ---------------------------------------------------------------------------
+    # Common Schemas
+    # ---------------------------------------------------------------------------
+    
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        statusCode:
+          type: integer
+
+    Issue:
+      type: object
+      properties:
+        id:
+          type: string
+        ruleId:
+          type: string
+        message:
+          type: string
+        severity:
+          type: string
+          enum: [critical, error, warning, info]
+        file:
+          type: string
+        line:
+          type: integer
+        column:
+          type: integer
+        endLine:
+          type: integer
+        endColumn:
+          type: integer
+        category:
+          type: string
+        fixable:
+          type: boolean
+        suggestions:
+          type: array
+          items:
+            type: object
+
+    Fix:
+      type: object
+      properties:
+        issueId:
+          type: string
+        fixedCode:
+          type: string
+        originalCode:
+          type: string
+        confidence:
+          type: number
+        fixer:
+          type: string
+        applied:
+          type: boolean
+
+    Report:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        data:
+          type: object
+          additionalProperties: true
+
+    LogEntry:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        type:
+          type: string
+        message:
+          type: string
+        data:
+          type: object
+          additionalProperties: true
+
+    # ---------------------------------------------------------------------------
+    # Analysis Schemas
+    # ---------------------------------------------------------------------------
+    
+    AnalysisSummary:
+      type: object
+      properties:
+        total:
+          type: integer
+        critical:
+          type: integer
+        error:
+          type: integer
+        warning:
+          type: integer
+        info:
+          type: integer
+        fixable:
+          type: integer
+
+    AnalysisStats:
+      type: object
+      properties:
+        filesAnalyzed:
+          type: integer
+        linesAnalyzed:
+          type: integer
+        duration:
+          type: integer
+        lintersUsed:
+          type: array
+          items:
+            type: string
+
+    # ---------------------------------------------------------------------------
+    # Workspace Schemas
+    # ---------------------------------------------------------------------------
+    
+    WorkspaceStatus:
+      type: object
+      properties:
+        path:
+          type: string
+        configured:
+          type: boolean
+        lastAnalyzed:
+          type: string
+          format: date-time
+        issueCount:
+          type: integer
+        config:
+          type: object
+          additionalProperties: true
+
+    # ---------------------------------------------------------------------------
+    # Agent Schemas
+    # ---------------------------------------------------------------------------
+    
+    AgentWork:
+      type: object
+      properties:
+        id:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [queued, planning, awaiting_approval, working, verifying, completed, failed, cancelled, blocked]
+        priority:
+          type: string
+          enum: [critical, high, medium, low]
+        started:
+          type: string
+          format: date-time
+        completed:
+          type: string
+          format: date-time
+        plan:
+          $ref: '#/components/schemas/ExecutionPlan'
+        output:
+          type: object
+          additionalProperties: true
+        error:
+          type: string
+        active:
+          type: boolean
+
+    ExecutionPlan:
+      type: object
+      properties:
+        steps:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              description:
+                type: string
+              type:
+                type: string
+              files:
+                type: array
+                items:
+                  type: string
+        affectedFiles:
+          type: array
+          items:
+            type: string
+        expectedChecks:
+          type: array
+          items:
+            type: object
+        risks:
+          type: array
+          items:
+            type: object
+            properties:
+              level:
+                type: string
+              category:
+                type: string
+              description:
+                type: string
+              mitigation:
+                type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    # ---------------------------------------------------------------------------
+    # Pipeline Schemas
+    # ---------------------------------------------------------------------------
+    
+    Pipeline:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        version:
+          type: string
+        stages:
+          type: array
+          items:
+            type: string
+        schema:
+          type: object
+          properties:
+            input:
+              type: object
+              additionalProperties: true
+            output:
+              type: object
+              additionalProperties: true
+        verification:
+          type: object
+          properties:
+            required:
+              type: boolean
+        metadata:
+          type: object
+          additionalProperties: true
+        registeredAt:
+          type: string
+          format: date-time
+
+    PipelineExecution:
+      type: object
+      properties:
+        runId:
+          type: string
+        pipelineId:
+          type: string
+        taskId:
+          type: string
+        workspace:
+          type: string
+        status:
+          type: string
+          enum: [queued, running, completed, failed, cancelled]
+        started:
+          type: string
+          format: date-time
+        completed:
+          type: string
+          format: date-time
+        duration:
+          type: integer
+        stages:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              started:
+                type: string
+                format: date-time
+              completed:
+                type: string
+                format: date-time
+              duration:
+                type: integer
+              result:
+                type: object
+        metrics:
+          type: object
+          properties:
+            toolCalls:
+              type: integer
+            modelCalls:
+              type: integer
+            totalTokens:
+              type: integer
+            totalCost:
+              type: number
+            filesChanged:
+              type: integer
+        output:
+          type: object
+          additionalProperties: true
+        error:
+          type: string
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - BearerAuth: []

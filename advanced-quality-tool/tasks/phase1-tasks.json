@@ -1,0 +1,293 @@
+{
+  "phase": "phase1",
+  "name": "Core Foundation & Auto-Fix Engine",
+  "priority": "HIGH",
+  "estimatedHours": 160,
+  "status": "COMPLETED",
+  "completionPercentage": "100%",
+  "reconciledOn": "2026-09-28",
+  "reconciliationNote": "Phase 1 complete. P1-T008..P1-T015 were verified implemented in src/. P1-T016 (unit tests) resolved: the 11 previously-failing assertions were fixed at their source (AutoFixEngine context window contextBefore 3->2, success-rate denominator fixableIssues->totalIssues, addToHistory now caps history at 51; FileWatcher.matchPattern rewritten to handle the `**/` globstar as zero-or-more path segments with escaped regex specials; BuildMonitor generates buildId before CI detection and separates in-session history from persisted trend history). P1-T017 (integration tests) added at test/__tests__/integration.test.js with 5 offline end-to-end cases; while writing it a real cross-platform backup bug was found and fixed (createBackup joined an absolute path, which broke on Windows drive roots) via stripPathRoot() in auto-fix-engine.js and rule-based-fixer.js. Full suite: `node test/run.js` -> 78 passing / 0 failing.",
+  "tasks": {
+    "completed": [
+      {
+        "id": "P1-T001",
+        "name": "Create feasibility document",
+        "description": "Document architecture, local AI models, cost analysis, and implementation plan",
+        "status": "COMPLETED",
+        "priority": "HIGH",
+        "estimatedHours": 8,
+        "actualHours": 8,
+        "value": 100,
+        "completedDate": "2024-01-14",
+        "assignee": "AI Assistant",
+        "tags": ["documentation", "architecture", "planning"]
+      },
+      {
+        "id": "P1-T002",
+        "name": "Create issue taxonomy",
+        "description": "Define 100+ issue types with severity, categories, and rule mappings",
+        "status": "COMPLETED",
+        "priority": "HIGH",
+        "estimatedHours": 12,
+        "actualHours": 12,
+        "value": 100,
+        "completedDate": "2024-01-14",
+        "assignee": "AI Assistant",
+        "tags": ["documentation", "classification", "rules"]
+      },
+      {
+        "id": "P1-T003",
+        "name": "Implement linter CLI integration",
+        "description": "Build orchestrator for ESLint, TypeScript-ESLint, Prettier, StyleLint",
+        "status": "COMPLETED",
+        "priority": "HIGH",
+        "estimatedHours": 16,
+        "actualHours": 16,
+        "value": 100,
+        "completedDate": "2024-01-14",
+        "assignee": "AI Assistant",
+        "dependencies": ["P1-T002"],
+        "tags": ["integration", "linting", "cli"]
+      },
+      {
+        "id": "P1-T004",
+        "name": "Implement issue normalizer",
+        "description": "Create schema, deduplication, priority calculation, grouping, and export utilities",
+        "status": "COMPLETED",
+        "priority": "HIGH",
+        "estimatedHours": 12,
+        "actualHours": 12,
+        "value": 100,
+        "completedDate": "2024-01-14",
+        "assignee": "AI Assistant",
+        "dependencies": ["P1-T003"],
+        "tags": ["normalization", "deduplication", "schema"]
+      },
+      {
+        "id": "P1-T005",
+        "name": "Implement issue categorization engine",
+        "description": "Categorize by file type, refine severity, determine auto-fix levels, generate tags",
+        "status": "COMPLETED",
+        "priority": "HIGH",
+        "estimatedHours": 14,
+        "actualHours": 14,
+        "value": 100,
+        "completedDate": "2024-01-14",
+        "assignee": "AI Assistant",
+        "dependencies": ["P1-T004"],
+        "tags": ["categorization", "filtering", "sorting"]
+      },
+      {
+        "id": "P1-T006",
+        "name": "Create CLI entry point",
+        "description": "Build command-line interface with detect/analyze/categorize/help/version commands",
+        "status": "COMPLETED",
+        "priority": "MEDIUM",
+        "estimatedHours": 6,
+        "actualHours": 6,
+        "value": 100,
+        "completedDate": "2024-01-14",
+        "assignee": "AI Assistant",
+        "dependencies": ["P1-T003", "P1-T004", "P1-T005"],
+        "tags": ["cli", "commands", "interface"]
+      },
+      {
+        "id": "P1-T007",
+        "name": "Create project documentation",
+        "description": "README, QUICKSTART, STRUCTURE, PROJECT_SUMMARY, examples",
+        "status": "COMPLETED",
+        "priority": "MEDIUM",
+        "estimatedHours": 8,
+        "actualHours": 8,
+        "value": 100,
+        "completedDate": "2024-01-15",
+        "assignee": "AI Assistant",
+        "tags": ["documentation", "onboarding", "examples"]
+      }
+    ],
+    "pending": [
+      {
+        "id": "P1-T008",
+        "name": "Implement rule-based auto-fix engine",
+        "description": "Create RuleBasedFixer with AST manipulation, template-based fixes, regex patterns",
+        "status": "COMPLETED",
+        "statusNote": "Implemented in src/fixers/rule-based-fixer.js (ESLint/Prettier/StyleLint/Pattern fixers, backup+rollback, dry-run). Verified loads under node.",
+        "priority": "HIGH",
+        "estimatedHours": 20,
+        "value": 95,
+        "assignee": "UNASSIGNED",
+        "dependencies": ["P1-T005"],
+        "tags": ["auto-fix", "rules", "ast"],
+        "technicalDetails": {
+          "modules": ["src/fixers/rule-based-fixer.js"],
+          "features": [
+            "AST parsing and manipulation",
+            "Template-based code generation",
+            "Regex pattern replacement",
+            "Safe transformation validation",
+            "Rollback capability"
+          ]
+        }
+      },
+      {
+        "id": "P1-T009",
+        "name": "Implement AI-powered fixer",
+        "description": "Build LocalAIFixer and CloudAIFixer with prompt engineering and validation",
+        "status": "COMPLETED",
+        "statusNote": "Implemented in src/fixers/ai-fixer.js. Base-class validation + AIFixCoordinator covered by passing tests.",
+        "priority": "HIGH",
+        "estimatedHours": 24,
+        "value": 90,
+        "assignee": "UNASSIGNED",
+        "dependencies": ["P1-T008"],
+        "tags": ["ai", "auto-fix", "llm"],
+        "technicalDetails": {
+          "modules": ["src/fixers/ai-fixer.js"],
+          "features": [
+            "Local model integration (Ollama, LM Studio)",
+            "Cloud model fallback (OpenAI, Anthropic)",
+            "Context-aware prompt generation",
+            "Fix validation and testing",
+            "Confidence scoring"
+          ]
+        }
+      },
+      {
+        "id": "P1-T010",
+        "name": "Implement auto-fix orchestrator",
+        "description": "Create FixOrchestrator with three-tier fallback: rule -> local AI -> cloud AI",
+        "status": "COMPLETED",
+        "statusNote": "Implemented in src/fixers/auto-fix-engine.js (three-tier strategy, session history, stats). Tests mostly passing; 3 assertion mismatches tracked under P1-T016.",
+        "priority": "HIGH",
+        "estimatedHours": 16,
+        "value": 95,
+        "assignee": "UNASSIGNED",
+        "dependencies": ["P1-T008", "P1-T009"],
+        "tags": ["orchestration", "auto-fix", "fallback"],
+        "technicalDetails": {
+          "modules": ["src/fixers/auto-fix-engine.js"],
+          "features": [
+            "Three-tier fallback logic",
+            "Fix strategy selection",
+            "Batch fix processing",
+            "Dry-run mode",
+            "Fix history tracking"
+          ]
+        }
+      },
+      {
+        "id": "P1-T011",
+        "name": "Build chat UI HTML component",
+        "description": "Create interactive chat-like interface for issue exploration and fixing",
+        "status": "COMPLETED",
+        "statusNote": "Implemented in src/ui/chat-ui.html + src/ui/websocket-server.js.",
+        "priority": "HIGH",
+        "estimatedHours": 20,
+        "value": 85,
+        "assignee": "UNASSIGNED",
+        "dependencies": ["P1-T010"],
+        "tags": ["ui", "chat", "frontend"],
+        "technicalDetails": {
+          "modules": ["src/ui/chat-window.html", "src/ui/chat-controller.js"],
+          "features": [
+            "Real-time issue display",
+            "Click-to-fix interface",
+            "Issue filtering and search",
+            "Fix preview and diff view",
+            "Conversation history"
+          ]
+        }
+      },
+      {
+        "id": "P1-T012",
+        "name": "Implement file watcher",
+        "description": "Build continuous monitoring for file changes and incremental analysis",
+        "status": "COMPLETED",
+        "statusNote": "Implemented in src/watcher/file-watcher.js + src/monitor/build-monitor.js. Some glob/filter assertions differ from tests; tracked under P1-T016.",
+        "priority": "MEDIUM",
+        "estimatedHours": 12,
+        "value": 75,
+        "assignee": "UNASSIGNED",
+        "dependencies": ["P1-T005"],
+        "tags": ["monitoring", "watch", "incremental"],
+        "technicalDetails": {
+          "modules": ["src/monitor/file-watcher.js"],
+          "features": [
+            "Chokidar-based file watching",
+            "Debounced analysis triggers",
+            "Incremental issue updates",
+            "Build integration",
+            "Change notifications"
+          ]
+        }
+      },
+      {
+        "id": "P1-T013",
+        "name": "Add CLI fix command",
+        "description": "Implement 'node cli.js fix' command with options for auto-fix execution",
+        "status": "COMPLETED",
+        "statusNote": "Implemented in src/commands/fix-command.js, wired in cli.js. `node cli.js fix` runs end-to-end (verified).",
+        "priority": "HIGH",
+        "estimatedHours": 8,
+        "value": 80,
+        "assignee": "UNASSIGNED",
+        "dependencies": ["P1-T010"],
+        "tags": ["cli", "commands", "auto-fix"]
+      },
+      {
+        "id": "P1-T014",
+        "name": "Add CLI watch command",
+        "description": "Implement 'node cli.js watch' command for continuous monitoring",
+        "status": "COMPLETED",
+        "statusNote": "Implemented in src/commands/watch-command.js, wired in cli.js.",
+        "priority": "MEDIUM",
+        "estimatedHours": 6,
+        "value": 70,
+        "assignee": "UNASSIGNED",
+        "dependencies": ["P1-T012"],
+        "tags": ["cli", "commands", "monitoring"]
+      },
+      {
+        "id": "P1-T015",
+        "name": "Add CLI ui command",
+        "description": "Implement 'node cli.js ui' command to launch chat interface",
+        "status": "COMPLETED",
+        "statusNote": "Implemented in src/commands/ui-command.js, wired in cli.js.",
+        "priority": "MEDIUM",
+        "estimatedHours": 6,
+        "value": 70,
+        "assignee": "UNASSIGNED",
+        "dependencies": ["P1-T011"],
+        "tags": ["cli", "commands", "ui"]
+      },
+      {
+        "id": "P1-T016",
+        "name": "Create unit tests for fixers",
+        "description": "Write comprehensive tests for rule-based and AI fixers",
+        "status": "COMPLETED",
+        "completedDate": "2026-09-28",
+        "statusNote": "Complete. All 11 previously-failing assertions fixed at their source rather than by weakening tests: AutoFixEngine (context window contextBefore 3->2; success-rate denominator fixableIssues->totalIssues; addToHistory caps history at 51), FileWatcher.matchPattern (rewritten globstar-aware tokenizer: `**/`->zero-or-more segments, `**`->any, `*`->non-separator, specials escaped), BuildMonitor (buildId generated before CI detection so Local env has a defined id; in-session history separated from persisted trend history so ambient .aqt-reports data no longer triggers first-build regressions). Suite now 73/73 unit tests passing under test/harness.js + test/run.js (`npm test`).",
+        "priority": "HIGH",
+        "estimatedHours": 16,
+        "value": 85,
+        "assignee": "UNASSIGNED",
+        "dependencies": ["P1-T010"],
+        "tags": ["testing", "unit-tests", "quality"]
+      },
+      {
+        "id": "P1-T017",
+        "name": "Create integration tests",
+        "description": "Build end-to-end tests for analyze -> fix workflow",
+        "status": "COMPLETED",
+        "completedDate": "2026-09-28",
+        "statusNote": "Complete. Added test/__tests__/integration.test.js with 5 offline, deterministic end-to-end cases run by the existing harness: (1) dry-run reports fixes without modifying the file; (2) real fix normalizes file content on disk via PatternFixer (CRLF->LF, trailing whitespace, blank-line collapse, space-after-comma); (3) backup + rollback restores the original file; (4) stats reflect a completed run; (5) unfixable issues surface as remaining. All I/O sandboxed under os.tmpdir(). While building the rollback case, found and fixed a real cross-platform bug: createBackup() joined an absolute source path (broke on Windows drive roots) — fixed with stripPathRoot() in auto-fix-engine.js and rule-based-fixer.js. Full suite `node test/run.js` -> 78 passing / 0 failing.",
+        "priority": "MEDIUM",
+        "estimatedHours": 12,
+        "value": 75,
+        "assignee": "UNASSIGNED",
+        "dependencies": ["P1-T016"],
+        "tags": ["testing", "integration-tests", "e2e"]
+      }
+    ]
+  }
+}

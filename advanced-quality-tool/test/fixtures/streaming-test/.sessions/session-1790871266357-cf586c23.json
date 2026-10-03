@@ -1,0 +1,31 @@
+{
+  "id": "session-1790871266357-cf586c23",
+  "workspace": "/workspace",
+  "model": null,
+  "provider": null,
+  "createdAt": 1790871266357,
+  "updatedAt": 1790871266357,
+  "events": [
+    {
+      "id": "bcc86848d340ea79d3f7ff869770973e",
+      "type": "session-start",
+      "timestamp": 1790871266357,
+      "data": {
+        "sessionId": "session-1790871266357-cf586c23",
+        "workspace": "/workspace"
+      }
+    }
+  ],
+  "context": {
+    "task": null,
+    "files": [],
+    "references": []
+  },
+  "changes": {
+    "applied": [],
+    "rejected": [],
+    "failed": []
+  },
+  "status": "active",
+  "metadata": {}
+}

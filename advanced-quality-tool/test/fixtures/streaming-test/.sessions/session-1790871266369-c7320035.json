@@ -1,0 +1,45 @@
+{
+  "id": "session-1790871266369-c7320035",
+  "workspace": "/workspace",
+  "model": null,
+  "provider": null,
+  "createdAt": 1790871266369,
+  "updatedAt": 1790871266369,
+  "events": [
+    {
+      "id": "de9f9ad60a99a5a22b1388b4450f8aeb",
+      "type": "session-start",
+      "timestamp": 1790871266369,
+      "data": {
+        "sessionId": "session-1790871266369-c7320035",
+        "workspace": "/workspace"
+      }
+    }
+  ],
+  "context": {
+    "task": null,
+    "files": [],
+    "references": []
+  },
+  "changes": {
+    "applied": [
+      {
+        "path": "/file1.js",
+        "type": "applied",
+        "timestamp": 1790871266370,
+        "additions": 5
+      }
+    ],
+    "rejected": [
+      {
+        "path": "/file2.js",
+        "type": "rejected",
+        "timestamp": 1790871266370,
+        "reason": "User rejected"
+      }
+    ],
+    "failed": []
+  },
+  "status": "active",
+  "metadata": {}
+}

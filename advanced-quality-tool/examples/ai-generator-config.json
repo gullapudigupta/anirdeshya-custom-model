@@ -1,0 +1,26 @@
+{
+  "_comment": "AI Issue Generator configuration (Phase 6). Copy to .aqt/ai-generator.json in your project root.",
+  "execution": {
+    "strategy": "local-first",
+    "localModel": "codellama:7b",
+    "cloudProvider": "openai",
+    "cloudModel": "gpt-4o-mini",
+    "maxAttempts": 3
+  },
+  "search": {
+    "enabled": true,
+    "sources": ["docs", "github", "stackoverflow"],
+    "maxResults": 5,
+    "docPatterns": [
+      { "name": "eslint", "test": "^eslint(-|$)", "docsUrl": "https://eslint.org/docs/latest/", "topics": ["rules", "configuration"] },
+      { "name": "typescript", "test": "^typescript$", "docsUrl": "https://www.typescriptlang.org/docs/", "topics": ["handbook"] },
+      { "name": "angular", "test": "^@angular/", "docsUrl": "https://angular.dev/", "topics": ["components", "guide"] },
+      { "name": "react", "test": "^react(-dom)?$", "docsUrl": "https://react.dev/reference/react", "topics": ["hooks"] }
+    ]
+  },
+  "limits": {
+    "maxFixesPerRun": 50,
+    "requestsPerMinute": 20,
+    "dailyBudgetUsd": 5.0
+  }
+}

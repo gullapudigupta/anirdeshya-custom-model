@@ -1,0 +1,11 @@
+# Files excluded from the packaged .vsix (P3-T008)
+ARCHITECTURE.md
+**/*.test.js
+.vscode-test/**
+.gitignore
+**/tsconfig.json
+**/.eslintrc*
+
+# NOTE: the extension reuses the tool core under ../../ (src/integrations,
+# src/fixers). The `package` npm script must run from a layout where those
+# modules resolve. See README.md "Packaging" for the two supported layouts.

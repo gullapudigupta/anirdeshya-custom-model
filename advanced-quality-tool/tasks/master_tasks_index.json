@@ -1,0 +1,219 @@
+{
+  "version": "1.0",
+  "format": "kiro/tasks-master-index+json",
+  "structureModeledOn": "agent_tasks/master_tasks_index.json",
+  "metadata": {
+    "title": "Master Task Index — Advanced Quality Tool",
+    "tool": "tools/advanced-quality-tool",
+    "purpose": "Top-level index for the advanced-quality-tool only. Work is split into per-phase task files (phase1-tasks.json .. phase9-tasks.json), with bugs and change requests tracked separately under maintenance/.",
+    "createdBy": "Kiro",
+    "createdOn": "2026-09-07",
+    "updatedOn": "2026-09-30",
+    "sourceOfTruth": "Per-phase task files in this folder. The legacy monolithic TASKS.json (in the tool root) mirrors the same tasks and should be treated as read-only history.",
+    "notes": "When adding/renaming a planned task: place it in the correct phaseN-tasks.json, then update the matching module entry below and the rollup. For bugs and change requests (CRs/tweaks), inspect maintenanceFiles below, identify the exact related phase task, and record its task ID and phase file. meta.json holds scoring/roadmap/research metadata and is not a task list."
+  },
+  "activePhase": "phase9",
+  "phaseFiles": {
+    "phase1": "./phase1-tasks.json",
+    "phase2": "./phase2-tasks.json",
+    "phase3": "./phase3-tasks.json",
+    "phase4": "./phase4-tasks.json",
+    "phase5": "./phase5-tasks.json",
+    "phase6": "./phase6-tasks.json",
+    "phase7": "./phase7-tasks.json",
+    "phase8": "./phase8-tasks.json",
+    "phase9": "./phase9-tasks.json",
+    "meta": "./meta.json",
+    "bugs": "./maintenance/bugs.json",
+    "changeRequests": "./maintenance/crs.json"
+  },
+  "maintenanceFiles": {
+    "bugsIndex": "./maintenance/bugs.json",
+    "bugRecords": "./maintenance/bugs-tasks.json",
+    "changeRequestsIndex": "./maintenance/crs.json",
+    "changeRequestRecords": "./maintenance/cr-tasks.json",
+    "workflow": [
+      "Before recording a bug or CR/tweak, find the exact task in phase1-tasks.json through phase9-tasks.json. If no matching task exists, add the planned task to the appropriate phase file first.",
+      "Every record must include phaseTaskId and phaseTaskFile pointing to that exact task; do not guess or leave the link unresolved.",
+      "Append bug records to bugs-tasks.json and CR/tweak records to cr-tasks.json. Each shard holds at most 100 records.",
+      "When the current shard reaches 100 records, create the next numbered shard (for example, bugs-tasks-002.json or cr-tasks-002.json) and add its relative path to the matching index (bugs.json or crs.json). Keep each index's shard counts and ID boundaries current."
+    ]
+  },
+  "modules": [
+    {
+      "phase": "phase1",
+      "file": "./phase1-tasks.json",
+      "name": "Core Foundation & Auto-Fix Engine",
+      "priority": "HIGH",
+      "status": "COMPLETED",
+      "estimatedHours": 160,
+      "taskCount": 17,
+      "statusSummary": { "completed": 17, "in_progress": 0, "pending": 0 },
+      "reconciledOn": "2026-09-28",
+      "reconciliationNote": "Phase 1 complete. P1-T016 resolved by fixing the 11 failing unit-test assertions at their source (AutoFixEngine, FileWatcher.matchPattern, BuildMonitor). P1-T017 added test/__tests__/integration.test.js (5 offline end-to-end cases) and, along the way, fixed a real cross-platform createBackup bug (absolute-path join) via stripPathRoot(). Full suite `node test/run.js` -> 78 passing / 0 failing.",
+      "completedIds": ["P1-T001", "P1-T002", "P1-T003", "P1-T004", "P1-T005", "P1-T006", "P1-T007", "P1-T008", "P1-T009", "P1-T010", "P1-T011", "P1-T012", "P1-T013", "P1-T014", "P1-T015", "P1-T016", "P1-T017"]
+    },
+    {
+      "phase": "phase2",
+      "file": "./phase2-tasks.json",
+      "name": "C# Support & Multi-Language Extension",
+      "priority": "MEDIUM",
+      "status": "COMPLETED",
+      "estimatedHours": 80,
+      "taskCount": 7,
+      "statusSummary": { "completed": 7, "pending": 0 },
+      "reconciledOn": "2026-09-28",
+      "reconciliationNote": "C# support implemented (src/languages/csharp-analyzer.js, src/fixers/csharp-fixer.js), documented (docs/CSHARP_SUPPORT.md), demoed (examples/analyze-csharp.js) and tested (test/__tests__/csharp.test.js, 12 tests). P2-T006 plugin architecture pre-existed in src/plugins/plugin-system.js. Full suite: 90 passing / 0 failing.",
+      "completedIds": ["P2-T001", "P2-T002", "P2-T003", "P2-T004", "P2-T005", "P2-T006", "P2-T007"]
+    },
+    {
+      "phase": "phase3",
+      "file": "./phase3-tasks.json",
+      "name": "VS Code Extension & IDE Integration",
+      "priority": "MEDIUM",
+      "status": "COMPLETED",
+      "estimatedHours": 100,
+      "taskCount": 9,
+      "statusSummary": { "completed": 9, "pending": 0 },
+      "reconciledOn": "2026-09-28",
+      "reconciliationNote": "VS Code extension implemented under src/extension/ as a thin adapter over the tool core. extension.js is the only vscode-coupled module (lazily requires vscode); all logic lives in vscode-agnostic units under src/extension/lib (aqt-service, diagnostics-provider, code-actions-provider, webview-panel, config, status-bar). package.json contributes 5 commands, editor context menus, and 7 settings. Added test/__tests__/extension.test.js (22 tests). Full suite: 112 passing / 0 failing. P3-T008 packaging is config + documented layouts; marketplace publish left as an operator step (needs publisher token).",
+      "completedIds": ["P3-T001", "P3-T002", "P3-T003", "P3-T004", "P3-T005", "P3-T006", "P3-T007", "P3-T008", "P3-T009"]
+    },
+    {
+      "phase": "phase4",
+      "file": "./phase4-tasks.json",
+      "name": "Advanced Features & Enhancements (from online research)",
+      "priority": "LOW",
+      "status": "COMPLETED",
+      "estimatedHours": 200,
+      "taskCount": 25,
+      "statusSummary": { "completed": 25, "pending": 0 },
+      "reconciledOn": "2026-09-30",
+      "reconciliationNote": "All 25 tasks completed. The remaining 13 pending tasks (P4-T004, P4-T007, P4-T010, P4-T012–P4-T017, P4-T019–P4-T021, P4-T023) were implemented on 2026-09-30: code smell, coverage, branch analysis, anti-patterns, accessibility, PR integration, pre-commit hooks, custom rule UI, rule pack marketplace, doc quality checks, team collaboration, notifications, Docker.",
+      "completedIds": ["P4-T001", "P4-T002", "P4-T003", "P4-T004", "P4-T005", "P4-T006", "P4-T007", "P4-T008", "P4-T009", "P4-T010", "P4-T011", "P4-T012", "P4-T013", "P4-T014", "P4-T015", "P4-T016", "P4-T017", "P4-T018", "P4-T019", "P4-T020", "P4-T021", "P4-T022", "P4-T023", "P4-T024", "P4-T025"]
+    },
+    {
+      "phase": "phase5",
+      "file": "./phase5-tasks.json",
+      "name": "Additional Language Support",
+      "priority": "LOW",
+      "status": "COMPLETED",
+      "estimatedHours": 120,
+      "taskCount": 6,
+      "statusSummary": { "completed": 5, "archived": 1, "pending": 0 },
+      "reconciledOn": "2026-09-28",
+      "reconciliationNote": "Python, Go, Rust, PHP, and Ruby support shipped. P5-T002 (Java) archived; prototype at archive/languages/java-analyzer.js, not in active pipeline. Phase considered complete.",
+      "completedIds": ["P5-T001", "P5-T003", "P5-T004", "P5-T005", "P5-T006"]
+    },
+    {
+      "phase": "phase6",
+      "file": "./phase6-tasks.json",
+      "name": "AI Issue Generator - Self-Explanatory Intelligent Auto-Fix",
+      "priority": "CRITICAL",
+      "status": "COMPLETED",
+      "estimatedHours": 160,
+      "taskCount": 16,
+      "statusSummary": { "completed": 16, "pending": 0 },
+      "reconciledOn": "2026-09-07",
+      "reconciliationNote": "All 16 phase6 tasks implemented under src/ai-generator/ and src/commands/generate-fixes-command.js. Dependency-injected, network-free by default; verified via tests/ai-generator/generator.test.js (20/20 passing) plus the foundations smoke test.",
+      "completedIds": ["P6-T001", "P6-T002", "P6-T003", "P6-T004", "P6-T005", "P6-T006", "P6-T007", "P6-T008", "P6-T009", "P6-T010", "P6-T011", "P6-T012", "P6-T013", "P6-T014", "P6-T015", "P6-T016"]
+    },
+    {
+      "phase": "phase7",
+      "file": "./phase7-tasks.json",
+      "name": "Advanced Intelligent Code Transformation",
+      "priority": "CRITICAL",
+      "status": "COMPLETED",
+      "estimatedHours": 332,
+      "taskCount": 9,
+      "statusSummary": { "completed": 9, "pending": 0 },
+      "reconciledOn": "2026-09-30",
+      "reconciliationNote": "All 9 Phase 7 tasks completed 2026-09-30: architectural-refactoring-engine.js, business-logic-workflow.js, algorithm-framework.js, compiler-fix-engine.js, explainable-review.js, fix-generation-v2.js, context-solution-generator.js, security-perf-remediation.js, model-requirement-disclosure.js — all in src/ai/.",
+      "completedIds": ["P7-T001","P7-T002","P7-T003","P7-T004","P7-T005","P7-T006","P7-T007","P7-T008","P7-T009"]
+    },
+    {
+      "phase": "phase8",
+      "file": "./phase8-tasks.json",
+      "name": "Multi-Interface Access and UI Modularization",
+      "priority": "HIGH",
+      "status": "COMPLETED",
+      "estimatedHours": 148,
+      "taskCount": 7,
+      "statusSummary": { "completed": 7, "pending": 0 },
+      "reconciledOn": "2026-09-30",
+      "reconciliationNote": "All 7 Phase 8 tasks completed 2026-09-30: shared-app-services.js + interface-adapter.js (P8-T001), mcp-server.js (P8-T002), orchestration-adapter.js (P8-T003), standalone-cli.js + bin/aqt.js (P8-T004), http-api-server.js (P8-T005), comprehensive interface docs (P8-T006), UI asset separation verified (P8-T007). Multiple access points now available with proper documentation.",
+      "completedIds": ["P8-T001", "P8-T002", "P8-T003", "P8-T004", "P8-T005", "P8-T006", "P8-T007"]
+    },
+    {
+      "phase": "phase9",
+      "file": "./phase9-tasks.json",
+      "name": "Coding Agent Workbench and Documentation",
+      "priority": "HIGH",
+      "status": "PENDING",
+      "estimatedHours": 778,
+      "taskCount": 40,
+      "statusSummary": { "completed": 0, "in_progress": 0, "pending": 40 },
+      "reconciliationNote": "Preserves the six documentation normalization tasks and adds thirteen coding-agent workbench tasks covering workspace/linter configuration, task import, model selection, planning, tools, permissions, review, verification, and acceptance."
+    }
+  ],
+  "supportingFeatures": {
+    "note": "Cross-tool enablers required by phase6, tracked in docs (not counted as phase tasks).",
+    "codeAnalyzer": {
+      "count": 5,
+      "doc": "tools/code-analyzer/docs/SUPPORTING_FEATURES_AI_GENERATOR.md"
+    },
+    "advancedQualityTool": {
+      "count": 6,
+      "doc": "tools/advanced-quality-tool/docs/SUPPORTING_FEATURES_AI_GENERATOR.md"
+    }
+  },
+  "contextCompressionStrategy": {
+    "description": "Techniques to keep context lean through this long multi-phase implementation.",
+    "strategies": [
+      {
+        "id": "CCS-1",
+        "name": "Rolling Summary Pattern",
+        "detail": "After completing each phase (or logical group of tasks), write a compact PROGRESS_SUMMARY.md in the tasks folder with a one-liner per completed task (id + artifact path + status). Future turns reference that file instead of re-reading all phase files."
+      },
+      {
+        "id": "CCS-2",
+        "name": "Session Notes File",
+        "detail": "Maintain active-session-notes.md with: current active task ID, files modified this session, key decisions made. This survives context compaction.",
+        "file": "./active-session-notes.md"
+      },
+      {
+        "id": "CCS-3",
+        "name": "Shallow Phase Reads",
+        "detail": "For completed phases (1–3, 5, 6), read only their completedIds from master_tasks_index.json rather than full phase files. Only deep-read the phase currently being actively worked on."
+      },
+      {
+        "id": "CCS-4",
+        "name": "Artifact-First Verification",
+        "detail": "Instead of re-reading all related source files when starting a new task, check whether the artifact path listed in the task exists and is non-empty. If yes, mark it complete without full re-read unless the new task depends on its internals."
+      },
+      {
+        "id": "CCS-5",
+        "name": "Task Completion Timestamps In Place",
+        "detail": "As tasks are completed, immediately update the task JSON status and log in master_tasks_index.json so future sessions can skip reconciliation."
+      }
+    ]
+  },
+  "statusLegend": {
+    "COMPLETED": "Implemented / done",
+    "PENDING": "Not started",
+    "IN_PROGRESS": "Currently being worked on"
+  },
+  "rollup": {
+    "totalPhases": 9,
+    "totalTasks": 136,
+    "byStatus": {
+      "completed": 86,
+      "archived": 1,
+      "in_progress": 0,
+      "pending": 49
+    },
+    "totalEstimatedHours": 2078,
+    "completionPercentage": "63%",
+    "note": "Counts derived from id/status fields across the nine phase files. Phase 1 COMPLETED (17/17), Phase 2 COMPLETED (7/7), Phase 3 COMPLETED (9/9), Phase 4 COMPLETED (25/25), Phase 5 COMPLETED (5/5 active; 1 archived), Phase 6 COMPLETED (16/16), Phase 7 COMPLETED (9/9), Phase 8 COMPLETED (7/7), and Phase 9 PENDING (0/40)."
+  }
+}

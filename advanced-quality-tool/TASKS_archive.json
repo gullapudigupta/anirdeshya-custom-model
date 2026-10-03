@@ -1,0 +1,1399 @@
+{
+  "project": "Advanced Quality Tool - SonarQube-like Analyzer",
+  "version": "1.0.0",
+  "lastUpdated": "2024-01-15",
+  "progressTracking": {
+    "totalTasks": 102,
+    "completedTasks": 7,
+    "inProgressTasks": 0,
+    "pendingTasks": 95,
+    "completionPercentage": "7%",
+    "phase6Tasks": 15,
+    "phase6EstimatedHours": 148,
+    "supportingFeaturesRequired": {
+      "codeAnalyzer": 5,
+      "advancedQualityTool": 6
+    }
+  },
+  "phases": {
+    "phase1": {
+      "name": "Core Foundation & Auto-Fix Engine",
+      "priority": "HIGH",
+      "estimatedHours": 160,
+      "status": "IN_PROGRESS",
+      "completionPercentage": "35%",
+      "tasks": {
+        "completed": [
+          {
+            "id": "P1-T001",
+            "name": "Create feasibility document",
+            "description": "Document architecture, local AI models, cost analysis, and implementation plan",
+            "status": "COMPLETED",
+            "priority": "HIGH",
+            "estimatedHours": 8,
+            "actualHours": 8,
+            "value": 100,
+            "completedDate": "2024-01-14",
+            "assignee": "AI Assistant",
+            "tags": ["documentation", "architecture", "planning"]
+          },
+          {
+            "id": "P1-T002",
+            "name": "Create issue taxonomy",
+            "description": "Define 100+ issue types with severity, categories, and rule mappings",
+            "status": "COMPLETED",
+            "priority": "HIGH",
+            "estimatedHours": 12,
+            "actualHours": 12,
+            "value": 100,
+            "completedDate": "2024-01-14",
+            "assignee": "AI Assistant",
+            "tags": ["documentation", "classification", "rules"]
+          },
+          {
+            "id": "P1-T003",
+            "name": "Implement linter CLI integration",
+            "description": "Build orchestrator for ESLint, TypeScript-ESLint, Prettier, StyleLint",
+            "status": "COMPLETED",
+            "priority": "HIGH",
+            "estimatedHours": 16,
+            "actualHours": 16,
+            "value": 100,
+            "completedDate": "2024-01-14",
+            "assignee": "AI Assistant",
+            "dependencies": ["P1-T002"],
+            "tags": ["integration", "linting", "cli"]
+          },
+          {
+            "id": "P1-T004",
+            "name": "Implement issue normalizer",
+            "description": "Create schema, deduplication, priority calculation, grouping, and export utilities",
+            "status": "COMPLETED",
+            "priority": "HIGH",
+            "estimatedHours": 12,
+            "actualHours": 12,
+            "value": 100,
+            "completedDate": "2024-01-14",
+            "assignee": "AI Assistant",
+            "dependencies": ["P1-T003"],
+            "tags": ["normalization", "deduplication", "schema"]
+          },
+          {
+            "id": "P1-T005",
+            "name": "Implement issue categorization engine",
+            "description": "Categorize by file type, refine severity, determine auto-fix levels, generate tags",
+            "status": "COMPLETED",
+            "priority": "HIGH",
+            "estimatedHours": 14,
+            "actualHours": 14,
+            "value": 100,
+            "completedDate": "2024-01-14",
+            "assignee": "AI Assistant",
+            "dependencies": ["P1-T004"],
+            "tags": ["categorization", "filtering", "sorting"]
+          },
+          {
+            "id": "P1-T006",
+            "name": "Create CLI entry point",
+            "description": "Build command-line interface with detect/analyze/categorize/help/version commands",
+            "status": "COMPLETED",
+            "priority": "MEDIUM",
+            "estimatedHours": 6,
+            "actualHours": 6,
+            "value": 100,
+            "completedDate": "2024-01-14",
+            "assignee": "AI Assistant",
+            "dependencies": ["P1-T003", "P1-T004", "P1-T005"],
+            "tags": ["cli", "commands", "interface"]
+          },
+          {
+            "id": "P1-T007",
+            "name": "Create project documentation",
+            "description": "README, QUICKSTART, STRUCTURE, PROJECT_SUMMARY, examples",
+            "status": "COMPLETED",
+            "priority": "MEDIUM",
+            "estimatedHours": 8,
+            "actualHours": 8,
+            "value": 100,
+            "completedDate": "2024-01-15",
+            "assignee": "AI Assistant",
+            "tags": ["documentation", "onboarding", "examples"]
+          }
+        ],
+        "pending": [
+          {
+            "id": "P1-T008",
+            "name": "Implement rule-based auto-fix engine",
+            "description": "Create RuleBasedFixer with AST manipulation, template-based fixes, regex patterns",
+            "status": "PENDING",
+            "priority": "HIGH",
+            "estimatedHours": 20,
+            "value": 95,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P1-T005"],
+            "tags": ["auto-fix", "rules", "ast"],
+            "technicalDetails": {
+              "modules": ["src/fixers/rule-based-fixer.js"],
+              "features": [
+                "AST parsing and manipulation",
+                "Template-based code generation",
+                "Regex pattern replacement",
+                "Safe transformation validation",
+                "Rollback capability"
+              ]
+            }
+          },
+          {
+            "id": "P1-T009",
+            "name": "Implement AI-powered fixer",
+            "description": "Build LocalAIFixer and CloudAIFixer with prompt engineering and validation",
+            "status": "PENDING",
+            "priority": "HIGH",
+            "estimatedHours": 24,
+            "value": 90,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P1-T008"],
+            "tags": ["ai", "auto-fix", "llm"],
+            "technicalDetails": {
+              "modules": ["src/fixers/ai-fixer.js"],
+              "features": [
+                "Local model integration (Ollama, LM Studio)",
+                "Cloud model fallback (OpenAI, Anthropic)",
+                "Context-aware prompt generation",
+                "Fix validation and testing",
+                "Confidence scoring"
+              ]
+            }
+          },
+          {
+            "id": "P1-T010",
+            "name": "Implement auto-fix orchestrator",
+            "description": "Create FixOrchestrator with three-tier fallback: rule -> local AI -> cloud AI",
+            "status": "PENDING",
+            "priority": "HIGH",
+            "estimatedHours": 16,
+            "value": 95,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P1-T008", "P1-T009"],
+            "tags": ["orchestration", "auto-fix", "fallback"],
+            "technicalDetails": {
+              "modules": ["src/fixers/auto-fix-engine.js"],
+              "features": [
+                "Three-tier fallback logic",
+                "Fix strategy selection",
+                "Batch fix processing",
+                "Dry-run mode",
+                "Fix history tracking"
+              ]
+            }
+          },
+          {
+            "id": "P1-T011",
+            "name": "Build chat UI HTML component",
+            "description": "Create interactive chat-like interface for issue exploration and fixing",
+            "status": "PENDING",
+            "priority": "HIGH",
+            "estimatedHours": 20,
+            "value": 85,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P1-T010"],
+            "tags": ["ui", "chat", "frontend"],
+            "technicalDetails": {
+              "modules": ["src/ui/chat-window.html", "src/ui/chat-controller.js"],
+              "features": [
+                "Real-time issue display",
+                "Click-to-fix interface",
+                "Issue filtering and search",
+                "Fix preview and diff view",
+                "Conversation history"
+              ]
+            }
+          },
+          {
+            "id": "P1-T012",
+            "name": "Implement file watcher",
+            "description": "Build continuous monitoring for file changes and incremental analysis",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 12,
+            "value": 75,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P1-T005"],
+            "tags": ["monitoring", "watch", "incremental"],
+            "technicalDetails": {
+              "modules": ["src/monitor/file-watcher.js"],
+              "features": [
+                "Chokidar-based file watching",
+                "Debounced analysis triggers",
+                "Incremental issue updates",
+                "Build integration",
+                "Change notifications"
+              ]
+            }
+          },
+          {
+            "id": "P1-T013",
+            "name": "Add CLI fix command",
+            "description": "Implement 'node cli.js fix' command with options for auto-fix execution",
+            "status": "PENDING",
+            "priority": "HIGH",
+            "estimatedHours": 8,
+            "value": 80,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P1-T010"],
+            "tags": ["cli", "commands", "auto-fix"]
+          },
+          {
+            "id": "P1-T014",
+            "name": "Add CLI watch command",
+            "description": "Implement 'node cli.js watch' command for continuous monitoring",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 6,
+            "value": 70,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P1-T012"],
+            "tags": ["cli", "commands", "monitoring"]
+          },
+          {
+            "id": "P1-T015",
+            "name": "Add CLI ui command",
+            "description": "Implement 'node cli.js ui' command to launch chat interface",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 6,
+            "value": 70,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P1-T011"],
+            "tags": ["cli", "commands", "ui"]
+          },
+          {
+            "id": "P1-T016",
+            "name": "Create unit tests for fixers",
+            "description": "Write comprehensive tests for rule-based and AI fixers",
+            "status": "PENDING",
+            "priority": "HIGH",
+            "estimatedHours": 16,
+            "value": 85,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P1-T010"],
+            "tags": ["testing", "unit-tests", "quality"]
+          },
+          {
+            "id": "P1-T017",
+            "name": "Create integration tests",
+            "description": "Build end-to-end tests for analyze -> fix workflow",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 12,
+            "value": 75,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P1-T016"],
+            "tags": ["testing", "integration-tests", "e2e"]
+          }
+        ]
+      }
+    },
+    "phase2": {
+      "name": "C# Support & Multi-Language Extension",
+      "priority": "MEDIUM",
+      "estimatedHours": 80,
+      "status": "PENDING",
+      "completionPercentage": "0%",
+      "tasks": {
+        "pending": [
+          {
+            "id": "P2-T001",
+            "name": "Research C# analyzers",
+            "description": "Evaluate Roslyn analyzers, StyleCop, SonarAnalyzer.CSharp",
+            "status": "PENDING",
+            "priority": "HIGH",
+            "estimatedHours": 8,
+            "value": 80,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["research", "csharp", "analyzers"]
+          },
+          {
+            "id": "P2-T002",
+            "name": "Implement Roslyn analyzer integration",
+            "description": "Build CLI integration for .NET compiler platform analyzers",
+            "status": "PENDING",
+            "priority": "HIGH",
+            "estimatedHours": 20,
+            "value": 90,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P2-T001"],
+            "tags": ["integration", "csharp", "roslyn"]
+          },
+          {
+            "id": "P2-T003",
+            "name": "Extend issue taxonomy for C#",
+            "description": "Add C#-specific issue types, patterns, and best practices",
+            "status": "PENDING",
+            "priority": "HIGH",
+            "estimatedHours": 8,
+            "value": 75,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P2-T001"],
+            "tags": ["documentation", "csharp", "taxonomy"]
+          },
+          {
+            "id": "P2-T004",
+            "name": "Implement C# auto-fix rules",
+            "description": "Create C#-specific fix templates and AST manipulation",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 16,
+            "value": 80,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P2-T002", "P2-T003"],
+            "tags": ["auto-fix", "csharp", "rules"]
+          },
+          {
+            "id": "P2-T005",
+            "name": "Add C# examples and documentation",
+            "description": "Create C# usage examples and integration guide",
+            "status": "PENDING",
+            "priority": "LOW",
+            "estimatedHours": 6,
+            "value": 60,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P2-T004"],
+            "tags": ["documentation", "examples", "csharp"]
+          },
+          {
+            "id": "P2-T006",
+            "name": "Create language plugin architecture",
+            "description": "Design extensible plugin system for additional language support",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 16,
+            "value": 85,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P2-T002"],
+            "tags": ["architecture", "plugins", "extensibility"]
+          },
+          {
+            "id": "P2-T007",
+            "name": "C# integration testing",
+            "description": "Build test suite for C# analysis and fixes",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 6,
+            "value": 70,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P2-T004"],
+            "tags": ["testing", "csharp", "integration"]
+          }
+        ]
+      }
+    },
+    "phase3": {
+      "name": "VS Code Extension & IDE Integration",
+      "priority": "MEDIUM",
+      "estimatedHours": 100,
+      "status": "PENDING",
+      "completionPercentage": "0%",
+      "tasks": {
+        "pending": [
+          {
+            "id": "P3-T001",
+            "name": "Design VS Code extension architecture",
+            "description": "Plan extension structure, activation events, and commands",
+            "status": "PENDING",
+            "priority": "HIGH",
+            "estimatedHours": 8,
+            "value": 80,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["architecture", "vscode", "extension"]
+          },
+          {
+            "id": "P3-T002",
+            "name": "Implement extension core",
+            "description": "Create extension.js, activation, and deactivation logic",
+            "status": "PENDING",
+            "priority": "HIGH",
+            "estimatedHours": 16,
+            "value": 85,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P3-T001"],
+            "tags": ["implementation", "vscode", "extension"]
+          },
+          {
+            "id": "P3-T003",
+            "name": "Build diagnostics provider",
+            "description": "Integrate tool output with VS Code diagnostics panel",
+            "status": "PENDING",
+            "priority": "HIGH",
+            "estimatedHours": 12,
+            "value": 90,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P3-T002"],
+            "tags": ["diagnostics", "vscode", "integration"]
+          },
+          {
+            "id": "P3-T004",
+            "name": "Implement code actions provider",
+            "description": "Add quick-fix suggestions in VS Code editor",
+            "status": "PENDING",
+            "priority": "HIGH",
+            "estimatedHours": 16,
+            "value": 90,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P3-T003"],
+            "tags": ["code-actions", "vscode", "quick-fix"]
+          },
+          {
+            "id": "P3-T005",
+            "name": "Create extension webview UI",
+            "description": "Build interactive panel for issue browsing and fixing",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 20,
+            "value": 75,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P3-T002"],
+            "tags": ["ui", "webview", "vscode"]
+          },
+          {
+            "id": "P3-T006",
+            "name": "Add extension settings and configuration",
+            "description": "Implement configuration options for rules, fixers, and behavior",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 8,
+            "value": 70,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P3-T002"],
+            "tags": ["configuration", "settings", "vscode"]
+          },
+          {
+            "id": "P3-T007",
+            "name": "Implement status bar integration",
+            "description": "Show issue count and analysis status in status bar",
+            "status": "PENDING",
+            "priority": "LOW",
+            "estimatedHours": 4,
+            "value": 50,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P3-T003"],
+            "tags": ["ui", "statusbar", "vscode"]
+          },
+          {
+            "id": "P3-T008",
+            "name": "Package and publish extension",
+            "description": "Bundle extension and publish to VS Code marketplace",
+            "status": "PENDING",
+            "priority": "LOW",
+            "estimatedHours": 8,
+            "value": 60,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P3-T004", "P3-T005", "P3-T006"],
+            "tags": ["packaging", "publishing", "marketplace"]
+          },
+          {
+            "id": "P3-T009",
+            "name": "Extension testing and debugging",
+            "description": "Create test suite for extension functionality",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 8,
+            "value": 75,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P3-T004"],
+            "tags": ["testing", "debugging", "extension"]
+          }
+        ]
+      }
+    },
+    "phase4": {
+      "name": "Advanced Features & Enhancements (from online research)",
+      "priority": "LOW",
+      "estimatedHours": 200,
+      "status": "PENDING",
+      "completionPercentage": "0%",
+      "tasks": {
+        "pending": [
+          {
+            "id": "P4-T001",
+            "name": "Implement security vulnerability detection",
+            "description": "Add OWASP Top 10, CWE, and common vulnerability pattern detection",
+            "status": "PENDING",
+            "priority": "HIGH",
+            "estimatedHours": 24,
+            "value": 95,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["security", "vulnerabilities", "owasp"],
+            "inspiration": "SonarQube security hotspots",
+            "technicalDetails": {
+              "features": [
+                "SQL injection detection",
+                "XSS vulnerability scanning",
+                "Hardcoded credentials detection",
+                "Path traversal detection",
+                "Insecure deserialization"
+              ]
+            }
+          },
+          {
+            "id": "P4-T002",
+            "name": "Implement secret scanning",
+            "description": "Detect API keys, tokens, passwords in source code",
+            "status": "PENDING",
+            "priority": "HIGH",
+            "estimatedHours": 16,
+            "value": 90,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["security", "secrets", "credentials"],
+            "inspiration": "GitHub Advanced Security secret scanning"
+          },
+          {
+            "id": "P4-T003",
+            "name": "Add dependency vulnerability scanning",
+            "description": "Integrate npm audit, yarn audit, and vulnerability databases",
+            "status": "PENDING",
+            "priority": "HIGH",
+            "estimatedHours": 20,
+            "value": 90,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["security", "dependencies", "vulnerabilities"],
+            "inspiration": "Snyk, Dependabot"
+          },
+          {
+            "id": "P4-T004",
+            "name": "Implement code smell detection",
+            "description": "Detect long methods, god classes, feature envy, and other smells",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 20,
+            "value": 75,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["code-quality", "refactoring", "smells"],
+            "inspiration": "SonarQube code smells"
+          },
+          {
+            "id": "P4-T005",
+            "name": "Add complexity metrics",
+            "description": "Calculate cyclomatic complexity, cognitive complexity, maintainability index",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 16,
+            "value": 80,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["metrics", "complexity", "maintainability"],
+            "inspiration": "SonarQube complexity metrics"
+          },
+          {
+            "id": "P4-T006",
+            "name": "Implement duplicate code detection",
+            "description": "Find copy-paste code blocks and suggest refactoring",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 20,
+            "value": 70,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["duplication", "refactoring", "code-quality"],
+            "inspiration": "SonarQube duplication detection"
+          },
+          {
+            "id": "P4-T007",
+            "name": "Add code coverage integration",
+            "description": "Integrate Istanbul/NYC coverage reports and highlight uncovered code",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 16,
+            "value": 75,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["testing", "coverage", "quality"],
+            "inspiration": "SonarQube code coverage"
+          },
+          {
+            "id": "P4-T008",
+            "name": "Implement quality gates",
+            "description": "Define pass/fail criteria for builds based on issue thresholds",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 12,
+            "value": 80,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P4-T005"],
+            "tags": ["quality-gates", "ci-cd", "thresholds"],
+            "inspiration": "SonarQube quality gates"
+          },
+          {
+            "id": "P4-T009",
+            "name": "Add historical trending",
+            "description": "Track issue metrics over time and generate trend reports",
+            "status": "PENDING",
+            "priority": "LOW",
+            "estimatedHours": 16,
+            "value": 65,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["analytics", "trending", "reporting"],
+            "inspiration": "SonarQube historical analysis"
+          },
+          {
+            "id": "P4-T010",
+            "name": "Implement multi-branch analysis",
+            "description": "Compare issues across Git branches and pull requests",
+            "status": "PENDING",
+            "priority": "LOW",
+            "estimatedHours": 20,
+            "value": 70,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["git", "branches", "comparison"],
+            "inspiration": "SonarQube branch analysis"
+          },
+          {
+            "id": "P4-T011",
+            "name": "Add performance issue detection",
+            "description": "Identify N+1 queries, inefficient loops, memory leaks",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 24,
+            "value": 85,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["performance", "optimization", "profiling"],
+            "inspiration": "DeepSource performance analysis"
+          },
+          {
+            "id": "P4-T012",
+            "name": "Implement anti-pattern detection",
+            "description": "Detect common anti-patterns (God object, Spaghetti code, etc.)",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 16,
+            "value": 75,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["anti-patterns", "architecture", "best-practices"],
+            "inspiration": "DeepSource anti-patterns"
+          },
+          {
+            "id": "P4-T013",
+            "name": "Add accessibility checks",
+            "description": "Check for WCAG compliance, semantic HTML, ARIA attributes",
+            "status": "PENDING",
+            "priority": "LOW",
+            "estimatedHours": 16,
+            "value": 60,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["accessibility", "wcag", "a11y"]
+          },
+          {
+            "id": "P4-T014",
+            "name": "Implement pull request integration",
+            "description": "Comment on PRs with issue summaries and pass/fail status",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 16,
+            "value": 80,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P4-T008"],
+            "tags": ["git", "pull-requests", "ci-cd"],
+            "inspiration": "GitHub code review integration"
+          },
+          {
+            "id": "P4-T015",
+            "name": "Add pre-commit hook integration",
+            "description": "Run analysis before commits using Husky or similar",
+            "status": "PENDING",
+            "priority": "LOW",
+            "estimatedHours": 8,
+            "value": 65,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["git", "hooks", "pre-commit"],
+            "inspiration": "ESLint/Prettier Git hooks"
+          },
+          {
+            "id": "P4-T016",
+            "name": "Implement custom rule creation UI",
+            "description": "Allow users to define custom rules via UI",
+            "status": "PENDING",
+            "priority": "LOW",
+            "estimatedHours": 24,
+            "value": 70,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["ui", "rules", "customization"],
+            "inspiration": "ESLint custom rules"
+          },
+          {
+            "id": "P4-T017",
+            "name": "Add rule pack marketplace",
+            "description": "Allow sharing and downloading community rule packs",
+            "status": "PENDING",
+            "priority": "LOW",
+            "estimatedHours": 32,
+            "value": 60,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P4-T016"],
+            "tags": ["marketplace", "community", "sharing"]
+          },
+          {
+            "id": "P4-T018",
+            "name": "Implement AI code review assistant",
+            "description": "Use LLM to provide architectural and design feedback",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 32,
+            "value": 85,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["ai", "code-review", "llm"],
+            "technicalDetails": {
+              "features": [
+                "Architectural pattern detection",
+                "Design principle violations",
+                "Code quality suggestions",
+                "Best practice recommendations"
+              ]
+            }
+          },
+          {
+            "id": "P4-T019",
+            "name": "Add documentation quality checks",
+            "description": "Verify JSDoc/TSDoc completeness and accuracy",
+            "status": "PENDING",
+            "priority": "LOW",
+            "estimatedHours": 12,
+            "value": 55,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["documentation", "jsdoc", "quality"]
+          },
+          {
+            "id": "P4-T020",
+            "name": "Implement team collaboration features",
+            "description": "Issue assignment, comments, status tracking",
+            "status": "PENDING",
+            "priority": "LOW",
+            "estimatedHours": 24,
+            "value": 65,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["collaboration", "team", "workflow"]
+          },
+          {
+            "id": "P4-T021",
+            "name": "Add notification system",
+            "description": "Email/Slack notifications for critical issues",
+            "status": "PENDING",
+            "priority": "LOW",
+            "estimatedHours": 16,
+            "value": 60,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["notifications", "alerts", "integration"]
+          },
+          {
+            "id": "P4-T022",
+            "name": "Implement dashboard and reporting",
+            "description": "Build web dashboard with charts, trends, and team metrics",
+            "status": "PENDING",
+            "priority": "LOW",
+            "estimatedHours": 40,
+            "value": 70,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P4-T009"],
+            "tags": ["dashboard", "reporting", "visualization"]
+          },
+          {
+            "id": "P4-T023",
+            "name": "Add Docker containerization",
+            "description": "Package tool as Docker image for easy deployment",
+            "status": "PENDING",
+            "priority": "LOW",
+            "estimatedHours": 8,
+            "value": 65,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["docker", "deployment", "containers"]
+          },
+          {
+            "id": "P4-T024",
+            "name": "Implement CI/CD pipeline integration",
+            "description": "Add GitHub Actions, GitLab CI, Jenkins plugins",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 20,
+            "value": 75,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P4-T008"],
+            "tags": ["ci-cd", "automation", "integration"]
+          },
+          {
+            "id": "P4-T025",
+            "name": "Add offline mode support",
+            "description": "Full functionality without internet connection",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 12,
+            "value": 70,
+            "assignee": "UNASSIGNED",
+            "dependencies": [],
+            "tags": ["offline", "local", "privacy"]
+          }
+        ]
+      }
+    },
+    "phase5": {
+      "name": "Additional Language Support",
+      "priority": "LOW",
+      "estimatedHours": 120,
+      "status": "PENDING",
+      "completionPercentage": "0%",
+      "tasks": {
+        "pending": [
+          {
+            "id": "P5-T001",
+            "name": "Add Python support",
+            "description": "Integrate Pylint, Flake8, Black, mypy",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 24,
+            "value": 80,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P2-T006"],
+            "tags": ["python", "integration", "linting"]
+          },
+          {
+            "id": "P5-T002",
+            "name": "Add Java support",
+            "description": "Integrate Checkstyle, PMD, SpotBugs",
+            "status": "PENDING",
+            "priority": "MEDIUM",
+            "estimatedHours": 24,
+            "value": 75,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P2-T006"],
+            "tags": ["java", "integration", "linting"]
+          },
+          {
+            "id": "P5-T003",
+            "name": "Add Go support",
+            "description": "Integrate golint, gofmt, go vet",
+            "status": "PENDING",
+            "priority": "LOW",
+            "estimatedHours": 20,
+            "value": 65,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P2-T006"],
+            "tags": ["go", "integration", "linting"]
+          },
+          {
+            "id": "P5-T004",
+            "name": "Add Rust support",
+            "description": "Integrate Clippy, rustfmt",
+            "status": "PENDING",
+            "priority": "LOW",
+            "estimatedHours": 20,
+            "value": 60,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P2-T006"],
+            "tags": ["rust", "integration", "linting"]
+          },
+          {
+            "id": "P5-T005",
+            "name": "Add PHP support",
+            "description": "Integrate PHP_CodeSniffer, PHPMD, PHPStan",
+            "status": "PENDING",
+            "priority": "LOW",
+            "estimatedHours": 20,
+            "value": 65,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P2-T006"],
+            "tags": ["php", "integration", "linting"]
+          },
+          {
+            "id": "P5-T006",
+            "name": "Add Ruby support",
+            "description": "Integrate RuboCop, Reek",
+            "status": "PENDING",
+            "priority": "LOW",
+            "estimatedHours": 16,
+            "value": 55,
+            "assignee": "UNASSIGNED",
+            "dependencies": ["P2-T006"],
+            "tags": ["ruby", "integration", "linting"]
+          }
+        ]
+      }
+    }
+  },
+  "valueMap": {
+    "description": "Task value scoring system (0-100)",
+    "criteria": {
+      "90-100": "Critical feature - core functionality, high user impact",
+      "75-89": "Important feature - significant value, moderate user impact",
+      "60-74": "Nice to have - enhances experience, lower priority",
+      "40-59": "Optional - minor improvement, very low priority",
+      "0-39": "Future consideration - exploratory or experimental"
+    }
+  },
+  "priorityLevels": {
+    "HIGH": "Must complete in current phase",
+    "MEDIUM": "Should complete soon, but can defer if needed",
+    "LOW": "Future enhancement, not blocking"
+  },
+  "estimationNotes": {
+    "unit": "hours",
+    "includesDesign": true,
+    "includesTesting": true,
+    "includesDocumentation": true,
+    "buffer": "20% added for unknowns"
+  },
+  "roadmap": {
+    "phase1Target": "2024-Q1",
+    "phase2Target": "2024-Q2",
+    "phase3Target": "2024-Q3",
+    "phase4Target": "2024-Q4",
+    "phase5Target": "2025-Q1"
+  },
+  "onlineResearchSummary": {
+    "sources": [
+      "SonarQube features",
+      "GitHub Advanced Security",
+      "DeepSource capabilities",
+      "ESLint ecosystem",
+      "Snyk code analysis",
+      "CodeQL documentation",
+      "Semgrep features"
+    ],
+    "keyInsights": [
+      "Security vulnerability detection is a must-have feature",
+      "Secret scanning prevents credential leaks",
+      "Complexity metrics help identify maintainability issues",
+      "Quality gates enable CI/CD integration",
+      "Duplicate code detection reduces technical debt",
+      "Multi-language support requires plugin architecture",
+      "AI-powered code review adds significant value",
+      "Pull request integration improves team workflow",
+      "Historical trending enables data-driven decisions",
+      "Performance analysis complements quality checks"
+    ],
+    "competitiveFeatures": [
+      "SonarQube: Quality gates, security hotspots, code smells",
+      "GitHub: Secret scanning, dependency scanning, CodeQL",
+      "DeepSource: Auto-fix, performance issues, anti-patterns",
+      "Snyk: Vulnerability database, fix PRs, license compliance",
+      "CodeQL: Deep semantic analysis, custom queries",
+      "Semgrep: Custom rule creation, SAST, supply chain security"
+    ]
+  },
+  "additionalImprovements": {
+    "fromResearch": [
+      {
+        "feature": "License compliance checking",
+        "description": "Scan dependencies for license violations and incompatibilities",
+        "priority": "MEDIUM",
+        "estimatedHours": 16,
+        "value": 70,
+        "inspiration": "Snyk, FOSSA"
+      },
+      {
+        "feature": "Supply chain security",
+        "description": "Detect malicious packages and typosquatting",
+        "priority": "HIGH",
+        "estimatedHours": 24,
+        "value": 85,
+        "inspiration": "Socket.dev, Snyk"
+      },
+      {
+        "feature": "Code explanation assistant",
+        "description": "Use LLM to explain complex code sections",
+        "priority": "LOW",
+        "estimatedHours": 16,
+        "value": 60,
+        "inspiration": "GitHub Copilot, ChatGPT"
+      },
+      {
+        "feature": "Refactoring suggestions",
+        "description": "AI-generated refactoring recommendations",
+        "priority": "MEDIUM",
+        "estimatedHours": 24,
+        "value": 75,
+        "inspiration": "DeepSource, SonarQube"
+      },
+      {
+        "feature": "Test generation",
+        "description": "Auto-generate unit tests for uncovered code",
+        "priority": "MEDIUM",
+        "estimatedHours": 32,
+        "value": 80,
+        "inspiration": "GitHub Copilot, Diffblue"
+      },
+      {
+        "feature": "Code migration assistant",
+        "description": "Help migrate between framework versions",
+        "priority": "LOW",
+        "estimatedHours": 40,
+        "value": 65,
+        "inspiration": "ngUpdate, React codemod"
+      },
+      {
+        "feature": "Technical debt tracking",
+        "description": "Quantify and track technical debt over time",
+        "priority": "MEDIUM",
+        "estimatedHours": 20,
+        "value": 75,
+        "inspiration": "SonarQube technical debt"
+      },
+      {
+        "feature": "API contract validation",
+        "description": "Verify OpenAPI/Swagger compliance",
+        "priority": "LOW",
+        "estimatedHours": 16,
+        "value": 60,
+        "inspiration": "Spectral, Redocly"
+      },
+      {
+        "feature": "Infrastructure as Code analysis",
+        "description": "Scan Terraform, CloudFormation, Kubernetes YAML",
+        "priority": "LOW",
+        "estimatedHours": 24,
+        "value": 65,
+        "inspiration": "Checkov, tfsec"
+      },
+      {
+        "feature": "GraphQL query optimization",
+        "description": "Detect expensive queries and N+1 problems",
+        "priority": "LOW",
+        "estimatedHours": 16,
+        "value": 55,
+        "inspiration": "Apollo Studio"
+      }
+    ]
+  },
+  "phase6": {
+    "name": "AI Issue Generator - Self-Explanatory Intelligent Auto-Fix",
+    "priority": "CRITICAL",
+    "estimatedHours": 148,
+    "status": "PENDING",
+    "completionPercentage": "0%",
+    "description": "AI-powered issue resolution system that provides self-explanatory issue descriptions, uses code-analyzer for symbol queries and LINQ-like code analysis, applies line-level fixes, researches solutions online, and validates results with intelligent error recovery",
+    "documentation": "docs/AI_ISSUE_GENERATOR_SUMMARY.md",
+    "supportingFeatures": {
+      "codeAnalyzer": "tools/code-analyzer/docs/SUPPORTING_FEATURES_AI_GENERATOR.md",
+      "advancedQualityTool": "tools/advanced-quality-tool/docs/SUPPORTING_FEATURES_AI_GENERATOR.md"
+    },
+    "keyFeatures": [
+      "Self-explanatory issue descriptions (what/why/how to fix)",
+      "Line-level code editing (not full file rewrites)",
+      "Code-analyzer integration for symbol queries and context",
+      "LINQ-style code analysis and pattern matching",
+      "Multi-source research (docs, GitHub, StackOverflow)",
+      "Local-first AI execution with cloud fallback",
+      "Intelligent error recovery with enhanced context"
+    ],
+    "tasks": [
+      {
+        "id": "P6-T001",
+        "name": "Self-Explanatory Issue Classifier",
+        "description": "Build issue classifier that generates plain English explanations (what is the issue, why it's a problem, what to do) and uses code-analyzer for symbol context analysis",
+        "priority": "CRITICAL",
+        "estimatedHours": 10,
+        "value": 100,
+        "dependencies": [],
+        "codeAnalyzerIntegration": [
+          "query-engine.js for symbol queries",
+          "symbol-extractor.js for usage analysis",
+          "context-composer.js for minimal context"
+        ],
+        "deliverables": [
+          "src/ai-generator/issue-classifier.js",
+          "Self-explanatory description generator",
+          "Symbol context analyzer (using code-analyzer)",
+          "Issue summarizer (<100 tokens)",
+          "Priority and fix complexity scorer"
+        ],
+        "tags": ["ai", "classification", "self-explanatory", "code-analyzer"]
+      },
+      {
+        "id": "P6-T002",
+        "name": "Code Context Analyzer with Symbol Queries",
+        "description": "Build intelligent context extraction using code-analyzer's LINQ-like symbol queries for precise analysis and minimal token usage",
+        "priority": "CRITICAL",
+        "estimatedHours": 12,
+        "value": 95,
+        "dependencies": ["P6-T001"],
+        "codeAnalyzerIntegration": [
+          "query-engine.js for LINQ-style queries",
+          "symbol-extractor.js for symbol discovery",
+          "context-composer.js for context building",
+          "ast-utils.js for AST traversal"
+        ],
+        "deliverables": [
+          "src/ai-generator/code-context-analyzer.js",
+          "LINQ-style symbol query interface",
+          "Minimal context extractor (<300 tokens)",
+          "Related symbol discovery",
+          "Import chain analyzer"
+        ],
+        "tags": ["context", "code-analyzer", "linq", "symbols"]
+      },
+      {
+        "id": "P6-T003",
+        "name": "Documentation Search Engine",
+        "description": "Integrate documentation search for official docs (ESLint, TypeScript, Angular, React) with local caching",
+        "priority": "HIGH",
+        "estimatedHours": 10,
+        "value": 85,
+        "dependencies": ["P6-T001"],
+        "deliverables": [
+          "src/ai-generator/doc-searcher.js",
+          "Multi-source search adapter",
+          "Result ranking algorithm",
+          "Local cache system (AQ-SF-002)"
+        ],
+        "tags": ["search", "documentation", "context"]
+      },
+      {
+        "id": "P6-T004",
+        "name": "GitHub Issues Search Integration",
+        "description": "Search GitHub issues for similar problems and their solutions from relevant repositories",
+        "priority": "HIGH",
+        "estimatedHours": 10,
+        "value": 80,
+        "dependencies": ["P6-T001"],
+        "deliverables": [
+          "src/ai-generator/github-searcher.js",
+          "GitHub API client",
+          "Query optimizer",
+          "Solution extractor"
+        ],
+        "tags": ["search", "github", "context"]
+      },
+      {
+        "id": "P6-T005",
+        "name": "StackOverflow Search Integration",
+        "description": "Search StackOverflow for related questions and accepted answers",
+        "priority": "HIGH",
+        "estimatedHours": 8,
+        "value": 75,
+        "dependencies": ["P6-T001"],
+        "deliverables": [
+          "src/ai-generator/stackoverflow-searcher.js",
+          "StackExchange API client",
+          "Answer parser",
+          "Code snippet extractor"
+        ],
+        "tags": ["search", "stackoverflow", "context"]
+      },
+      {
+        "id": "P6-T006",
+        "name": "Context Aggregator & Summarizer",
+        "description": "Aggregate search results, code context, and symbol analysis; deduplicate and summarize within token limits using AQ-SF-005",
+        "priority": "CRITICAL",
+        "estimatedHours": 12,
+        "value": 90,
+        "dependencies": ["P6-T002", "P6-T003", "P6-T004", "P6-T005"],
+        "deliverables": [
+          "src/ai-generator/context-aggregator.js",
+          "Deduplication algorithm (AQ-SF-005)",
+          "Relevance scoring",
+          "Token optimizer (<2000 tokens total)",
+          "Summary generator"
+        ],
+        "tags": ["context", "aggregation", "optimization"]
+      },
+      {
+        "id": "P6-T007",
+        "name": "Self-Explanatory Prompt Builder",
+        "description": "Build prompts that clearly explain the issue and expected fix, include code context from code-analyzer, and request line-level edits",
+        "priority": "CRITICAL",
+        "estimatedHours": 10,
+        "value": 95,
+        "dependencies": ["P6-T002", "P6-T006"],
+        "deliverables": [
+          "src/ai-generator/prompt-builder.js",
+          "Self-explanatory prompt templates",
+          "Line-edit request formatter",
+          "Token budget manager",
+          "Output format specifications"
+        ],
+        "tags": ["ai", "prompts", "self-explanatory"]
+      },
+      {
+        "id": "P6-T008",
+        "name": "Local AI Model Executor (Ollama)",
+        "description": "Execute prompts against local AI model (Ollama) with retry logic",
+        "priority": "HIGH",
+        "estimatedHours": 10,
+        "value": 85,
+        "dependencies": ["P6-T007"],
+        "deliverables": [
+          "src/ai-generator/local-executor.js",
+          "Ollama client",
+          "Response parser",
+          "Error handler",
+          "Retry logic"
+        ],
+        "tags": ["ai", "local-model", "execution"]
+      },
+      {
+        "id": "P6-T009",
+        "name": "Cloud AI Model Executor",
+        "description": "Fallback executor for cloud AI models (OpenAI, Anthropic) with enhanced context",
+        "priority": "HIGH",
+        "estimatedHours": 8,
+        "value": 85,
+        "dependencies": ["P6-T007"],
+        "deliverables": [
+          "src/ai-generator/cloud-executor.js",
+          "Multi-provider client",
+          "Cost tracker",
+          "Response validator"
+        ],
+        "tags": ["ai", "cloud-model", "execution"]
+      },
+      {
+        "id": "P6-T010",
+        "name": "Line-Level Code Applicator",
+        "description": "Apply AI-generated line-level edits (not full file rewrites) with AST validation using code-analyzer and AQ-SF-001",
+        "priority": "CRITICAL",
+        "estimatedHours": 12,
+        "value": 100,
+        "dependencies": ["P6-T008", "P6-T009"],
+        "codeAnalyzerIntegration": [
+          "ast-utils.js for syntax validation",
+          "Validate AST before/after edits"
+        ],
+        "deliverables": [
+          "src/ai-generator/line-editor.js",
+          "Line-level replacement engine (AQ-SF-001)",
+          "AST validator (code-analyzer)",
+          "Backup manager",
+          "Transaction-based rollback"
+        ],
+        "tags": ["code-modification", "line-level", "validation", "code-analyzer"]
+      },
+      {
+        "id": "P6-T011",
+        "name": "Error Context Generator & Recovery",
+        "description": "Detect errors after fixes, generate enhanced context using code-analyzer (AQ-SF-006), and retry with error-specific solutions",
+        "priority": "CRITICAL",
+        "estimatedHours": 12,
+        "value": 95,
+        "dependencies": ["P6-T010"],
+        "codeAnalyzerIntegration": [
+          "query-engine.js for error context analysis",
+          "symbol-extractor.js for related symbols",
+          "context-composer.js for enhanced context"
+        ],
+        "deliverables": [
+          "src/ai-generator/error-recovery.js",
+          "Build error detector",
+          "Lint error analyzer",
+          "Error-specific search (AQ-SF-006)",
+          "Enhanced context generator (using code-analyzer)",
+          "Retry orchestrator (max 3 attempts)"
+        ],
+        "tags": ["error-handling", "recovery", "code-analyzer", "context-enhancement"]
+      },
+      {
+        "id": "P6-T012",
+        "name": "AI Generation Orchestrator",
+        "description": "Main orchestrator that coordinates the entire AI issue generation workflow",
+        "priority": "CRITICAL",
+        "estimatedHours": 10,
+        "value": 95,
+        "dependencies": ["P6-T001", "P6-T006", "P6-T007", "P6-T008", "P6-T009", "P6-T010", "P6-T011"],
+        "deliverables": [
+          "src/ai-generator/orchestrator.js",
+          "Workflow engine",
+          "State manager",
+          "Progress tracker",
+          "Metrics collector"
+        ],
+        "tags": ["orchestration", "workflow", "coordination"]
+      },
+      {
+        "id": "P6-T013",
+        "name": "CLI Integration",
+        "description": "Add CLI commands for AI issue generation",
+        "priority": "HIGH",
+        "estimatedHours": 6,
+        "value": 80,
+        "dependencies": ["P6-T012"],
+        "deliverables": [
+          "src/commands/generate-fixes-command.js",
+          "CLI argument parser",
+          "Progress UI",
+          "Summary reporter"
+        ],
+        "tags": ["cli", "integration", "ui"]
+      },
+      {
+        "id": "P6-T014",
+        "name": "Configuration & Cost Monitoring",
+        "description": "Configuration system, rate limiting, and cost tracking using AQ-SF-004",
+        "priority": "HIGH",
+        "estimatedHours": 6,
+        "value": 75,
+        "dependencies": ["P6-T012"],
+        "deliverables": [
+          "src/ai-generator/config.js",
+          "Rate limiter",
+          "Cost tracker (AQ-SF-004)",
+          "Budget enforcer",
+          "Daily cost reports"
+        ],
+        "tags": ["configuration", "rate-limiting", "cost-management"]
+      },
+      {
+        "id": "P6-T015",
+        "name": "Testing & Documentation",
+        "description": "Comprehensive testing and documentation for AI Issue Generator",
+        "priority": "HIGH",
+        "estimatedHours": 12,
+        "value": 85,
+        "dependencies": ["P6-T001", "P6-T002", "P6-T003", "P6-T004", "P6-T005", "P6-T006", "P6-T007", "P6-T008", "P6-T009", "P6-T010", "P6-T011", "P6-T012", "P6-T013", "P6-T014"],
+        "deliverables": [
+          "tests/ai-generator/",
+          "docs/AI_ISSUE_GENERATOR.md",
+          "docs/api/AI_GENERATOR_API.md",
+          "examples/ai-generator-config.json"
+        ],
+        "tags": ["testing", "documentation", "examples"]
+      }
+    ]
+  },
+  "nextActions": {
+    "immediate": [
+      "Review and approve Phase 6 AI Issue Generator (self-explanatory approach)",
+      "Review supporting features documents for code-analyzer and advanced-quality-tool",
+      "Setup API keys for GitHub, StackOverflow, and AI services (OpenAI/Anthropic)",
+      "Install and configure Ollama with CodeLlama model for local AI execution",
+      "Review AI_ISSUE_GENERATOR_SUMMARY.md for full feature specification"
+    ],
+    "shortTerm": [
+      "Implement code-analyzer supporting features (CA-SF-001 to CA-SF-005): 46 hours",
+      "Implement advanced-quality-tool supporting features (AQ-SF-001 to AQ-SF-006): 62 hours",
+      "Begin Phase 6 implementation: Issue Classifier with self-explanatory descriptions",
+      "Build LINQ-style symbol query integration with code-analyzer",
+      "Develop line-level editing system with AST validation"
+    ],
+    "longTerm": [
+      "Optimize AI prompt engineering for better self-explanatory fixes",
+      "Add support for more programming languages and frameworks",
+      "Implement machine learning for context relevance scoring",
+      "Build analytics dashboard for AI performance and cost tracking",
+      "Extend symbol analysis with more advanced LINQ-like queries"
+    ]
+  }
+}

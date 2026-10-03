@@ -1,0 +1,366 @@
+{
+  "$schema": "./task-schema.json",
+  "version": "1.0.0",
+  "description": "Example template task file showing the standardized task structure based on phase9-tasks.json",
+  "usage": "Copy this template to create new tasks. Adjust fields as needed for your specific task.",
+  "metadata": {
+    "created": "2026-09-30",
+    "author": "Kiro AI Agent",
+    "purpose": "Template for creating new tasks in the phase task system",
+    "modelPricing": {
+      "deepseek-v4-flash": { "input": 0.14, "output": 0.28, "perMTokens": 0.98 },
+      "gpt-4o-mini": { "input": 0.15, "output": 0.60, "perMTokens": 1.95 },
+      "claude-haiku-4": { "input": 1.00, "output": 5.00, "perMTokens": 16.00 },
+      "o1-mini": { "input": 3.00, "output": 12.00, "perMTokens": 39.00 },
+      "gpt-4.1": { "input": 2.00, "output": 8.00, "perMTokens": 26.00 },
+      "deepseek-r1": { "input": 8.00, "output": 32.00, "perMTokens": 104.00 },
+      "claude-opus-5": { "input": 4.00, "output": 20.00, "perMTokens": 64.00 }
+    },
+    "modelSelectionGuidance": {
+      "fileOperations": ["deepseek-v4-flash", "gpt-4o-mini", "claude-haiku-4"],
+      "moderateReasoning": ["gpt-4o-mini", "gpt-4.1", "deepseek-r1"],
+      "securityCritical": ["o1-mini", "gpt-4.1", "claude-opus-5"],
+      "criticalArchitecture": ["gpt-4o-mini", "o1-mini", "gpt-4.1"]
+    }
+  },
+  "exampleTask": {
+    "id": "P9-T001",
+    "name": "Documentation Inventory and Content Review",
+    "status": "PENDING",
+    "priority": "HIGH",
+    "estimatedHours": 12,
+    "value": 85,
+    "recommendedModel": ["deepseek-v4-flash", "gpt-4o-mini", "claude-haiku-4"],
+    "modelRationale": "File inventory, classification, metadata extraction. DeepSeek V4-Flash is 70% cheaper than Haiku with comparable quality for file ops.",
+    "dependencies": [],
+    "deliverables": [
+      "Inventory documentation across the repository, including Markdown, text, and API reference files",
+      "Read each document's metadata and actual contents before deciding its destination or disposition",
+      "Classify documents as active, completed, historical, duplicate, or obsolete",
+      "Identify canonical topic documents, conflicting guidance, inbound links, and ownership"
+    ],
+    "tags": ["documentation", "inventory", "content-review"]
+  },
+  "exampleTaskWithDependencies": {
+    "id": "P9-T003",
+    "name": "Redundant Documentation Consolidation",
+    "status": "PENDING",
+    "priority": "HIGH",
+    "estimatedHours": 24,
+    "value": 95,
+    "recommendedModel": ["gpt-4o-mini", "gpt-4.1", "deepseek-r1"],
+    "modelRationale": "Complex comparison and conflict resolution. GPT-4o mini offers 7.5/10 reasoning at fraction of cost. Escalate to GPT-4.1 or R1 if reasoning insufficient.",
+    "dependencies": ["P9-T001", "P9-T002"],
+    "deliverables": [
+      "Compare metadata summaries and actual text to detect duplicate or overlapping material",
+      "Merge redundant documentation into one canonical file per topic and reconcile conflicting guidance",
+      "Preserve unique, current information and maintain distinct documents where audiences or interfaces differ",
+      "Update inbound references before removing superseded duplicate files"
+    ],
+    "tags": ["documentation", "deduplication", "consolidation", "canonical-source"]
+  },
+  "examplePipelineTask": {
+    "id": "P9-T024",
+    "name": "Pipeline Catalog and Execution Ledger",
+    "status": "PENDING",
+    "priority": "CRITICAL",
+    "estimatedHours": 24,
+    "value": 100,
+    "recommendedModel": ["gpt-4o-mini", "gpt-4.1", "deepseek-r1"],
+    "modelRationale": "CRITICAL: Schema design, event store architecture. GPT-4o mini surprisingly capable. Escalate to GPT-4.1 for foundational design.",
+    "dependencies": ["P9-T010", "P9-T019"],
+    "pipelineId": "pipeline-ledger",
+    "pipelineStages": ["register", "start", "stage-start", "stage-end", "complete", "fail", "cancel"],
+    "deliverables": [
+      "Define a registry of named pipelines with stable pipeline IDs, versions, stages, inputs, outputs, and verification checks",
+      "Persist every pipeline run with run ID, task ID, workspace, timestamps, status, stage results, errors, and cancellation state",
+      "Record model, provider, token, cost, documentation sources, tool calls, changed files, and validation results when applicable",
+      "Store execution records in a workspace-scoped append-only JSONL or SQLite event store with retention and redaction controls",
+      "Expose querying and export for a task, pipeline, session, date range, or failed stage",
+      "Add tests proving incomplete or failed pipeline runs cannot be reported as completed"
+    ],
+    "executionRecord": {
+      "required": true,
+      "store": ".aqt-reports/pipelines",
+      "format": "jsonl-or-sqlite"
+    },
+    "tags": ["pipelines", "telemetry", "audit", "execution-history", "observability"]
+  },
+  "exampleSecurityTask": {
+    "id": "P9-T014",
+    "name": "Execution Permissions and Workspace Safety",
+    "status": "PENDING",
+    "priority": "CRITICAL",
+    "estimatedHours": 20,
+    "value": 100,
+    "recommendedModel": ["o1-mini", "gpt-4.1", "claude-opus-5"],
+    "modelRationale": "CRITICAL: Security boundaries, path validation, secret redaction. o1-mini for reasoning. Escalate to Opus for maximum safety.",
+    "dependencies": ["P9-T013"],
+    "deliverables": [
+      "Provide clear approval modes for read-only, approval-required, and explicitly trusted operations, with safe defaults",
+      "Require confirmation for terminal commands and file writes according to policy and show the exact command, working directory, or target files",
+      "Constrain file operations to the selected workspace and guard against traversal, symlink escapes, and destructive commands",
+      "Redact secrets from prompts, tool output, and logs, and require explicit consent before sending source to a cloud provider",
+      "Add security tests for path escapes, command policy, secret redaction, cancellation, and denied operations"
+    ],
+    "tags": ["security", "permissions", "approval", "privacy"]
+  },
+  "exampleTaskWithCompletion": {
+    "id": "P8-T001",
+    "name": "Shared Core and Interface Adapter Architecture",
+    "status": "COMPLETED",
+    "completedDate": "2026-09-30",
+    "artifacts": ["src/core/shared-app-services.js", "src/core/interface-adapter.js"],
+    "priority": "CRITICAL",
+    "estimatedHours": 24,
+    "value": 100,
+    "recommendedModel": ["gpt-4o-mini", "o1-mini", "deepseek-r1"],
+    "modelRationale": "CRITICAL: Architecture design. GPT-4o mini for most work. Escalate for complex architectural decisions.",
+    "dependencies": ["P1-T001", "P1-T008", "P6-T012"],
+    "deliverables": [
+      "Define stable shared application services independent of any transport or user interface",
+      "Define interface adapter contracts for configuration, inputs, outputs, errors, and lifecycle",
+      "Create separate application access points that reuse the shared core without duplicating business logic",
+      "Propagate model-required and provider-unavailable outcomes consistently across interfaces",
+      "Add adapter-level contract tests and configuration isolation"
+    ],
+    "tags": ["architecture", "adapters", "interfaces", "shared-core"]
+  },
+  "modelArrayPatterns": {
+    "pattern1_fileOperations": {
+      "description": "For simple file operations, implementations, and standard patterns",
+      "recommendedModel": ["deepseek-v4-flash", "gpt-4o-mini", "claude-haiku-4"],
+      "estimatedCost": 0.98,
+      "useCases": [
+        "File inventory and classification",
+        "Metadata extraction and template application",
+        "File moves and link updates",
+        "JSON parsing and validation",
+        "UI state management (after architecture)",
+        "Diff generation and rollback",
+        "URL fetching and content extraction",
+        "Pipeline implementations (after T024)",
+        "CLI argument parsing",
+        "Data aggregation and reporting"
+      ]
+    },
+    "pattern2_moderateReasoning": {
+      "description": "For tasks requiring moderate reasoning but not security-critical",
+      "recommendedModel": ["gpt-4o-mini", "gpt-4.1", "deepseek-r1"],
+      "estimatedCost": 1.95,
+      "useCases": [
+        "Documentation consolidation and conflict resolution",
+        "Workspace configuration and discovery",
+        "Context assembly and token budgets",
+        "Complex state management",
+        "Verification orchestration",
+        "Requirement mapping",
+        "CI integration and regression detection",
+        "Plugin architecture design",
+        "Contract testing"
+      ]
+    },
+    "pattern3_securityCritical": {
+      "description": "For security-critical tasks requiring specialized reasoning",
+      "recommendedModel": ["o1-mini", "gpt-4.1", "claude-opus-5"],
+      "estimatedCost": 39.00,
+      "useCases": [
+        "Provider and credential management",
+        "Tool registry and execution safety",
+        "Workspace permissions and path validation",
+        "Privacy controls and usage tracking",
+        "Secret redaction",
+        "Security scanning"
+      ],
+      "note": "Security should never be compromised for cost savings"
+    },
+    "pattern4_criticalArchitecture": {
+      "description": "For critical tasks requiring deep reasoning but not security-specific",
+      "recommendedModel": ["gpt-4o-mini", "o1-mini", "gpt-4.1"],
+      "estimatedCost": "1.95-39.00",
+      "useCases": [
+        "Agent planning and orchestration",
+        "Task scope analysis",
+        "Code generation workflow",
+        "Pipeline catalog design",
+        "Auto-fix orchestration",
+        "AI issue resolution"
+      ],
+      "note": "Start with GPT-4o mini, escalate to o1-mini if reasoning insufficient"
+    }
+  },
+  "taskCreationGuide": {
+    "requiredFields": [
+      {
+        "field": "id",
+        "type": "string",
+        "format": "P{phase}-T{number}",
+        "example": "P9-T041",
+        "description": "Unique task identifier"
+      },
+      {
+        "field": "name",
+        "type": "string",
+        "example": "New Task Name",
+        "description": "Human-readable task name"
+      },
+      {
+        "field": "status",
+        "type": "string",
+        "enum": ["PENDING", "IN_PROGRESS", "COMPLETED", "BLOCKED", "CANCELLED"],
+        "default": "PENDING",
+        "description": "Current task status"
+      },
+      {
+        "field": "priority",
+        "type": "string",
+        "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
+        "default": "MEDIUM",
+        "description": "Task priority level"
+      },
+      {
+        "field": "estimatedHours",
+        "type": "number",
+        "minimum": 1,
+        "example": 16,
+        "description": "Estimated hours to complete"
+      },
+      {
+        "field": "value",
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 85,
+        "description": "Business value score (0-100)"
+      },
+      {
+        "field": "recommendedModel",
+        "type": "array",
+        "items": { "type": "string" },
+        "minItems": 1,
+        "maxItems": 3,
+        "example": ["deepseek-v4-flash", "gpt-4o-mini", "claude-haiku-4"],
+        "description": "Array of recommended models in priority order (lowest cost first)"
+      },
+      {
+        "field": "modelRationale",
+        "type": "string",
+        "example": "Explain why these models and when to escalate",
+        "description": "Explanation of model selection and escalation triggers"
+      },
+      {
+        "field": "dependencies",
+        "type": "array",
+        "items": { "type": "string" },
+        "example": ["P9-T001", "P9-T002"],
+        "description": "Array of task IDs that must be completed first"
+      },
+      {
+        "field": "deliverables",
+        "type": "array",
+        "items": { "type": "string" },
+        "minItems": 1,
+        "example": ["Deliverable 1", "Deliverable 2"],
+        "description": "List of expected deliverables"
+      },
+      {
+        "field": "tags",
+        "type": "array",
+        "items": { "type": "string" },
+        "example": ["documentation", "inventory"],
+        "description": "Categorization tags"
+      }
+    ],
+    "optionalFields": [
+      {
+        "field": "pipelineId",
+        "type": "string",
+        "example": "pipeline-ledger",
+        "description": "Identifier for pipeline-based tasks"
+      },
+      {
+        "field": "pipelineStages",
+        "type": "array",
+        "items": { "type": "string" },
+        "example": ["register", "start", "complete"],
+        "description": "Stages in pipeline execution"
+      },
+      {
+        "field": "executionRecord",
+        "type": "object",
+        "properties": {
+          "required": { "type": "boolean" },
+          "store": { "type": "string" },
+          "format": { "type": "string" },
+          "pipeline": { "type": "string" }
+        },
+        "description": "Execution record configuration"
+      },
+      {
+        "field": "completedDate",
+        "type": "string",
+        "format": "date",
+        "example": "2026-09-30",
+        "description": "Date task was completed"
+      },
+      {
+        "field": "artifacts",
+        "type": "array",
+        "items": { "type": "string" },
+        "example": ["src/core/services.js"],
+        "description": "Files or artifacts produced by this task"
+      },
+      {
+        "field": "blocker",
+        "type": "string",
+        "description": "Description of what is blocking this task"
+      },
+      {
+        "field": "notes",
+        "type": "string",
+        "description": "Additional notes or context"
+      }
+    ]
+  },
+  "costEstimationGuide": {
+    "formula": "estimatedTokens = estimatedHours * 100000",
+    "modelCosts": {
+      "deepseek-v4-flash": { "per1MInput": 0.14, "per1MOutput": 0.28, "blendedPer1M": 0.98 },
+      "gpt-4o-mini": { "per1MInput": 0.15, "per1MOutput": 0.60, "blendedPer1M": 1.95 },
+      "claude-haiku-4": { "per1MInput": 1.00, "per1MOutput": 5.00, "blendedPer1M": 16.00 },
+      "o1-mini": { "per1MInput": 3.00, "per1MOutput": 12.00, "blendedPer1M": 39.00 },
+      "gpt-4.1": { "per1MInput": 2.00, "per1MOutput": 8.00, "blendedPer1M": 26.00 },
+      "deepseek-r1": { "per1MInput": 8.00, "per1MOutput": 32.00, "blendedPer1M": 104.00 },
+      "claude-opus-5": { "per1MInput": 4.00, "per1MOutput": 20.00, "blendedPer1M": 64.00 }
+    },
+    "example": {
+      "task": "P9-T001 Documentation Inventory",
+      "estimatedHours": 12,
+      "estimatedTokens": 1200000,
+      "model1Cost": "0.98 * 1.2 = $1.18",
+      "model2Cost": "1.95 * 1.2 = $2.34",
+      "model3Cost": "16.00 * 1.2 = $19.20"
+    }
+  },
+  "quickReference": {
+    "chooseModelPattern": {
+      "simple_implementation": "Pattern 1: ['deepseek-v4-flash', 'gpt-4o-mini', 'claude-haiku-4']",
+      "requires_reasoning": "Pattern 2: ['gpt-4o-mini', 'gpt-4.1', 'deepseek-r1']",
+      "security_sensitive": "Pattern 3: ['o1-mini', 'gpt-4.1', 'claude-opus-5']",
+      "critical_complex": "Pattern 4: ['gpt-4o-mini', 'o1-mini', 'gpt-4.1']"
+    },
+    "priorityGuidelines": {
+      "CRITICAL": "Must complete; affects multiple other tasks; no alternatives",
+      "HIGH": "Important feature; significant value; some workarounds",
+      "MEDIUM": "Nice to have; adds value; can be deferred",
+      "LOW": "Enhancement; minor impact; can be skipped"
+    },
+    "statusTransitions": {
+      "PENDING": ["IN_PROGRESS", "BLOCKED", "CANCELLED"],
+      "IN_PROGRESS": ["COMPLETED", "BLOCKED", "CANCELLED"],
+      "BLOCKED": ["PENDING", "CANCELLED"],
+      "COMPLETED": [],
+      "CANCELLED": ["PENDING"]
+    }
+  }
+}

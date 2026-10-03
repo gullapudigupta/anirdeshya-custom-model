@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Advanced Quality Tool - Interactive Chat UI</title>
+  <link rel="stylesheet" href="chat-ui.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>
+        <span>🔧</span>
+        Advanced Quality Tool
+      </h1>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-value" id="totalIssues">0</div>
+          <div class="stat-label">Issues</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="fixedCount">0</div>
+          <div class="stat-label">Fixed</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="successRate">0%</div>
+          <div class="stat-label">Success</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-container">
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-controls">
+            <button id="analyzeBtn" class="sidebar-action" type="button">Analyze Project</button>
+            <button id="securityScanBtn" class="sidebar-action security-btn" type="button">🔒 Security Scan</button>
+            <button id="exportBtn" class="sidebar-action export-btn" type="button">📥 Export</button>
+            <button id="loadTasksBtn" class="sidebar-action" type="button">Load Tasks JSON</button>
+            <input id="tasksFile" type="file" accept=".json,application/json" hidden>
+          </div>
+          <div class="sidebar-tabs" role="tablist" aria-label="Project data">
+            <button id="issuesTab" class="sidebar-tab active" type="button" role="tab" aria-selected="true" data-sidebar-view="issues">
+              Issues <span id="issueCount">0</span>
+            </button>
+            <button id="tasksTab" class="sidebar-tab" type="button" role="tab" aria-selected="false" data-sidebar-view="tasks">
+              Tasks <span id="taskCount">0</span>
+            </button>
+            <button id="pipelineTab" class="sidebar-tab" type="button" role="tab" aria-selected="false" data-sidebar-view="pipeline">
+              ⚡ Pipeline
+            </button>
+            <button id="agentTab" class="sidebar-tab" type="button" role="tab" aria-selected="false" data-sidebar-view="agent">
+              🤖 Agents
+            </button>
+            <button id="aiTab" class="sidebar-tab" type="button" role="tab" aria-selected="false" data-sidebar-view="ai">
+              ✨ AI Gen
+            </button>
+            <button id="metricsTab" class="sidebar-tab" type="button" role="tab" aria-selected="false" data-sidebar-view="metrics">
+              📊 Metrics
+            </button>
+          </div>
+        </div>
+        <div class="sidebar-status" id="sidebarStatus" role="status">No live analysis loaded. Analyze the project or load a task JSON file.</div>
+        
+        <!-- Issue Filtering (P11-T011) -->
+        <div class="filters-container" id="filtersContainer" style="display: none;">
+          <div class="filter-group">
+            <label for="severityFilter" class="filter-label">Severity</label>
+            <select id="severityFilter" class="filter-select">
+              <option value="">All</option>
+              <option value="critical">🔴 Critical</option>
+              <option value="high">🟠 High</option>
+              <option value="medium">🟡 Medium</option>
+              <option value="low">🟢 Low</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="categoryFilter" class="filter-label">Category</label>
+            <select id="categoryFilter" class="filter-select">
+              <option value="">All</option>
+              <option value="security">Security</option>
+              <option value="performance">Performance</option>
+              <option value="maintainability">Maintainability</option>
+              <option value="reliability">Reliability</option>
+              <option value="style">Style</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="fileFilter" class="filter-label">File</label>
+            <input id="fileFilter" type="text" class="filter-input" placeholder="Filter by file...">
+          </div>
+          <button id="clearFiltersBtn" class="clear-filters-btn" title="Clear all filters">✕ Clear</button>
+        </div>
+        
+        <!-- Search Functionality (P11-T012) -->
+        <div class="search-container" id="searchContainer" style="display: none;">
+          <div class="search-input-group">
+            <input id="searchInput" type="text" class="search-input" placeholder="Search issues by message, file, or rule ID..." aria-label="Search issues">
+            <button id="searchClearBtn" class="search-clear-btn" title="Clear search" style="display: none;">✕</button>
+          </div>
+          <div class="search-results-info" id="searchResultsInfo" style="display: none;"></div>
+        </div>
+        
+        <!-- Multi-Issue Selection (P11-T013) -->
+        <div class="bulk-actions-bar" id="bulkActionsBar" style="display: none;">
+          <div class="bulk-selection-info">
+            <input type="checkbox" id="selectAllCheckbox" class="select-all-checkbox" title="Select all visible issues">
+            <span class="selection-count"><span id="selectedCount">0</span> selected</span>
+          </div>
+          <div class="bulk-actions">
+            <button id="fixSelectedBtn" class="bulk-action-btn fix-btn" title="Fix all selected issues">
+              🔧 Fix Selected
+            </button>
+            <button id="clearSelectionBtn" class="bulk-action-btn clear-btn" title="Clear selection">
+              ✕ Clear
+            </button>
+          </div>
+        </div>
+        
+        <div class="sidebar-content" id="issuesList">
+          <div class="empty-state">
+            <h3>No live findings</h3>
+            <p>Run project analysis to load current issues.</p>
+          </div>
+        </div>
+
+        <!-- Pipeline Panel (P11-T018) -->
+        <div class="sidebar-content pipeline-panel" id="pipelinePanel" style="display: none;">
+          <div class="panel-header">
+            <h3>⚡ Pipeline Execution</h3>
+            <p class="panel-description">Manage and monitor quality pipelines</p>
+          </div>
+
+          <!-- Pipeline Selection -->
+          <div class="panel-section">
+            <label class="panel-label">Select Pipeline</label>
+            <select id="pipelineSelect" class="panel-select">
+              <option value="">-- Select a pipeline --</option>
+            </select>
+            <button id="pipelineRefreshBtn" class="panel-action-btn" title="Refresh pipelines">🔄</button>
+          </div>
+
+          <!-- Pipeline Info -->
+          <div id="pipelineInfo" class="pipeline-info" style="display: none;">
+            <div class="info-header">
+              <span class="info-title" id="pipelineName">-</span>
+              <span class="info-badge" id="pipelineVersion">v1.0</span>
+            </div>
+            <div class="info-description" id="pipelineDescription">-</div>
+            <div class="info-meta">
+              <span class="meta-item">
+                <span class="meta-label">Steps:</span>
+                <span class="meta-value" id="pipelineSteps">0</span>
+              </span>
+              <span class="meta-item">
+                <span class="meta-label">Timeout:</span>
+                <span class="meta-value" id="pipelineTimeout">30m</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Execution Controls -->
+          <div class="panel-section">
+            <div class="execution-controls">
+              <button id="pipelineRunBtn" class="execution-btn primary" disabled>
+                ▶️ Run Pipeline
+              </button>
+              <button id="pipelineCancelBtn" class="execution-btn danger" disabled>
+                ⏹️ Cancel
+              </button>
+            </div>
+            <div class="execution-options">
+              <label class="checkbox-label">
+                <input id="pipelineDryRun" type="checkbox">
+                Dry Run (no fixes applied)
+              </label>
+              <label class="checkbox-label">
+                <input id="pipelineAutoApprove" type="checkbox">
+                Auto-approve safe fixes
+              </label>
+            </div>
+          </div>
+
+          <!-- Execution Progress -->
+          <div id="pipelineProgress" class="pipeline-progress" style="display: none;">
+            <div class="progress-header">
+              <span class="progress-title">Execution Progress</span>
+              <span class="progress-status" id="pipelineExecStatus">Running</span>
+            </div>
+            <div class="progress-bar-container">
+              <div class="progress-bar" id="pipelineProgressBar" style="width: 0%"></div>
+            </div>
+            <div class="progress-stats">
+              <span id="pipelineProgressText">0 / 0 steps completed</span>
+              <span id="pipelineElapsed">00:00</span>
+            </div>
+          </div>
+
+          <!-- Pipeline Steps List -->
+          <div id="pipelineStepsList" class="pipeline-steps">
+            <div class="steps-header">
+              <h4>Pipeline Steps</h4>
+              <span class="steps-summary" id="stepsSummary">0 total</span>
+            </div>
+            <div id="pipelineStepsContent" class="steps-content">
+              <div class="empty-state small">
+                <p>Select a pipeline to view steps</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Execution History -->
+          <div class="panel-section">
+            <div class="section-header">
+              <h4>Recent Executions</h4>
+              <button id="pipelineHistoryBtn" class="link-btn">View All</button>
+            </div>
+            <div id="pipelineHistory" class="history-list">
+              <div class="empty-state small">
+                <p>No recent executions</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Execution Details Modal (inline) -->
+          <div id="pipelineExecDetails" class="exec-details" style="display: none;">
+            <div class="details-header">
+              <h4>Execution Details</h4>
+              <button id="closePipelineDetails" class="close-btn">×</button>
+            </div>
+            <div class="details-content">
+              <div class="detail-row">
+                <span class="detail-label">Execution ID:</span>
+                <span class="detail-value" id="execId">-</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Started:</span>
+                <span class="detail-value" id="execStart">-</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Duration:</span>
+                <span class="detail-value" id="execDuration">-</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Status:</span>
+                <span class="detail-value" id="execStatus">-</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Issues Found:</span>
+                <span class="detail-value" id="execIssuesFound">-</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Issues Fixed:</span>
+                <span class="detail-value" id="execIssuesFixed">-</span>
+              </div>
+            </div>
+            <div class="details-actions">
+              <button id="execReplayBtn" class="action-btn">🔄 Replay</button>
+              <button id="execExportBtn" class="action-btn">📥 Export Report</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Agent Monitoring Panel (P11-T019) -->
+        <div class="sidebar-content agent-panel" id="agentPanel" style="display: none;">
+          <div class="panel-header">
+            <h3>🤖 Agent Monitoring</h3>
+            <p class="panel-description">Monitor and control autonomous agents</p>
+          </div>
+
+          <!-- Agent Controls -->
+          <div class="panel-section">
+            <div class="agent-controls">
+              <button id="agentStartBtn" class="agent-btn primary">
+                🚀 Start Agent
+              </button>
+              <button id="agentRefreshBtn" class="agent-btn" title="Refresh agents">
+                🔄
+              </button>
+            </div>
+          </div>
+
+          <!-- Start Agent Form -->
+          <div id="agentStartForm" class="agent-form" style="display: none;">
+            <div class="form-section">
+              <label class="panel-label">Agent Type</label>
+              <select id="agentType" class="panel-select">
+                <option value="autonomous">Autonomous Agent</option>
+                <option value="interactive">Interactive Agent</option>
+                <option value="guided">Guided Agent</option>
+              </select>
+            </div>
+            <div class="form-section">
+              <label class="panel-label">Goal / Task</label>
+              <textarea id="agentGoal" class="panel-textarea" placeholder="Describe what the agent should accomplish..."></textarea>
+            </div>
+            <div class="form-section">
+              <label class="panel-label">Max Iterations</label>
+              <input id="agentMaxIterations" type="number" class="panel-input" value="10" min="1" max="100">
+            </div>
+            <div class="form-section">
+              <label class="checkbox-label">
+                <input id="agentAutoApprove" type="checkbox">
+                Auto-approve safe operations
+              </label>
+            </div>
+            <div class="form-actions">
+              <button id="agentConfirmBtn" class="agent-btn primary">Start</button>
+              <button id="agentCancelStartBtn" class="agent-btn">Cancel</button>
+            </div>
+          </div>
+
+          <!-- Active Agents -->
+          <div class="panel-section">
+            <div class="section-header">
+              <h4>Active Agents</h4>
+              <span class="agents-count" id="activeAgentsCount">0</span>
+            </div>
+            <div id="activeAgentsList" class="agents-list">
+              <div class="empty-state small">
+                <p>No active agents</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Agent Details View -->
+          <div id="agentDetails" class="agent-details" style="display: none;">
+            <div class="details-header">
+              <h4>Agent Details</h4>
+              <button id="closeAgentDetails" class="close-btn">×</button>
+            </div>
+            <div class="agent-info">
+              <div class="info-row">
+                <span class="info-label">Agent ID:</span>
+                <span class="info-value" id="agentDetailId">-</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Type:</span>
+                <span class="info-value" id="agentDetailType">-</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Status:</span>
+                <span class="info-value" id="agentDetailStatus">-</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Progress:</span>
+                <span class="info-value" id="agentDetailProgress">-</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Current Step:</span>
+                <span class="info-value" id="agentDetailStep">-</span>
+              </div>
+            </div>
+
+            <!-- Agent Progress Bar -->
+            <div class="agent-progress">
+              <div class="progress-bar-container">
+                <div class="progress-bar" id="agentProgressBar" style="width: 0%"></div>
+              </div>
+              <div class="progress-text">
+                <span id="agentProgressText">0%</span>
+                <span id="agentIterationText">Iteration 0/0</span>
+              </div>
+            </div>
+
+            <!-- Agent Actions -->
+            <div class="agent-detail-actions">
+              <button id="agentPauseBtn" class="action-btn">⏸️ Pause</button>
+              <button id="agentResumeBtn" class="action-btn" disabled>▶️ Resume</button>
+              <button id="agentCancelDetailBtn" class="action-btn danger">⏹️ Cancel</button>
+            </div>
+
+            <!-- Pending Approvals -->
+            <div id="pendingApprovals" class="pending-approvals" style="display: none;">
+              <h5>Pending Approvals</h5>
+              <div id="approvalsList" class="approvals-list"></div>
+            </div>
+
+            <!-- Agent Logs -->
+            <div class="agent-logs">
+              <div class="logs-header">
+                <h5>Recent Logs</h5>
+                <button id="agentLogsExpandBtn" class="link-btn">Expand</button>
+              </div>
+              <div id="agentLogsContent" class="logs-content">
+                <div class="empty-state small">
+                  <p>No logs available</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Agent History -->
+          <div class="panel-section">
+            <div class="section-header">
+              <h4>Recent Agents</h4>
+              <button id="agentHistoryBtn" class="link-btn">View All</button>
+            </div>
+            <div id="agentHistory" class="history-list">
+              <div class="empty-state small">
+                <p>No recent agent activity</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Agent Stats -->
+          <div class="agent-stats">
+            <div class="stat-card">
+              <div class="stat-icon">✅</div>
+              <div class="stat-info">
+                <div class="stat-value" id="agentsCompleted">0</div>
+                <div class="stat-label">Completed</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">⚡</div>
+              <div class="stat-info">
+                <div class="stat-value" id="agentsTasksCompleted">0</div>
+                <div class="stat-label">Tasks Done</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">🔧</div>
+              <div class="stat-info">
+                <div class="stat-value" id="agentsFixesApplied">0</div>
+                <div class="stat-label">Fixes Applied</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- AI Generation Panel (P11-T060) -->
+        <div class="sidebar-content ai-panel" id="aiPanel" style="display: none;">
+          <div class="ai-header">
+            <h3>🤖 AI Code Generation</h3>
+            <p class="ai-description">Generate code, tests, and docs with AI</p>
+          </div>
+
+          <!-- Generation Type Selector -->
+          <div class="ai-section">
+            <label class="ai-label">Generation Type</label>
+            <select id="aiGenerationType" class="ai-select">
+              <option value="code">Generate Code</option>
+              <option value="test">Generate Tests</option>
+              <option value="doc">Generate Documentation</option>
+              <option value="fix">Fix Issue</option>
+              <option value="refactor">Refactor Code</option>
+            </select>
+          </div>
+
+          <!-- Input Form (Dynamic based on type) -->
+          <div id="aiInputForm">
+            <!-- Code Generation Form -->
+            <div id="codeGenForm" class="ai-form">
+              <div class="ai-section">
+                <label class="ai-label">Description</label>
+                <textarea id="codeDescription" class="ai-textarea" placeholder="Describe what code to generate..."></textarea>
+              </div>
+              <div class="ai-section">
+                <label class="ai-label">Language</label>
+                <select id="codeLanguage" class="ai-select">
+                  <option value="javascript">JavaScript</option>
+                  <option value="typescript">TypeScript</option>
+                  <option value="python">Python</option>
+                  <option value="java">Java</option>
+                </select>
+              </div>
+              <div class="ai-section">
+                <label class="ai-label">Framework (Optional)</label>
+                <input id="codeFramework" type="text" class="ai-input" placeholder="e.g., React, Express">
+              </div>
+            </div>
+
+            <!-- Test Generation Form -->
+            <div id="testGenForm" class="ai-form" style="display: none;">
+              <div class="ai-section">
+                <label class="ai-label">File Path</label>
+                <input id="testFilePath" type="text" class="ai-input" placeholder="src/utils.js">
+              </div>
+              <div class="ai-section">
+                <label class="ai-label">Test Framework</label>
+                <select id="testFramework" class="ai-select">
+                  <option value="jest">Jest</option>
+                  <option value="mocha">Mocha</option>
+                  <option value="pytest">Pytest</option>
+                  <option value="junit">JUnit</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Doc Generation Form -->
+            <div id="docGenForm" class="ai-form" style="display: none;">
+              <div class="ai-section">
+                <label class="ai-label">File Path</label>
+                <input id="docFilePath" type="text" class="ai-input" placeholder="src/utils.js">
+              </div>
+              <div class="ai-section">
+                <label class="ai-label">Format</label>
+                <select id="docFormat" class="ai-select">
+                  <option value="markdown">Markdown</option>
+                  <option value="jsdoc">JSDoc</option>
+                  <option value="restructured-text">reStructuredText</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Issue Fix Form -->
+            <div id="fixIssueForm" class="ai-form" style="display: none;">
+              <div class="ai-section">
+                <label class="ai-label">Issue ID</label>
+                <input id="fixIssueId" type="text" class="ai-input" placeholder="Select an issue from Issues tab">
+              </div>
+              <div class="ai-section">
+                <label class="ai-checkbox-label">
+                  <input id="fixDryRun" type="checkbox" checked>
+                  Dry Run (preview only)
+                </label>
+              </div>
+            </div>
+
+            <!-- Refactor Form -->
+            <div id="refactorForm" class="ai-form" style="display: none;">
+              <div class="ai-section">
+                <label class="ai-label">File Path</label>
+                <input id="refactorFilePath" type="text" class="ai-input" placeholder="src/app.js">
+              </div>
+              <div class="ai-section">
+                <label class="ai-label">Refactoring Goal</label>
+                <textarea id="refactorDescription" class="ai-textarea" placeholder="e.g., Extract validation logic into separate functions"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI Provider Settings -->
+          <div class="ai-section">
+            <label class="ai-label">AI Provider</label>
+            <select id="aiProvider" class="ai-select">
+              <option value="openai">OpenAI (GPT-4)</option>
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="google">Google (Gemini)</option>
+              <option value="ollama">Ollama (Local)</option>
+            </select>
+          </div>
+
+          <!-- Cost Estimation -->
+          <div class="ai-cost-estimate">
+            <div class="cost-label">Estimated Cost:</div>
+            <div class="cost-value" id="aiCostEstimate">$0.00</div>
+          </div>
+
+          <!-- Generate Button -->
+          <button id="aiGenerateBtn" class="ai-generate-btn">
+            🚀 Generate
+          </button>
+
+          <!-- Progress Indicator -->
+          <div id="aiProgress" class="ai-progress" style="display: none;">
+            <div class="progress-spinner"></div>
+            <div class="progress-text">Generating...</div>
+          </div>
+
+          <!-- Result Display -->
+          <div id="aiResult" class="ai-result" style="display: none;">
+            <div class="result-header">
+              <span class="result-title">Generated Content</span>
+              <button id="aiCopyBtn" class="result-action">📋 Copy</button>
+            </div>
+            <pre id="aiResultContent" class="result-content"></pre>
+            <div class="result-footer">
+              <div class="result-cost">Cost: <span id="aiActualCost">$0.00</span></div>
+              <div class="result-actions">
+                <button id="aiApplyBtn" class="result-action-btn">✅ Apply</button>
+                <button id="aiSaveBtn" class="result-action-btn">💾 Save</button>
+                <button id="aiClearBtn" class="result-action-btn">🗑️ Clear</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cost Tracking -->
+          <div class="ai-cost-tracking">
+            <h4>Cost Tracking</h4>
+            <div class="cost-stats">
+              <div class="cost-stat">
+                <div class="cost-stat-label">Today</div>
+                <div class="cost-stat-value" id="costToday">$0.00</div>
+              </div>
+              <div class="cost-stat">
+                <div class="cost-stat-label">This Month</div>
+                <div class="cost-stat-value" id="costMonth">$0.00</div>
+              </div>
+              <div class="cost-stat">
+                <div class="cost-stat-label">Budget Remaining</div>
+                <div class="cost-stat-value" id="costRemaining">$100.00</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Metrics Dashboard Panel (P11-T016) -->
+        <div class="sidebar-content metrics-panel" id="metricsPanel" style="display: none;">
+          <div class="panel-header">
+            <h3>📊 Metrics Dashboard</h3>
+            <p class="panel-description">Code complexity and maintainability overview</p>
+          </div>
+
+          <div class="metrics-controls">
+            <button id="metricsRefreshBtn" class="panel-action-btn" title="Refresh metrics">🔄 Refresh</button>
+          </div>
+
+          <!-- Summary Cards -->
+          <div id="metricsSummary" class="metrics-summary">
+            <div class="metric-card">
+              <div class="metric-card-icon">📁</div>
+              <div class="metric-card-body">
+                <div class="metric-value" id="metricsFilesCount">—</div>
+                <div class="metric-label">Files Scanned</div>
+              </div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-card-icon">⚙️</div>
+              <div class="metric-card-body">
+                <div class="metric-value" id="metricsFunctionsCount">—</div>
+                <div class="metric-label">Functions</div>
+              </div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-card-icon">⚠️</div>
+              <div class="metric-card-body">
+                <div class="metric-value" id="metricsIssuesCount">—</div>
+                <div class="metric-label">Issues</div>
+              </div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-card-icon">🏆</div>
+              <div class="metric-card-body">
+                <div class="metric-value" id="metricsAvgMaintainability">—</div>
+                <div class="metric-label">Avg Maintainability</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Loading / Error State -->
+          <div id="metricsLoading" class="metrics-loading" style="display: none;">
+            <div class="loading-spinner-small"></div>
+            <span>Analyzing complexity…</span>
+          </div>
+          <div id="metricsError" class="metrics-error" style="display: none;"></div>
+
+          <!-- File list -->
+          <div class="panel-section">
+            <div class="section-header">
+              <h4>File Complexity</h4>
+              <span class="section-hint">sorted by complexity</span>
+            </div>
+            <div id="metricsFileList" class="metrics-file-list">
+              <div class="empty-state small">
+                <p>Click Refresh to load metrics</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Chat Area -->
+      <div class="chat-area">
+        <div class="messages" id="messages">
+          <div class="message assistant">
+            <div class="message-avatar">🤖</div>
+            <div class="message-content">
+              <div class="message-text">
+                No analysis loaded. Run project analysis to see current findings, or load a task JSON file.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="input-area">
+          <div class="input-container">
+            <div class="input-wrapper">
+              <textarea 
+                id="messageInput" 
+                placeholder="Ask about code quality issues, request fixes, or chat about improvements..."
+                rows="1"
+              ></textarea>
+            </div>
+            <button id="sendBtn" title="Send message">
+              ➤
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export Dialog (P11-T017) -->
+  <div id="exportDialog" class="export-dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="exportDialogTitle" style="display: none;">
+    <div class="export-dialog">
+      <div class="export-dialog-header">
+        <h3 id="exportDialogTitle">📥 Export Issues</h3>
+        <button id="exportDialogCloseBtn" class="export-dialog-close" aria-label="Close export dialog">×</button>
+      </div>
+      <div class="export-dialog-body">
+        <p class="export-dialog-hint" id="exportDialogHint">Select a format to download</p>
+        <div class="export-format-grid">
+          <button class="export-format-btn" data-format="json" aria-label="Export as JSON">
+            <span class="export-format-icon">{ }</span>
+            <span class="export-format-name">JSON</span>
+            <span class="export-format-desc">Machine-readable</span>
+          </button>
+          <button class="export-format-btn" data-format="csv" aria-label="Export as CSV">
+            <span class="export-format-icon">📊</span>
+            <span class="export-format-name">CSV</span>
+            <span class="export-format-desc">Spreadsheet</span>
+          </button>
+          <button class="export-format-btn" data-format="markdown" aria-label="Export as Markdown">
+            <span class="export-format-icon">📝</span>
+            <span class="export-format-name">Markdown</span>
+            <span class="export-format-desc">Human-readable</span>
+          </button>
+          <button class="export-format-btn" data-format="sarif" aria-label="Export as SARIF">
+            <span class="export-format-icon">🔍</span>
+            <span class="export-format-name">SARIF</span>
+            <span class="export-format-desc">Security tools</span>
+          </button>
+        </div>
+      </div>
+      <div class="export-dialog-footer">
+        <button id="exportCancelBtn" class="export-cancel-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="chat-ui.js"></script>
+</body>
+</html>

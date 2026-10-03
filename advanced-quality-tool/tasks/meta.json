@@ -1,0 +1,204 @@
+{
+  "project": "Advanced Quality Tool - SonarQube-like Analyzer",
+  "version": "1.0.0",
+  "lastUpdated": "2026-09-29",
+  "progressTrackingNote": "Authoritative task counts live in master_tasks_index.json (rollup). Legacy completion counters remain historical; current phase task totals, including Phases 7-9, are reflected in the master index.",
+  "progressTracking": {
+    "totalTasks": 136,
+    "completedTasks": 66,
+    "archivedTasks": 1,
+    "inProgressTasks": 0,
+    "pendingTasks": 69,
+    "completionPercentage": "56%",
+    "phase6Tasks": 15,
+    "phase6EstimatedHours": 148,
+    "phase7Tasks": 9,
+    "phase7EstimatedHours": 332,
+    "phase8Tasks": 7,
+    "phase8EstimatedHours": 148,
+    "phase9Tasks": 40,
+    "phase9EstimatedHours": 778,
+    "supportingFeaturesRequired": {
+      "codeAnalyzer": 5,
+      "advancedQualityTool": 6
+    }
+  },
+  "phaseFiles": {
+    "phase1": "./phase1-tasks.json",
+    "phase2": "./phase2-tasks.json",
+    "phase3": "./phase3-tasks.json",
+    "phase4": "./phase4-tasks.json",
+    "phase5": "./phase5-tasks.json",
+    "phase6": "./phase6-tasks.json",
+    "phase7": "./phase7-tasks.json",
+    "phase8": "./phase8-tasks.json",
+    "phase9": "./phase9-tasks.json"
+  },
+  "valueMap": {
+    "description": "Task value scoring system (0-100)",
+    "criteria": {
+      "90-100": "Critical feature - core functionality, high user impact",
+      "75-89": "Important feature - significant value, moderate user impact",
+      "60-74": "Nice to have - enhances experience, lower priority",
+      "40-59": "Optional - minor improvement, very low priority",
+      "0-39": "Future consideration - exploratory or experimental"
+    }
+  },
+  "priorityLevels": {
+    "HIGH": "Must complete in current phase",
+    "MEDIUM": "Should complete soon, but can defer if needed",
+    "LOW": "Future enhancement, not blocking"
+  },
+  "estimationNotes": {
+    "unit": "hours",
+    "includesDesign": true,
+    "includesTesting": true,
+    "includesDocumentation": true,
+    "buffer": "20% added for unknowns"
+  },
+  "roadmap": {
+    "phase1Target": "2024-Q1",
+    "phase2Target": "2024-Q2",
+    "phase3Target": "2024-Q3",
+    "phase4Target": "2024-Q4",
+    "phase5Target": "2025-Q1"
+  },
+  "onlineResearchSummary": {
+    "sources": [
+      "SonarQube features",
+      "GitHub Advanced Security",
+      "DeepSource capabilities",
+      "ESLint ecosystem",
+      "Snyk code analysis",
+      "CodeQL documentation",
+      "Semgrep features"
+    ],
+    "keyInsights": [
+      "Security vulnerability detection is a must-have feature",
+      "Secret scanning prevents credential leaks",
+      "Complexity metrics help identify maintainability issues",
+      "Quality gates enable CI/CD integration",
+      "Duplicate code detection reduces technical debt",
+      "Multi-language support requires plugin architecture",
+      "AI-powered code review adds significant value",
+      "Pull request integration improves team workflow",
+      "Historical trending enables data-driven decisions",
+      "Performance analysis complements quality checks"
+    ],
+    "competitiveFeatures": [
+      "SonarQube: Quality gates, security hotspots, code smells",
+      "GitHub: Secret scanning, dependency scanning, CodeQL",
+      "DeepSource: Auto-fix, performance issues, anti-patterns",
+      "Snyk: Vulnerability database, fix PRs, license compliance",
+      "CodeQL: Deep semantic analysis, custom queries",
+      "Semgrep: Custom rule creation, SAST, supply chain security"
+    ]
+  },
+  "additionalImprovements": {
+    "fromResearch": [
+      {
+        "feature": "License compliance checking",
+        "description": "Scan dependencies for license violations and incompatibilities",
+        "priority": "MEDIUM",
+        "estimatedHours": 16,
+        "value": 70,
+        "inspiration": "Snyk, FOSSA"
+      },
+      {
+        "feature": "Supply chain security",
+        "description": "Detect malicious packages and typosquatting",
+        "priority": "HIGH",
+        "estimatedHours": 24,
+        "value": 85,
+        "inspiration": "Socket.dev, Snyk"
+      },
+      {
+        "feature": "Code explanation assistant",
+        "description": "Use LLM to explain complex code sections",
+        "priority": "LOW",
+        "estimatedHours": 16,
+        "value": 60,
+        "inspiration": "GitHub Copilot, ChatGPT"
+      },
+      {
+        "feature": "Refactoring suggestions",
+        "description": "AI-generated refactoring recommendations",
+        "priority": "MEDIUM",
+        "estimatedHours": 24,
+        "value": 75,
+        "inspiration": "DeepSource, SonarQube"
+      },
+      {
+        "feature": "Test generation",
+        "description": "Auto-generate unit tests for uncovered code",
+        "priority": "MEDIUM",
+        "estimatedHours": 32,
+        "value": 80,
+        "inspiration": "GitHub Copilot, Diffblue"
+      },
+      {
+        "feature": "Code migration assistant",
+        "description": "Help migrate between framework versions",
+        "priority": "LOW",
+        "estimatedHours": 40,
+        "value": 65,
+        "inspiration": "ngUpdate, React codemod"
+      },
+      {
+        "feature": "Technical debt tracking",
+        "description": "Quantify and track technical debt over time",
+        "priority": "MEDIUM",
+        "estimatedHours": 20,
+        "value": 75,
+        "inspiration": "SonarQube technical debt"
+      },
+      {
+        "feature": "API contract validation",
+        "description": "Verify OpenAPI/Swagger compliance",
+        "priority": "LOW",
+        "estimatedHours": 16,
+        "value": 60,
+        "inspiration": "Spectral, Redocly"
+      },
+      {
+        "feature": "Infrastructure as Code analysis",
+        "description": "Scan Terraform, CloudFormation, Kubernetes YAML",
+        "priority": "LOW",
+        "estimatedHours": 24,
+        "value": 65,
+        "inspiration": "Checkov, tfsec"
+      },
+      {
+        "feature": "GraphQL query optimization",
+        "description": "Detect expensive queries and N+1 problems",
+        "priority": "LOW",
+        "estimatedHours": 16,
+        "value": 55,
+        "inspiration": "Apollo Studio"
+      }
+    ]
+  },
+  "nextActions": {
+    "immediate": [
+      "Review and approve Phase 6 AI Issue Generator (self-explanatory approach)",
+      "Review supporting features documents for code-analyzer and advanced-quality-tool",
+      "Setup API keys for GitHub, StackOverflow, and AI services (OpenAI/Anthropic)",
+      "Install and configure Ollama with CodeLlama model for local AI execution",
+      "Review AI_ISSUE_GENERATOR_SUMMARY.md for full feature specification"
+    ],
+    "shortTerm": [
+      "Implement code-analyzer supporting features (CA-SF-001 to CA-SF-005): 46 hours",
+      "Implement advanced-quality-tool supporting features (AQ-SF-001 to AQ-SF-006): 62 hours",
+      "Begin Phase 6 implementation: Issue Classifier with self-explanatory descriptions",
+      "Build LINQ-style symbol query integration with code-analyzer",
+      "Develop line-level editing system with AST validation"
+    ],
+    "longTerm": [
+      "Optimize AI prompt engineering for better self-explanatory fixes",
+      "Add support for more programming languages and frameworks",
+      "Implement machine learning for context relevance scoring",
+      "Build analytics dashboard for AI performance and cost tracking",
+      "Extend symbol analysis with more advanced LINQ-like queries"
+    ]
+  }
+}

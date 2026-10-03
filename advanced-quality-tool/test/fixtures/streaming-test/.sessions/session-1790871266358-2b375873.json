@@ -1,0 +1,56 @@
+{
+  "id": "session-1790871266358-2b375873",
+  "workspace": "/workspace",
+  "model": "test-model",
+  "provider": null,
+  "createdAt": 1790871266358,
+  "updatedAt": 1790871266359,
+  "events": [
+    {
+      "id": "d326f853ac2b244438a18caaf59b3c2b",
+      "type": "session-start",
+      "timestamp": 1790871266358,
+      "data": {
+        "sessionId": "session-1790871266358-2b375873",
+        "workspace": "/workspace",
+        "model": "test-model"
+      }
+    },
+    {
+      "id": "19627540bd2e4ac9f66b6d84ffc1daae",
+      "type": "model-token",
+      "timestamp": 1790871266359,
+      "data": {
+        "token": "test"
+      }
+    },
+    {
+      "id": "db56ff229014b25873012e419e9db41b",
+      "type": "model-complete",
+      "timestamp": 1790871266359,
+      "data": {
+        "text": "complete"
+      }
+    },
+    {
+      "id": "f6741023c32d991d5035e901a9cc4a41",
+      "type": "session-end",
+      "timestamp": 1790871266359,
+      "data": {
+        "status": "completed"
+      }
+    }
+  ],
+  "context": {
+    "task": null,
+    "files": [],
+    "references": []
+  },
+  "changes": {
+    "applied": [],
+    "rejected": [],
+    "failed": []
+  },
+  "status": "completed",
+  "metadata": {}
+}

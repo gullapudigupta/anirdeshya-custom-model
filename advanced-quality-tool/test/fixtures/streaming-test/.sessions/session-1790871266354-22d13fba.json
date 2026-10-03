@@ -1,0 +1,40 @@
+{
+  "id": "session-1790871266354-22d13fba",
+  "workspace": "/workspace",
+  "model": null,
+  "provider": null,
+  "createdAt": 1790871266354,
+  "updatedAt": 1790871266355,
+  "events": [
+    {
+      "id": "a50428fcb5145d85be442c255342ead1",
+      "type": "session-start",
+      "timestamp": 1790871266354,
+      "data": {
+        "sessionId": "session-1790871266354-22d13fba",
+        "workspace": "/workspace"
+      }
+    },
+    {
+      "id": "4277283c6e88388284a34fc7ba4babaa",
+      "type": "session-cancel",
+      "timestamp": 1790871266355,
+      "data": {
+        "reason": "User cancelled",
+        "retryCount": 0
+      }
+    }
+  ],
+  "context": {
+    "task": null,
+    "files": [],
+    "references": []
+  },
+  "changes": {
+    "applied": [],
+    "rejected": [],
+    "failed": []
+  },
+  "status": "cancelled",
+  "metadata": {}
+}

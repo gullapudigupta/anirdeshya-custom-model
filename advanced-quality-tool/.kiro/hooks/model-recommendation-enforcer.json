@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Model Recommendation Enforcer",
+      "trigger": "PreTaskExec",
+      "description": "Ensures the current model matches the task's recommended model before task execution to prevent budget overruns",
+      "action": {
+        "type": "command",
+        "command": "powershell -ExecutionPolicy Bypass -File \"./scripts/check-model-recommendation.ps1\"",
+        "timeout": 10
+      }
+    }
+  ]
+}

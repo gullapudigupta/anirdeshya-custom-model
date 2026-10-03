@@ -1,0 +1,461 @@
+{
+  "phase": "phase6",
+  "name": "AI Issue Generator - Self-Explanatory Intelligent Auto-Fix",
+  "priority": "CRITICAL",
+  "estimatedHours": 160,
+  "status": "COMPLETED",
+  "completionPercentage": "100%",
+  "statusSummary": { "completed": 16, "pending": 0 },
+  "reconciledOn": "2026-09-07",
+  "reconciliationNote": "All 16 tasks implemented under src/ai-generator/ and src/commands/. Foundations (T001/T002/T006/T007/T010) plus search adapters (T003-T005), dependency-aware official-docs builder (T016), executors (T008 Ollama / T009 cloud), error recovery (T011), orchestrator (T012), CLI generate-fixes (T013), config/cost (T014), and tests/docs (T015). All modules are dependency-injected and network-free by default; verified via tests/ai-generator/generator.test.js (20/20 passing) and the foundations smoke test. Network/model access is only used when a transport is injected.",
+  "description": "AI-powered issue resolution system that provides self-explanatory issue descriptions, uses code-analyzer for symbol queries and LINQ-like code analysis, applies line-level fixes, researches solutions online, and validates results with intelligent error recovery",
+  "documentation": "docs/AI_ISSUE_GENERATOR_SUMMARY.md",
+  "supportingFeatures": {
+    "codeAnalyzer": "tools/code-analyzer/docs/SUPPORTING_FEATURES_AI_GENERATOR.md",
+    "advancedQualityTool": "tools/advanced-quality-tool/docs/SUPPORTING_FEATURES_AI_GENERATOR.md"
+  },
+  "keyFeatures": [
+    "Self-explanatory issue descriptions (what/why/how to fix)",
+    "Line-level code editing (not full file rewrites)",
+    "Code-analyzer integration for symbol queries and context",
+    "LINQ-style code analysis and pattern matching",
+    "Multi-source research (docs, GitHub, StackOverflow)",
+    "Local-first AI execution with cloud fallback",
+    "Intelligent error recovery with enhanced context"
+  ],
+  "tasks": [
+    {
+      "id": "P6-T001",
+      "name": "Self-Explanatory Issue Classifier",
+      "status": "COMPLETED",
+      "description": "Build issue classifier that generates plain English explanations (what is the issue, why it's a problem, what to do) and uses code-analyzer for symbol context analysis",
+      "priority": "CRITICAL",
+      "estimatedHours": 10,
+      "value": 100,
+      "dependencies": [],
+      "codeAnalyzerIntegration": [
+        "query-engine.js for symbol queries",
+        "symbol-extractor.js for usage analysis",
+        "context-composer.js for minimal context"
+      ],
+      "deliverables": [
+        "src/ai-generator/issue-classifier.js",
+        "Self-explanatory description generator",
+        "Symbol context analyzer (using code-analyzer)",
+        "Issue summarizer (<100 tokens)",
+        "Priority and fix complexity scorer"
+      ],
+      "tags": [
+        "ai",
+        "classification",
+        "self-explanatory",
+        "code-analyzer"
+      ]
+    },
+    {
+      "id": "P6-T002",
+      "name": "Code Context Analyzer with Symbol Queries",
+      "status": "COMPLETED",
+      "description": "Build intelligent context extraction using code-analyzer's LINQ-like symbol queries for precise analysis and minimal token usage",
+      "priority": "CRITICAL",
+      "estimatedHours": 12,
+      "value": 95,
+      "dependencies": [
+        "P6-T001"
+      ],
+      "codeAnalyzerIntegration": [
+        "query-engine.js for LINQ-style queries",
+        "symbol-extractor.js for symbol discovery",
+        "context-composer.js for context building",
+        "ast-utils.js for AST traversal"
+      ],
+      "deliverables": [
+        "src/ai-generator/code-context-analyzer.js",
+        "LINQ-style symbol query interface",
+        "Minimal context extractor (<300 tokens)",
+        "Related symbol discovery",
+        "Import chain analyzer"
+      ],
+      "tags": [
+        "context",
+        "code-analyzer",
+        "linq",
+        "symbols"
+      ]
+    },
+    {
+      "id": "P6-T003",
+      "status": "COMPLETED",
+      "name": "Documentation Search Engine",
+      "description": "Integrate documentation search for official docs (ESLint, TypeScript, Angular, React) with local caching",
+      "priority": "HIGH",
+      "estimatedHours": 10,
+      "value": 85,
+      "dependencies": [
+        "P6-T001"
+      ],
+      "deliverables": [
+        "src/ai-generator/doc-searcher.js",
+        "Multi-source search adapter",
+        "Result ranking algorithm",
+        "Local cache system (AQ-SF-002)"
+      ],
+      "tags": [
+        "search",
+        "documentation",
+        "context"
+      ]
+    },
+    {
+      "id": "P6-T004",
+      "status": "COMPLETED",
+      "name": "GitHub Issues Search Integration",
+      "description": "Search GitHub issues for similar problems and their solutions from relevant repositories",
+      "priority": "HIGH",
+      "estimatedHours": 10,
+      "value": 80,
+      "dependencies": [
+        "P6-T001"
+      ],
+      "deliverables": [
+        "src/ai-generator/github-searcher.js",
+        "GitHub API client",
+        "Query optimizer",
+        "Solution extractor"
+      ],
+      "tags": [
+        "search",
+        "github",
+        "context"
+      ]
+    },
+    {
+      "id": "P6-T005",
+      "status": "COMPLETED",
+      "name": "StackOverflow Search Integration",
+      "description": "Search StackOverflow for related questions and accepted answers",
+      "priority": "HIGH",
+      "estimatedHours": 8,
+      "value": 75,
+      "dependencies": [
+        "P6-T001"
+      ],
+      "deliverables": [
+        "src/ai-generator/stackoverflow-searcher.js",
+        "StackExchange API client",
+        "Answer parser",
+        "Code snippet extractor"
+      ],
+      "tags": [
+        "search",
+        "stackoverflow",
+        "context"
+      ]
+    },
+    {
+      "id": "P6-T006",
+      "name": "Context Aggregator & Summarizer",
+      "status": "COMPLETED",
+      "description": "Aggregate search results, code context, and symbol analysis; deduplicate and summarize within token limits using AQ-SF-005",
+      "priority": "CRITICAL",
+      "estimatedHours": 12,
+      "value": 90,
+      "dependencies": [
+        "P6-T002",
+        "P6-T003",
+        "P6-T004",
+        "P6-T005"
+      ],
+      "deliverables": [
+        "src/ai-generator/context-aggregator.js",
+        "Deduplication algorithm (AQ-SF-005)",
+        "Relevance scoring",
+        "Token optimizer (<2000 tokens total)",
+        "Summary generator"
+      ],
+      "tags": [
+        "context",
+        "aggregation",
+        "optimization"
+      ]
+    },
+    {
+      "id": "P6-T007",
+      "name": "Self-Explanatory Prompt Builder",
+      "status": "COMPLETED",
+      "description": "Build prompts that clearly explain the issue and expected fix, include code context from code-analyzer, and request line-level edits",
+      "priority": "CRITICAL",
+      "estimatedHours": 10,
+      "value": 95,
+      "dependencies": [
+        "P6-T002",
+        "P6-T006"
+      ],
+      "deliverables": [
+        "src/ai-generator/prompt-builder.js",
+        "Self-explanatory prompt templates",
+        "Line-edit request formatter",
+        "Token budget manager",
+        "Output format specifications"
+      ],
+      "tags": [
+        "ai",
+        "prompts",
+        "self-explanatory"
+      ]
+    },
+    {
+      "id": "P6-T008",
+      "status": "COMPLETED",
+      "name": "Local AI Model Executor (Ollama)",
+      "description": "Execute prompts against local AI model (Ollama) with retry logic",
+      "priority": "HIGH",
+      "estimatedHours": 10,
+      "value": 85,
+      "dependencies": [
+        "P6-T007"
+      ],
+      "deliverables": [
+        "src/ai-generator/local-executor.js",
+        "Ollama client",
+        "Response parser",
+        "Error handler",
+        "Retry logic"
+      ],
+      "tags": [
+        "ai",
+        "local-model",
+        "execution"
+      ]
+    },
+    {
+      "id": "P6-T009",
+      "status": "COMPLETED",
+      "name": "Cloud AI Model Executor",
+      "description": "Fallback executor for cloud AI models (OpenAI, Anthropic) with enhanced context",
+      "priority": "HIGH",
+      "estimatedHours": 8,
+      "value": 85,
+      "dependencies": [
+        "P6-T007"
+      ],
+      "deliverables": [
+        "src/ai-generator/cloud-executor.js",
+        "Multi-provider client",
+        "Cost tracker",
+        "Response validator"
+      ],
+      "tags": [
+        "ai",
+        "cloud-model",
+        "execution"
+      ]
+    },
+    {
+      "id": "P6-T010",
+      "name": "Line-Level Code Applicator",
+      "status": "COMPLETED",
+      "description": "Apply AI-generated line-level edits (not full file rewrites) with AST validation using code-analyzer and AQ-SF-001",
+      "priority": "CRITICAL",
+      "estimatedHours": 12,
+      "value": 100,
+      "dependencies": [
+        "P6-T008",
+        "P6-T009"
+      ],
+      "codeAnalyzerIntegration": [
+        "ast-utils.js for syntax validation",
+        "Validate AST before/after edits"
+      ],
+      "deliverables": [
+        "src/ai-generator/line-editor.js",
+        "Line-level replacement engine (AQ-SF-001)",
+        "AST validator (code-analyzer)",
+        "Backup manager",
+        "Transaction-based rollback"
+      ],
+      "tags": [
+        "code-modification",
+        "line-level",
+        "validation",
+        "code-analyzer"
+      ]
+    },
+    {
+      "id": "P6-T011",
+      "status": "COMPLETED",
+      "name": "Error Context Generator & Recovery",
+      "description": "Detect errors after fixes, generate enhanced context using code-analyzer (AQ-SF-006), and retry with error-specific solutions",
+      "priority": "CRITICAL",
+      "estimatedHours": 12,
+      "value": 95,
+      "dependencies": [
+        "P6-T010"
+      ],
+      "codeAnalyzerIntegration": [
+        "query-engine.js for error context analysis",
+        "symbol-extractor.js for related symbols",
+        "context-composer.js for enhanced context"
+      ],
+      "deliverables": [
+        "src/ai-generator/error-recovery.js",
+        "Build error detector",
+        "Lint error analyzer",
+        "Error-specific search (AQ-SF-006)",
+        "Enhanced context generator (using code-analyzer)",
+        "Retry orchestrator (max 3 attempts)"
+      ],
+      "tags": [
+        "error-handling",
+        "recovery",
+        "code-analyzer",
+        "context-enhancement"
+      ]
+    },
+    {
+      "id": "P6-T012",
+      "status": "COMPLETED",
+      "name": "AI Generation Orchestrator",
+      "description": "Main orchestrator that coordinates the entire AI issue generation workflow",
+      "priority": "CRITICAL",
+      "estimatedHours": 10,
+      "value": 95,
+      "dependencies": [
+        "P6-T001",
+        "P6-T006",
+        "P6-T007",
+        "P6-T008",
+        "P6-T009",
+        "P6-T010",
+        "P6-T011"
+      ],
+      "deliverables": [
+        "src/ai-generator/orchestrator.js",
+        "Workflow engine",
+        "State manager",
+        "Progress tracker",
+        "Metrics collector"
+      ],
+      "tags": [
+        "orchestration",
+        "workflow",
+        "coordination"
+      ]
+    },
+    {
+      "id": "P6-T013",
+      "status": "COMPLETED",
+      "name": "CLI Integration",
+      "description": "Add CLI commands for AI issue generation",
+      "priority": "HIGH",
+      "estimatedHours": 6,
+      "value": 80,
+      "dependencies": [
+        "P6-T012"
+      ],
+      "deliverables": [
+        "src/commands/generate-fixes-command.js",
+        "CLI argument parser",
+        "Progress UI",
+        "Summary reporter"
+      ],
+      "tags": [
+        "cli",
+        "integration",
+        "ui"
+      ]
+    },
+    {
+      "id": "P6-T014",
+      "status": "COMPLETED",
+      "name": "Configuration & Cost Monitoring",
+      "description": "Configuration system, rate limiting, and cost tracking using AQ-SF-004",
+      "priority": "HIGH",
+      "estimatedHours": 6,
+      "value": 75,
+      "dependencies": [
+        "P6-T012"
+      ],
+      "deliverables": [
+        "src/ai-generator/config.js",
+        "Rate limiter",
+        "Cost tracker (AQ-SF-004)",
+        "Budget enforcer",
+        "Daily cost reports"
+      ],
+      "tags": [
+        "configuration",
+        "rate-limiting",
+        "cost-management"
+      ]
+    },
+    {
+      "id": "P6-T015",
+      "status": "COMPLETED",
+      "name": "Testing & Documentation",
+      "description": "Comprehensive testing and documentation for AI Issue Generator",
+      "priority": "HIGH",
+      "estimatedHours": 12,
+      "value": 85,
+      "dependencies": [
+        "P6-T001",
+        "P6-T002",
+        "P6-T003",
+        "P6-T004",
+        "P6-T005",
+        "P6-T006",
+        "P6-T007",
+        "P6-T008",
+        "P6-T009",
+        "P6-T010",
+        "P6-T011",
+        "P6-T012",
+        "P6-T013",
+        "P6-T014"
+      ],
+      "deliverables": [
+        "tests/ai-generator/",
+        "docs/AI_ISSUE_GENERATOR.md",
+        "docs/api/AI_GENERATOR_API.md",
+        "examples/ai-generator-config.json"
+      ],
+      "tags": [
+        "testing",
+        "documentation",
+        "examples"
+      ]
+    },
+    {
+      "id": "P6-T016",
+      "status": "COMPLETED",
+      "name": "Dependency-Aware Official Documentation Context Builder",
+      "description": "Discover the project's real dependencies/frameworks (from package.json and other project references) and search their OFFICIAL documentation, then use all retrieved docs as reference material when building fix context. Search targets are resolved from configurable patterns that map detected dependencies to their official doc sources, so context reflects the libraries the project actually uses.",
+      "priority": "HIGH",
+      "estimatedHours": 12,
+      "value": 88,
+      "dependencies": [
+        "P6-T003",
+        "P6-T006"
+      ],
+      "codeAnalyzerIntegration": [
+        "query-engine.js for resolving referenced symbols to their source packages"
+      ],
+      "deliverables": [
+        "src/ai-generator/dependency-doc-resolver.js",
+        "Project dependency detector (package.json deps/devDeps, and other project references)",
+        "Configurable dependency -> official-docs pattern map (e.g. eslint, typescript, angular, react, express)",
+        "Official documentation resolver (reuses DocSearcher / P6-T003 with resolved sources)",
+        "Doc-context builder that feeds all retrieved official docs into the ContextAggregator (P6-T006) as reference fragments",
+        "Local caching of resolved doc sets (AQ-SF-002)"
+      ],
+      "notes": "Search sources are driven by patterns configurable in the AI-generator config (P6-T014). Network-free by default via injectable transport; without a transport it degrades to offline doc hints like the existing DocSearcher.",
+      "tags": [
+        "search",
+        "documentation",
+        "dependencies",
+        "context",
+        "official-docs"
+      ]
+    }
+  ]
+}

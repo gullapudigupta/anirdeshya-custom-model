@@ -1,0 +1,1657 @@
+﻿{
+    "phase":  "phase9",
+    "name":  "Coding Agent Workbench and Documentation",
+    "priority":  "HIGH",
+    "estimatedHours":  740,
+    "status":  "COMPLETED",
+    "completionPercentage":  "100%",
+    "statusSummary":  {
+                          "completed":  40,
+                          "pending":  0
+                      },
+    "description":  "Build a workspace-aware coding agent workbench with live analysis, task-file input, model selection, agent planning and execution, review and verification controls, alongside the existing documentation normalization work.",
+    "tasks":  [
+                  {
+                      "id":  "P9-T001",
+                      "name":  "Documentation Inventory and Content Review",
+                      "status":  "COMPLETED",
+                      "completedDate":  "2026-10-01",
+                      "artifacts":  [
+                                        "Workspace analysis report, documentation inventory"
+                                    ],
+                      "priority":  "HIGH",
+                      "estimatedHours":  12,
+                      "value":  85,
+                      "recommendedModel":  [
+                                               "deepseek-3.2",
+                                               "gpt-4o-mini",
+                                               "claude-haiku-4"
+                                           ],
+                      "modelRationale":  "File inventory, classification, metadata extraction. DeepSeek 3.2 is cost-optimized for file operations with good quality.",
+                      "dependencies":  [
+
+                                       ],
+                      "deliverables":  [
+                                           "Inventory documentation across the repository, including Markdown, text, and API reference files",
+                                           "Read each document\u0027s metadata and actual contents before deciding its destination or disposition",
+                                           "Classify documents as active, completed, historical, duplicate, or obsolete",
+                                           "Identify canonical topic documents, conflicting guidance, inbound links, and ownership"
+                                       ],
+                      "tags":  [
+                                   "documentation",
+                                   "inventory",
+                                   "content-review"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T002",
+                      "name":  "Document Summary Metadata Standard",
+                      "status":  "COMPLETED",
+                      "completedDate":  "2026-10-01",
+                      "artifacts":  [
+                                        "docs/METADATA_STANDARD.md",
+                                        "scripts/apply-metadata.js"
+                                    ],
+                      "priority":  "HIGH",
+                      "estimatedHours":  16,
+                      "value":  85,
+                      "recommendedModel":  [
+                                               "deepseek-v4-flash",
+                                               "gpt-4o-mini",
+                                               "claude-haiku-4"
+                                           ],
+                      "modelRationale":  "Template creation and systematic application. DeepSeek V4-Flash handles pattern-based work well at minimal cost.",
+                      "dependencies":  [
+                                           "P9-T001"
+                                       ],
+                      "deliverables":  [
+                                           "Define a concise, consistent metadata summary block at the top of each maintained document",
+                                           "Include the document purpose, scope, intended audience, and current status where applicable",
+                                           "Write summaries from both the document metadata and its actual content rather than filename alone",
+                                           "Apply and verify the summary block across all retained documentation, including completed documents moved to the archive, while preserving required formats"
+                                       ],
+                      "tags":  [
+                                   "documentation",
+                                   "metadata",
+                                   "summaries",
+                                   "consistency"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T003",
+                      "name":  "Redundant Documentation Consolidation",
+                      "status":  "COMPLETED",
+                      "completedDate":  "2026-10-01",
+                      "artifacts":  [
+                                        "scripts/consolidate-documentation.js",
+                                        ".aqt-reports/documentation-consolidation-report.json"
+                                    ],
+                      "priority":  "HIGH",
+                      "estimatedHours":  24,
+                      "value":  95,
+                      "recommendedModel":  [
+                                               "glm-4",
+                                               "glm-4-plus",
+                                               "deepseek-r1"
+                                           ],
+                      "modelRationale":  "Complex comparison and conflict resolution. glm-4 (equivalent to gpt-4o-mini) offers 7.5/10 reasoning at fraction of cost. Escalate to glm-4-plus or R1 if reasoning insufficient.",
+                      "dependencies":  [
+                                           "P9-T001",
+                                           "P9-T002"
+                                       ],
+                      "deliverables":  [
+                                           "Compare metadata summaries and actual text to detect duplicate or overlapping material",
+                                           "Merge redundant documentation into one canonical file per topic and reconcile conflicting guidance",
+                                           "Preserve unique, current information and maintain distinct documents where audiences or interfaces differ",
+                                           "Update inbound references before removing superseded duplicate files"
+                                       ],
+                      "tags":  [
+                                   "documentation",
+                                   "deduplication",
+                                   "consolidation",
+                                   "canonical-source"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T004",
+                      "name":  "Documentation Structure and File Relocation",
+                      "status":  "COMPLETED",
+                      "completedDate":  "2026-10-01",
+                      "artifacts":  [
+                                        "docs/project/",
+                                        "docs/guides/",
+                                        "docs/standards/",
+                                        "scripts/reorganize-docs.js"
+                                    ],
+                      "priority":  "HIGH",
+                      "estimatedHours":  20,
+                      "value":  90,
+                      "recommendedModel":  [
+                                               "deepseek-v4-flash",
+                                               "gpt-4o-mini",
+                                               "claude-haiku-4"
+                                           ],
+                      "modelRationale":  "File moves, link updates - mechanical restructuring. DeepSeek V4-Flash is ideal for file operations (cost: $0.98 vs $16.00).",
+                      "dependencies":  [
+                                           "P9-T001",
+                                           "P9-T003"
+                                       ],
+                      "deliverables":  [
+                                           "Keep README.md and the Getting Started document (currently QUICKSTART.md) at the repository root",
+                                           "Move other project documentation from the root into a logical structure under docs/",
+                                           "Arrange active documentation into topic-based sections with a clear index or navigation entry point",
+                                           "Move completed documentation into docs/completed/ and keep active guidance out of the completed archive",
+                                           "Update links and references to reflect all moves"
+                                       ],
+                      "tags":  [
+                                   "documentation",
+                                   "information-architecture",
+                                   "file-organization",
+                                   "archive"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T005",
+                      "name":  "Interface Documentation Organization",
+                      "status":  "COMPLETED",
+                      "completedDate":  "2026-10-01",
+                      "artifacts":  [
+                                        "docs/interfaces/README.md",
+                                        "docs/api/README.md",
+                                        "scripts/update-doc-links.js"
+                                    ],
+                      "priority":  "HIGH",
+                      "estimatedHours":  12,
+                      "value":  85,
+                      "recommendedModel":  [
+                                               "deepseek-v4-flash",
+                                               "gpt-4o-mini",
+                                               "claude-haiku-4"
+                                           ],
+                      "modelRationale":  "Documentation placement and linking. DeepSeek V4-Flash is cost-effective for straightforward organization tasks.",
+                      "dependencies":  [
+                                           "P8-T006",
+                                           "P9-T002",
+                                           "P9-T004"
+                                       ],
+                      "deliverables":  [
+                                           "Place MCP, orchestration-tool, CLI, and API documentation in the agreed docs structure",
+                                           "Keep separate interface-specific setup and reference material while linking shared concepts to canonical docs",
+                                           "Ensure examples and configuration guidance agree with the implemented interface contracts",
+                                           "Add the interface guides to documentation navigation"
+                                       ],
+                      "tags":  [
+                                   "documentation",
+                                   "mcp",
+                                   "orchestration",
+                                   "cli",
+                                   "api"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T006",
+                      "name":  "Documentation Reference and Structure Validation",
+                      "status":  "COMPLETED",
+                      "completedDate":  "2026-10-01",
+                      "artifacts":  [
+                                        "scripts/validate-documentation.js",
+                                        ".aqt-reports/documentation-validation-report.json"
+                                    ],
+                      "priority":  "MEDIUM",
+                      "estimatedHours":  12,
+                      "value":  80,
+                      "recommendedModel":  [
+                                               "deepseek-v4-flash",
+                                               "gpt-4o-mini",
+                                               "claude-haiku-4"
+                                           ],
+                      "modelRationale":  "Link validation and structure checking - automated verification tasks suit DeepSeek V4-Flash well.",
+                      "dependencies":  [
+                                           "P9-T003",
+                                           "P9-T004",
+                                           "P9-T005"
+                                       ],
+                      "deliverables":  [
+                                           "Validate internal Markdown links, relative paths, and documentation navigation",
+                                           "Check that root-level documentation exceptions and docs/completed/ placement follow the agreed structure",
+                                           "Detect remaining duplicate or unclassified documentation and report exceptions",
+                                           "Add a repeatable documentation validation check to the project workflow"
+                                       ],
+                      "tags":  [
+                                   "documentation",
+                                   "validation",
+                                   "links",
+                                   "quality"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T007",
+                      "name":  "Workspace and Package-Driven Linter Configuration",
+                      "status":  "COMPLETED",
+                      "completedDate":  "2026-10-01",
+                      "artifacts":  [
+                                        "src/workspace/linter-config-manager.js",
+                                        "src/workspace/workspace-resolver.js",
+                                        "src/workspace/package-config-reader.js",
+                                        "test/__tests__/workspace-linter-config.test.js"
+                                    ],
+                      "priority":  "HIGH",
+                      "estimatedHours":  20,
+                      "value":  95,
+                      "recommendedModel":  [
+                                               "glm-4",
+                                               "glm-4-plus",
+                                               "deepseek-r1"
+                                           ],
+                      "modelRationale":  "Complex workspace resolution and discovery logic. glm-4 (equivalent to gpt-4o-mini, 7/10 reasoning) handles this well. Escalate to glm-4-plus if needed.",
+                      "dependencies":  [
+                                           "P8-T001",
+                                           "P3-T002"
+                                       ],
+                      "deliverables":  [
+                                           "Resolve the active project root from the opened workspace or an explicit folder selection; never hard-code a developer-specific absolute path",
+                                           "Read the selected project\u0027s package.json, including scripts and dependencies, to discover supported lint, test, and analysis commands",
+                                           "Provide an editable default linter selection based on detected and installed tools, with per-project persistence and a clear unavailable state",
+                                           "Run only selected tools against the selected project and normalize their findings with source file, rule, line, and severity data",
+                                           "Add fixture-based tests proving discovery uses the selected project\u0027s package.json rather than the tool\u0027s own package.json"
+                                       ],
+                      "tags":  [
+                                   "workspace",
+                                   "package-json",
+                                   "linters",
+                                   "configuration"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T008",
+                      "name":  "Task File Import and Task Selection",
+                      "status":  "COMPLETED",
+                      "completedDate":  "2026-10-01",
+                      "artifacts":  [
+                                        "src/agent/task-importer.js",
+                                        "src/ui/task-import-ui.js",
+                                        "examples/task-importer-example.js"
+                                    ],
+                      "priority":  "HIGH",
+                      "estimatedHours":  16,
+                      "value":  90,
+                      "recommendedModel":  [
+                                               "deepseek-v4-flash",
+                                               "gpt-4o-mini",
+                                               "claude-haiku-4"
+                                           ],
+                      "modelRationale":  "JSON parsing, validation, UI display - well-defined implementation. DeepSeek V4-Flash is 94% cheaper than Haiku.",
+                      "dependencies":  [
+                                           "P9-T007"
+                                       ],
+                      "deliverables":  [
+                                           "Add a file-picker and drag-and-drop option for selecting a task JSON file by path",
+                                           "Parse supported task arrays and grouped task collections without losing task IDs, status, priority, dependencies, or descriptions",
+                                           "Support the repository\u0027s phase task format, including phase8-tasks.json, and validate malformed or unsupported input with actionable errors",
+                                           "Display imported tasks in a selectable queue and let users choose one or more tasks for an agent run",
+                                           "Keep the selected task file and imported task list scoped to the current workspace/session and provide a refresh or replace action"
+                                       ],
+                      "tags":  [
+                                   "tasks",
+                                   "json-import",
+                                   "file-picker",
+                                   "planning"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T009",
+                      "name":  "Provider and Model Selection",
+                      "status":  "COMPLETED",
+                      "completedDate":  "2026-10-01",
+                      "artifacts":  [
+                                        "src/agent/provider-model-selector.js",
+                                        "test/__tests__/provider-model-selector.test.js"
+                                    ],
+                      "priority":  "HIGH",
+                      "estimatedHours":  18,
+                      "value":  95,
+                      "recommendedModel":  [
+                                               "glm-5",
+                                               "glm-4-plus",
+                                               "glm-5-plus"
+                                           ],
+                      "modelRationale":  "Security-critical credential/provider logic. glm-5 (90% security accuracy, equivalent to o1-mini) is ideal. Escalate to glm-4-plus or glm-5-plus for highest stakes.",
+                      "dependencies":  [
+                                           "P8-T001",
+                                           "P6-T014"
+                                       ],
+                      "deliverables":  [
+                                           "Add a model dropdown populated from configured local and cloud providers rather than a hard-coded list",
+                                           "Show provider, model, availability, and capability information, and prevent selecting unavailable models",
+                                           "Allow a workspace default and an optional per-task model override, with a visible Auto option that reports the resolved model",
+                                           "Keep credentials in environment variables or an operating-system secret store and never persist secrets in workspace settings",
+                                           "Add provider connectivity checks and explicit errors for missing credentials, offline models, rate limits, and budget limits"
+                                       ],
+                      "tags":  [
+                                   "models",
+                                   "providers",
+                                   "configuration",
+                                   "secrets"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T010",
+                      "name":  "Agent Planning and Work Orchestration",
+                      "status":  "COMPLETED",
+                      "priority":  "CRITICAL",
+                      "estimatedHours":  28,
+                      "value":  100,
+                      "recommendedModel":  [
+                                               "glm-4",
+                                               "glm-5",
+                                               "glm-4-plus"
+                                           ],
+                      "modelRationale":  "CRITICAL: Dependency ordering, concurrency, retries. glm-4 (equivalent to gpt-4o-mini with 7/10 reasoning) surprisingly handles this well. glm-5 for deep reasoning if needed.",
+                      "dependencies":  [
+                                           "P9-T007",
+                                           "P9-T008",
+                                           "P9-T009",
+                                           "P6-T012"
+                                       ],
+                      "deliverables":  [
+                                           "Accept a coding request or selected task and produce a reviewable plan with ordered steps, affected files, expected checks, and risks",
+                                           "Break work into independently trackable work items and assign each item to a named agent or worker with an explicit model and tool policy",
+                                           "Track dependencies, concurrency limits, retries, blocked work, and cancellation without reporting unexecuted work as complete",
+                                           "Require user confirmation before starting plans that exceed configured permission or resource limits",
+                                           "Add deterministic orchestration tests for planning, task dependency ordering, failure propagation, and partial completion"
+                                       ],
+                      "tags":  [
+                                   "agent",
+                                   "planning",
+                                   "orchestration",
+                                   "task-queue"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T011",
+                      "name":  "Agent Assignment and Live Work Activity View",
+                      "status":  "COMPLETED",
+                      "completedDate":  "2026-10-01",
+                      "artifacts":  [
+                                        "src/ui/agent-activity-view.js",
+                                        "test/__tests__/agent-activity-context.test.js"
+                                    ],
+                      "priority":  "HIGH",
+                      "estimatedHours":  20,
+                      "value":  95,
+                      "recommendedModel":  [
+                                               "deepseek-v4-flash",
+                                               "gpt-4o-mini",
+                                               "claude-haiku-4"
+                                           ],
+                      "modelRationale":  "UI state management, event streaming - implementation after architecture defined. DeepSeek V4-Flash is cost-effective.",
+                      "dependencies":  [
+                                           "P9-T010"
+                                       ],
+                      "deliverables":  [
+                                           "Show each selected issue or task as a row with its assigned agent, selected model, current step, elapsed time, and result",
+                                           "Use explicit queued, planning, working, awaiting approval, verifying, completed, failed, and cancelled states sourced from orchestration events",
+                                           "Stream progress and tool activity into an inspectable event list while keeping the active work item and overall queue visible",
+                                           "Allow users to inspect an agent\u0027s current task, output, changed files, and failure details without conflating parallel runs",
+                                           "Add UI tests for state changes, simultaneous workers, errors, and empty/loading states"
+                                       ],
+                      "tags":  [
+                                   "ui",
+                                   "agent-status",
+                                   "progress",
+                                   "observability"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T012",
+                      "name":  "Workspace Context and Instruction Assembly",
+                      "status":  "COMPLETED",
+                      "completedDate":  "2026-10-01",
+                      "artifacts":  [
+                                        "src/workspace/context-assembler.js",
+                                        "test/__tests__/agent-activity-context.test.js"
+                                    ],
+                      "priority":  "HIGH",
+                      "estimatedHours":  20,
+                      "value":  95,
+                      "recommendedModel":  [
+                                               "glm-4",
+                                               "glm-4-plus",
+                                               "deepseek-r1"
+                                           ],
+                      "modelRationale":  "Complex context gathering, token budget calculations. glm-4 (equivalent to gpt-4o-mini, 7/10 reasoning) handles this well. glm-4-plus for edge cases.",
+                      "dependencies":  [
+                                           "P9-T007",
+                                           "P9-T008",
+                                           "P9-T010"
+                                       ],
+                      "deliverables":  [
+                                           "Let users attach the current file, editor selection, task file, diagnostics, and explicitly chosen workspace files to a request",
+                                           "Load applicable repository guidance such as AGENTS.md and project-specific instruction files and show which guidance was applied",
+                                           "Use workspace search, symbol references, and bounded code context to gather relevant source instead of sending the whole repository by default",
+                                           "Respect ignore rules, generated/build directories, file-size limits, and configurable context/token budgets",
+                                           "Show the context sources and estimated token usage before execution and test that excluded files never enter model prompts"
+                                       ],
+                      "tags":  [
+                                   "context",
+                                   "workspace",
+                                   "instructions",
+                                   "token-budget"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T013",
+                      "name":  "Coding Agent Tool Registry and Execution",
+                      "status":  "COMPLETED",
+                      "priority":  "CRITICAL",
+                      "estimatedHours":  28,
+                      "value":  100,
+                      "recommendedModel":  [
+                                               "glm-5",
+                                               "glm-4-plus",
+                                               "deepseek-r1"
+                                           ],
+                      "modelRationale":  "CRITICAL: Tool contract design, validation logic, security. glm-5 (equivalent to o1-mini) for reasoning. glm-4-plus as fallback.",
+                      "dependencies":  [
+                                           "P3-T002",
+                                           "P9-T010",
+                                           "P9-T012"
+                                       ],
+                      "deliverables":  [
+                                           "Expose typed agent tools for reading files, searching text and symbols, listing files, editing files, and inspecting diagnostics or diffs",
+                                           "Provide controlled terminal, selected-linter, build, and test tools with structured inputs, outputs, exit codes, and bounded logs",
+                                           "Validate tool arguments and workspace paths, enforce timeouts and output limits, and return actionable failures to the agent",
+                                           "Record every tool invocation and result in the active work item so users can inspect what the agent actually did",
+                                           "Add isolated tool-contract tests and integration tests using temporary workspaces"
+                                       ],
+                      "tags":  [
+                                   "tools",
+                                   "terminal",
+                                   "search",
+                                   "editing",
+                                   "tests"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T014",
+                      "name":  "Execution Permissions and Workspace Safety",
+                      "status":  "COMPLETED",
+                      "priority":  "CRITICAL",
+                      "estimatedHours":  20,
+                      "value":  100,
+                      "recommendedModel":  [
+                                               "glm-5",
+                                               "glm-4-plus",
+                                               "glm-5-plus"
+                                           ],
+                      "modelRationale":  "CRITICAL: Security boundaries, path validation, secret redaction. glm-5 (equivalent to o1-mini) for reasoning. Escalate to glm-5-plus for maximum safety.",
+                      "dependencies":  [
+                                           "P9-T013"
+                                       ],
+                      "deliverables":  [
+                                           "Provide clear approval modes for read-only, approval-required, and explicitly trusted operations, with safe defaults",
+                                           "Require confirmation for terminal commands and file writes according to policy and show the exact command, working directory, or target files",
+                                           "Constrain file operations to the selected workspace and guard against traversal, symlink escapes, and destructive commands",
+                                           "Redact secrets from prompts, tool output, and logs, and require explicit consent before sending source to a cloud provider",
+                                           "Add security tests for path escapes, command policy, secret redaction, cancellation, and denied operations"
+                                       ],
+                      "tags":  [
+                                   "security",
+                                   "permissions",
+                                   "approval",
+                                   "privacy"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T015",
+                      "name":  "Diff Review, Apply, Reject, and Rollback",
+                      "status":  "COMPLETED",
+                      "completedDate":  "2026-10-01",
+                      "artifacts":  [
+                                        "src/agent/diff-review-system.js",
+                                        "test/__tests__/diff-review-system.test.js"
+                                    ],
+                      "priority":  "HIGH",
+                      "estimatedHours":  20,
+                      "value":  95,
+                      "recommendedModel":  [
+                                               "deepseek-v4-flash",
+                                               "gpt-4o-mini",
+                                               "claude-haiku-4"
+                                           ],
+                      "modelRationale":  "File diff generation, atomic writes, backup/restore - well-established patterns. DeepSeek V4-Flash is cost-optimal.",
+                      "dependencies":  [
+                                           "P9-T013",
+                                           "P9-T014"
+                                       ],
+                      "deliverables":  [
+                                           "Present proposed edits as file-grouped unified diffs with added, removed, and unchanged context clearly distinguished",
+                                           "Allow users to apply or reject individual file changes and the complete proposal without losing other conversation or task state",
+                                           "Use atomic writes, pre-write validation, backups, and stale-source checks, and expose a recovery action when a write fails",
+                                           "Show exact changed paths and preserve unrelated user edits when applying agent output",
+                                           "Add tests for multi-file patches, rejected changes, stale versions, backup restoration, and partial failures"
+                                       ],
+                      "tags":  [
+                                   "diff",
+                                   "review",
+                                   "apply",
+                                   "rollback"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T016",
+                      "name":  "Streaming Conversation, Cancellation, and Session History",
+                      "status":  "COMPLETED",
+                      "completedDate":  "2026-10-01",
+                      "artifacts":  [
+                                        "src/agent/streaming-conversation.js",
+                                        "test/__tests__/streaming-conversation.test.js"
+                                    ],
+                      "priority":  "HIGH",
+                      "estimatedHours":  20,
+                      "value":  90,
+                      "recommendedModel":  [
+                                               "glm-4",
+                                               "glm-4-plus",
+                                               "deepseek-r1"
+                                           ],
+                      "modelRationale":  "Complex state management, cancellation races, session persistence. glm-4 (equivalent to gpt-4o-mini) handles this well. Escalate for edge cases.",
+                      "dependencies":  [
+                                           "P9-T010",
+                                           "P9-T011"
+                                       ],
+                      "deliverables":  [
+                                           "Stream model text, plan updates, tool calls, approvals, and verification results as distinct conversation events",
+                                           "Support stopping an active run, cancelling pending work, retrying failed steps, and resuming a recoverable session",
+                                           "Persist and restore named conversation sessions with their workspace, task, model, context references, and change outcomes",
+                                           "Keep session state isolated by workspace and provide clear handling for missing or changed referenced files",
+                                           "Add tests for interrupted streams, cancellation races, retries, persistence, and session isolation"
+                                       ],
+                      "tags":  [
+                                   "chat",
+                                   "streaming",
+                                   "cancellation",
+                                   "sessions"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T017",
+                      "name":  "Post-Edit Verification and Repair Loop",
+                      "status":  "COMPLETED",
+                      "completedDate":  "2026-10-01",
+                      "artifacts":  [
+                                        "src/agent/verification-repair-loop.js"
+                                    ],
+                      "priority":  "HIGH",
+                      "estimatedHours":  20,
+                      "value":  95,
+                      "recommendedModel":  [
+                                               "glm-4",
+                                               "glm-4-plus",
+                                               "deepseek-r1"
+                                           ],
+                      "modelRationale":  "Verification orchestration, retry logic, failure recovery. glm-4 (equivalent to gpt-4o-mini) for initial reasoning. Escalate for complex repairs.",
+                      "dependencies":  [
+                                           "P9-T007",
+                                           "P9-T013",
+                                           "P9-T015"
+                                       ],
+                      "deliverables":  [
+                                           "Run the selected linter and relevant tests after accepted edits, using the active workspace\u0027s configured commands",
+                                           "Associate verification output with the change and report pass, fail, skipped, or unavailable without converting failures into success",
+                                           "Optionally feed bounded verification errors back into the agent for a user-approved repair attempt with a retry limit",
+                                           "Preserve the pre-change backup and provide recovery guidance when verification fails or an automated repair cannot recover",
+                                           "Add tests for clean passes, failures, missing tools, retry exhaustion, and accurate final status"
+                                       ],
+                      "tags":  [
+                                   "verification",
+                                   "lint",
+                                   "tests",
+                                   "recovery"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T018",
+                      "name":  "Provider Privacy, Usage, and Cost Controls",
+                      "status":  "COMPLETED",
+                      "completedDate":  "2026-10-01",
+                      "artifacts":  [
+                                        "src/agent/privacy-cost-controls.js"
+                                    ],
+                      "priority":  "HIGH",
+                      "estimatedHours":  16,
+                      "value":  90,
+                      "recommendedModel":  [
+                                               "glm-5",
+                                               "glm-4-plus",
+                                               "glm-5-plus"
+                                           ],
+                      "modelRationale":  "Budget enforcement, usage tracking, privacy controls. glm-5 (equivalent to o1-mini) for financial/security logic reasoning.",
+                      "dependencies":  [
+                                           "P6-T014",
+                                           "P9-T009",
+                                           "P9-T014"
+                                       ],
+                      "deliverables":  [
+                                           "Show the active provider/model and whether each request is local or sends workspace context to a remote service",
+                                           "Enforce configurable per-run and daily token, request, and cost budgets before starting model work",
+                                           "Display usage, estimated cost, budget remaining, and rate-limit state for each session without exposing credentials",
+                                           "Allow local-only policy and ensure cloud fallback cannot occur when the workspace disallows remote processing",
+                                           "Add tests for budget rejection, local-only enforcement, usage accounting, and secret-safe reporting"
+                                       ],
+                      "tags":  [
+                                   "privacy",
+                                   "cost",
+                                   "usage",
+                                   "providers"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T019",
+                      "name":  "Coding Agent End-to-End Acceptance and Reliability",
+                      "status":  "COMPLETED",
+                      "priority":  "HIGH",
+                      "estimatedHours":  20,
+                      "value":  100,
+                      "recommendedModel":  [
+                                               "glm-4",
+                                               "glm-5",
+                                               "glm-4-plus"
+                                           ],
+                      "modelRationale":  "Complex integration testing, contract verification. glm-4 (equivalent to gpt-4o-mini) for most cases. glm-5 if deep reasoning needed.",
+                      "dependencies":  [
+                                           "P9-T007",
+                                           "P9-T008",
+                                           "P9-T009",
+                                           "P9-T010",
+                                           "P9-T011",
+                                           "P9-T012",
+                                           "P9-T013",
+                                           "P9-T014",
+                                           "P9-T015",
+                                           "P9-T016",
+                                           "P9-T017",
+                                           "P9-T018"
+                                       ],
+                      "deliverables":  [
+                                           "Define acceptance workflows for analyze, select tasks, plan, assign agents, approve tools, review diffs, apply edits, and verify results",
+                                           "Add offline end-to-end tests using stubbed providers and temporary repositories, plus provider contract tests where credentials are configured",
+                                           "Verify the agent never fabricates issue data, tool activity, model identity, test results, or successful edits when an operation did not occur",
+                                           "Check keyboard accessibility, responsive layouts, progress/error states, and recovery after server or provider failure",
+                                           "Document setup, package.json linter discovery, task file formats, model configuration, permissions, privacy, troubleshooting, and supported limitations"
+                                       ],
+                      "tags":  [
+                                   "acceptance",
+                                   "reliability",
+                                   "accessibility",
+                                   "documentation"
+                               ],
+                      "artifacts":  [
+                                        "src/agent/acceptance-workflow.js",
+                                        "test/__tests__/acceptance-workflow.test.js"
+                                    ]
+                  },
+                  {
+                      "id":  "P9-T020",
+                      "name":  "Documentation Link Ingestion and Evidence Context",
+                      "status":  "COMPLETED",
+                      "priority":  "HIGH",
+                      "estimatedHours":  20,
+                      "value":  95,
+                      "recommendedModel":  [
+                                               "deepseek-v4-flash",
+                                               "gpt-4o-mini",
+                                               "claude-haiku-4"
+                                           ],
+                      "modelRationale":  "URL fetching, caching, content extraction - straightforward HTTP operations. DeepSeek V4-Flash is cost-optimal.",
+                      "dependencies":  [
+                                           "P9-T008",
+                                           "P9-T012"
+                                       ],
+                      "deliverables":  [
+                                           "Accept explicit documentation URLs from imported tasks or user input",
+                                           "Fetch, validate, cache, and refresh documentation content",
+                                           "Restrict requests according to allowed-domain, network, and privacy policy",
+                                           "Extract relevant sections and attach source URLs to the task context",
+                                           "Show which documentation sources were used before implementation",
+                                           "Handle unavailable, invalid, or blocked documentation links with actionable errors"
+                                       ],
+                      "tags":  [
+                                   "documentation",
+                                   "urls",
+                                   "context",
+                                   "privacy",
+                                   "research"
+                               ],
+                      "artifacts":  [
+                                        "src/workspace/documentation-ingestion.js"
+                                    ]
+                  },
+                  {
+                      "id":  "P9-T021",
+                      "name":  "Task Scope Analysis and Decomposition Gate",
+                      "status":  "COMPLETED",
+                      "priority":  "CRITICAL",
+                      "estimatedHours":  20,
+                      "value":  100,
+                      "recommendedModel":  [
+                                               "glm-4",
+                                               "glm-5",
+                                               "deepseek-r1"
+                                           ],
+                      "modelRationale":  "CRITICAL: Requirement analysis, complexity classification, decomposition. glm-4 (equivalent to gpt-4o-mini, 7/10 reasoning) surprisingly capable. glm-5 for deep analysis.",
+                      "dependencies":  [
+                                           "P9-T008",
+                                           "P9-T010"
+                                       ],
+                      "deliverables":  [
+                                           "Classify tasks as atomic, bounded multi-file, broad, ambiguous, or multi-requirement",
+                                           "Detect multiple independent outcomes, excessive file scope, missing acceptance criteria, and unresolved dependencies",
+                                           "Generate proposed subtasks for broad or compound requirements",
+                                           "Ask the user to split or approve decomposition before code changes begin",
+                                           "Prevent implementation when the task scope is insufficiently defined",
+                                           "Add deterministic tests for atomic, broad, ambiguous, and compound task examples"
+                                       ],
+                      "tags":  [
+                                   "scope",
+                                   "decomposition",
+                                   "requirements",
+                                   "approval",
+                                   "planning"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T022",
+                      "name":  "Task-Driven Code Generation Workflow",
+                      "status":  "COMPLETED",
+                      "priority":  "CRITICAL",
+                      "estimatedHours":  28,
+                      "value":  100,
+                      "recommendedModel":  [
+                                               "glm-4",
+                                               "glm-5",
+                                               "deepseek-r1"
+                                           ],
+                      "modelRationale":  "CRITICAL: Multi-file generation planning. glm-4 (equivalent to gpt-4o-mini) for most cases. glm-5/R1 if generation complexity exceeds expectations.",
+                      "dependencies":  [
+                                           "P9-T010",
+                                           "P9-T012",
+                                           "P9-T020",
+                                           "P9-T021"
+                                       ],
+                      "deliverables":  [
+                                           "Build an implementation context from the selected task, deliverables, dependencies, acceptance criteria, repository instructions, code, and documentation evidence",
+                                           "Generate a reviewable plan containing affected files, implementation steps, risks, and expected checks",
+                                           "Generate structured multi-file patches from an approved task plan",
+                                           "Preserve task IDs and documentation references throughout planning, generation, review, and execution",
+                                           "Require user approval before writing generated code",
+                                           "Add offline tests using stubbed models and temporary repositories"
+                                       ],
+                      "tags":  [
+                                   "code-generation",
+                                   "tasks",
+                                   "planning",
+                                   "patches",
+                                   "traceability"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T023",
+                      "name":  "Requirement Traceability and Acceptance Validation",
+                      "status":  "COMPLETED",
+                      "priority":  "HIGH",
+                      "estimatedHours":  20,
+                      "value":  95,
+                      "recommendedModel":  [
+                                               "glm-4",
+                                               "glm-4-plus",
+                                               "deepseek-r1"
+                                           ],
+                      "modelRationale":  "Requirement mapping, validation logic. glm-4 (equivalent to gpt-4o-mini) handles this. Escalate to glm-4-plus for complex traceability.",
+                      "dependencies":  [
+                                           "P9-T017",
+                                           "P9-T019",
+                                           "P9-T022"
+                                       ],
+                      "deliverables":  [
+                                           "Map each task requirement and acceptance criterion to planned changes",
+                                           "Map acceptance criteria to tests, lint commands, builds, or other verification checks",
+                                           "Report unmet, satisfied, skipped, and unverifiable criteria separately",
+                                           "Prevent a task from being reported complete when required checks were not executed",
+                                           "Generate a final implementation report containing changed files, documentation sources, validation results, and remaining risks",
+                                           "Add tests proving incomplete or failed acceptance criteria cannot produce a successful completion status"
+                                       ],
+                      "tags":  [
+                                   "requirements",
+                                   "traceability",
+                                   "acceptance",
+                                   "verification",
+                                   "reporting"
+                               ],
+                      "artifacts":  [
+                                        "src/agent/requirement-traceability.js"
+                                    ]
+                  },
+                  {
+                      "id":  "P9-T024",
+                      "name":  "Pipeline Catalog and Execution Ledger",
+                      "status":  "COMPLETED",
+                      "completedDate":  "2026-10-01",
+                      "artifacts":  [
+                                        "src/pipelines/pipeline-catalog.js",
+                                        "src/pipelines/pipeline-registry.js",
+                                        "src/pipelines/execution-ledger.js",
+                                        "test/__tests__/pipeline-catalog.test.js"
+                                    ],
+                      "priority":  "CRITICAL",
+                      "estimatedHours":  24,
+                      "value":  100,
+                      "recommendedModel":  [
+                                               "glm-4",
+                                               "glm-4-plus",
+                                               "deepseek-r1"
+                                           ],
+                      "modelRationale":  "CRITICAL: Schema design, event store architecture. glm-4 (equivalent to gpt-4o-mini) surprisingly capable. Escalate to glm-4-plus for foundational design.",
+                      "dependencies":  [
+                                           "P9-T010",
+                                           "P9-T019"
+                                       ],
+                      "pipelineId":  "pipeline-ledger",
+                      "pipelineStages":  [
+                                             "register",
+                                             "start",
+                                             "stage-start",
+                                             "stage-end",
+                                             "complete",
+                                             "fail",
+                                             "cancel"
+                                         ],
+                      "deliverables":  [
+                                           "Define a registry of named pipelines with stable pipeline IDs, versions, stages, inputs, outputs, and verification checks",
+                                           "Persist every pipeline run with run ID, task ID, workspace, timestamps, status, stage results, errors, and cancellation state",
+                                           "Record model, provider, token, cost, documentation sources, tool calls, changed files, and validation results when applicable",
+                                           "Store execution records in a workspace-scoped append-only JSONL or SQLite event store with retention and redaction controls",
+                                           "Expose querying and export for a task, pipeline, session, date range, or failed stage",
+                                           "Add tests proving incomplete or failed pipeline runs cannot be reported as completed"
+                                       ],
+                      "executionRecord":  {
+                                              "required":  true,
+                                              "store":  ".aqt-reports/pipelines",
+                                              "format":  "jsonl-or-sqlite"
+                                          },
+                      "tags":  [
+                                   "pipelines",
+                                   "telemetry",
+                                   "audit",
+                                   "execution-history",
+                                   "observability"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T025",
+                      "name":  "Workspace Quality Analysis Pipeline",
+                      "status":  "COMPLETED",
+                      "priority":  "HIGH",
+                      "estimatedHours":  20,
+                      "value":  100,
+                      "recommendedModel":  [
+                                               "deepseek-v4-flash",
+                                               "gpt-4o-mini",
+                                               "claude-haiku-4"
+                                           ],
+                      "modelRationale":  "Pipeline implementation after T024. DeepSeek V4-Flash is optimal for applying established patterns. 70% cost savings.",
+                      "dependencies":  [
+                                           "P9-T007",
+                                           "P9-T024"
+                                       ],
+                      "pipelineId":  "workspace-quality-analysis",
+                      "pipelineStages":  [
+                                             "resolve-workspace",
+                                             "detect-tools",
+                                             "select-files",
+                                             "run-linters",
+                                             "collect-output",
+                                             "normalize-issues",
+                                             "deduplicate",
+                                             "sort",
+                                             "summarize"
+                                         ],
+                      "deliverables":  [
+                                           "Implement the end-to-end analysis pipeline over the active workspace and selected files",
+                                           "Use the selected project\u0027s tools and package configuration rather than the tool\u0027s own package configuration",
+                                           "Return stable issue, summary, statistics, and pipeline-run identifiers",
+                                           "Record each stage, tool command, duration, output status, and normalized issue count in the execution ledger",
+                                           "Add offline tests for successful, partially unavailable, empty, and failed linter runs"
+                                       ],
+                      "executionRecord":  {
+                                              "required":  true,
+                                              "pipeline":  "pipeline-ledger"
+                                          },
+                      "tags":  [
+                                   "pipeline",
+                                   "analysis",
+                                   "linters",
+                                   "normalization"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T026",
+                      "name":  "Issue Categorization and Enrichment Pipeline",
+                      "status":  "COMPLETED",
+                      "priority":  "HIGH",
+                      "estimatedHours":  16,
+                      "value":  90,
+                      "recommendedModel":  [
+                                               "deepseek-v4-flash",
+                                               "gpt-4o-mini",
+                                               "claude-haiku-4"
+                                           ],
+                      "modelRationale":  "Category mapping, enrichment logic - deterministic classification. DeepSeek V4-Flash is cost-effective.",
+                      "dependencies":  [
+                                           "P9-T025",
+                                           "P9-T024"
+                                       ],
+                      "pipelineId":  "issue-enrichment",
+                      "pipelineStages":  [
+                                             "load-issues",
+                                             "infer-file-type",
+                                             "classify-category",
+                                             "map-severity",
+                                             "determine-fixability",
+                                             "add-tags",
+                                             "filter",
+                                             "group"
+                                         ],
+                      "deliverables":  [
+                                           "Define the enrichment contract shared by CLI, extension, UI, reports, and fix engines",
+                                           "Preserve original linter evidence while adding category, severity, priority, fixability, and tags",
+                                           "Record classification decisions and rejected or filtered issues for auditability",
+                                           "Add deterministic tests for all supported issue categories and severity mappings"
+                                       ],
+                      "executionRecord":  {
+                                              "required":  true,
+                                              "pipeline":  "pipeline-ledger"
+                                          },
+                      "tags":  [
+                                   "pipeline",
+                                   "categorization",
+                                   "severity",
+                                   "issue-schema"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T027",
+                      "name":  "Rule and AI Auto-Fix Pipeline",
+                      "status":  "COMPLETED",
+                      "priority":  "CRITICAL",
+                      "estimatedHours":  24,
+                      "value":  100,
+                      "recommendedModel":  [
+                                               "glm-4",
+                                               "glm-4-plus",
+                                               "deepseek-r1"
+                                           ],
+                      "modelRationale":  "Complex fallback strategy, validation, rollback logic. glm-4 (equivalent to gpt-4o-mini, 7/10 reasoning) for initial design. Escalate for complex scenarios.",
+                      "dependencies":  [
+                                           "P9-T026",
+                                           "P9-T014",
+                                           "P9-T024"
+                                       ],
+                      "pipelineId":  "auto-fix",
+                      "pipelineStages":  [
+                                             "select-issues",
+                                             "group-by-file",
+                                             "create-backup",
+                                             "rule-fix",
+                                             "local-ai-fix",
+                                             "cloud-ai-fix",
+                                             "validate",
+                                             "apply-or-rollback",
+                                             "summarize"
+                                         ],
+                      "deliverables":  [
+                                           "Implement explicit rule-only, AI-only, local-first, cloud-fallback, and manual-review strategies",
+                                           "Record every attempted fixer, confidence decision, backup, patch, validation result, and rollback",
+                                           "Preserve unrelated user edits and reject stale or unsafe changes",
+                                           "Add tests for success, unavailable providers, fallback policy, partial failure, rollback, and dry-run execution"
+                                       ],
+                      "executionRecord":  {
+                                              "required":  true,
+                                              "pipeline":  "pipeline-ledger"
+                                          },
+                      "tags":  [
+                                   "pipeline",
+                                   "auto-fix",
+                                   "rollback",
+                                   "models"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T028",
+                      "name":  "AI Issue Resolution Pipeline",
+                      "status":  "COMPLETED",
+                      "priority":  "CRITICAL",
+                      "estimatedHours":  28,
+                      "value":  100,
+                      "recommendedModel":  [
+                                               "glm-4",
+                                               "glm-5",
+                                               "deepseek-r1"
+                                           ],
+                      "modelRationale":  "CRITICAL: Multi-stage research, context aggregation. glm-4 (equivalent to gpt-4o-mini) for initial stages. glm-5/R1 for complex reasoning phases.",
+                      "dependencies":  [
+                                           "P9-T020",
+                                           "P9-T024",
+                                           "P6-T012"
+                                       ],
+                      "pipelineId":  "ai-issue-resolution",
+                      "pipelineStages":  [
+                                             "classify-issue",
+                                             "analyze-code-context",
+                                             "search-docs",
+                                             "search-github",
+                                             "search-stackoverflow",
+                                             "resolve-dependency-docs",
+                                             "aggregate-context",
+                                             "build-prompt",
+                                             "execute-model",
+                                             "apply-line-edits",
+                                             "verify",
+                                             "recover"
+                                         ],
+                      "deliverables":  [
+                                           "Instrument the existing issue-classifier, context analyzer, searchers, aggregator, prompt builder, executors, line editor, and recovery loop as one named pipeline",
+                                           "Persist prompt metadata and source references without storing secrets or unnecessary source content",
+                                           "Record model requirement, selected provider, fallback decisions, token usage, cost, and final edit outcome",
+                                           "Add pipeline tests for local success, cloud fallback, missing model, search failure, parse failure, and recovery exhaustion"
+                                       ],
+                      "executionRecord":  {
+                                              "required":  true,
+                                              "pipeline":  "pipeline-ledger"
+                                          },
+                      "tags":  [
+                                   "pipeline",
+                                   "ai",
+                                   "research",
+                                   "issue-resolution"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T029",
+                      "name":  "AI Code Review Pipeline",
+                      "status":  "COMPLETED",
+                      "priority":  "HIGH",
+                      "estimatedHours":  20,
+                      "value":  90,
+                      "recommendedModel":  [
+                                               "deepseek-v4-flash",
+                                               "gpt-4o-mini",
+                                               "claude-haiku-4"
+                                           ],
+                      "modelRationale":  "Pipeline instrumentation, finding normalization. DeepSeek V4-Flash is cost-optimal for this implementation pattern.",
+                      "dependencies":  [
+                                           "P9-T012",
+                                           "P9-T024"
+                                       ],
+                      "pipelineId":  "ai-code-review",
+                      "pipelineStages":  [
+                                             "select-files",
+                                             "read-code",
+                                             "bound-context",
+                                             "build-review-prompt",
+                                             "execute-model",
+                                             "parse-findings",
+                                             "score-findings",
+                                             "publish-review"
+                                         ],
+                      "deliverables":  [
+                                           "Instrument AICodeReviewAssistant as a structured review pipeline with bounded context and focus areas",
+                                           "Normalize findings with evidence locations, severity, confidence, recommendations, provider, and model",
+                                           "Record review input boundaries and output findings without claiming execution that did not occur",
+                                           "Add tests for truncation, provider failure, malformed review output, and structured finding generation"
+                                       ],
+                      "executionRecord":  {
+                                              "required":  true,
+                                              "pipeline":  "pipeline-ledger"
+                                          },
+                      "tags":  [
+                                   "pipeline",
+                                   "ai",
+                                   "review",
+                                   "findings"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T030",
+                      "name":  "Continuous Watch and Auto-Fix Pipeline",
+                      "status":  "COMPLETED",
+                      "priority":  "HIGH",
+                      "estimatedHours":  16,
+                      "value":  90,
+                      "recommendedModel":  [
+                                               "deepseek-v4-flash",
+                                               "gpt-4o-mini",
+                                               "claude-haiku-4"
+                                           ],
+                      "modelRationale":  "File watching, debouncing, event publishing. DeepSeek V4-Flash for event-driven implementation.",
+                      "dependencies":  [
+                                           "P9-T025",
+                                           "P9-T027",
+                                           "P9-T024"
+                                       ],
+                      "pipelineId":  "watch-and-fix",
+                      "pipelineStages":  [
+                                             "discover-files",
+                                             "subscribe",
+                                             "detect-change",
+                                             "debounce",
+                                             "analyze-changed-files",
+                                             "optionally-fix",
+                                             "publish-event",
+                                             "record-run"
+                                         ],
+                      "deliverables":  [
+                                           "Instrument FileWatcher events, debouncing, changed-file analysis, and optional auto-fix as a pipeline",
+                                           "Prevent duplicate or overlapping runs for the same file and preserve cancellation state",
+                                           "Publish live pipeline status to configured UI or websocket consumers",
+                                           "Add tests for new files, excluded files, rapid changes, watcher errors, and auto-fix disabled mode"
+                                       ],
+                      "executionRecord":  {
+                                              "required":  true,
+                                              "pipeline":  "pipeline-ledger"
+                                          },
+                      "tags":  [
+                                   "pipeline",
+                                   "watcher",
+                                   "continuous",
+                                   "events"
+                               ],
+                      "artifacts":  [
+                                        "src/pipelines/watch-and-fix-pipeline.js"
+                                    ]
+                  },
+                  {
+                      "id":  "P9-T031",
+                      "name":  "CI Build Monitoring and Quality Gate Pipeline",
+                      "status":  "COMPLETED",
+                      "priority":  "HIGH",
+                      "estimatedHours":  20,
+                      "value":  95,
+                      "recommendedModel":  [
+                                               "glm-4",
+                                               "glm-4-plus",
+                                               "deepseek-r1"
+                                           ],
+                      "modelRationale":  "CI integration, regression detection, gate logic. glm-4 (equivalent to gpt-4o-mini) for most cases. Escalate for complex threshold reasoning.",
+                      "dependencies":  [
+                                           "P9-T025",
+                                           "P9-T024"
+                                       ],
+                      "pipelineId":  "ci-quality-gate",
+                      "pipelineStages":  [
+                                             "detect-ci",
+                                             "start-build",
+                                             "collect-analysis",
+                                             "calculate-metrics",
+                                             "check-gates",
+                                             "detect-regressions",
+                                             "save-results",
+                                             "generate-reports",
+                                             "set-exit-status"
+                                         ],
+                      "deliverables":  [
+                                           "Instrument BuildMonitor from CI detection through metrics, gates, regressions, history, reports, and exit status",
+                                           "Persist build and pipeline run IDs together so reports can be correlated with source and task context",
+                                           "Record gate decisions and distinguish unavailable checks from passing checks",
+                                           "Add tests for local and supported CI providers, first-build history, regressions, gate failures, and report failures"
+                                       ],
+                      "executionRecord":  {
+                                              "required":  true,
+                                              "pipeline":  "pipeline-ledger"
+                                          },
+                      "tags":  [
+                                   "pipeline",
+                                   "ci",
+                                   "quality-gates",
+                                   "regression"
+                               ]
+                  },
+                  {
+                      "id":  "P9-T032",
+                      "name":  "Multi-Language Analyzer and Plugin Pipeline",
+                      "status":  "COMPLETED",
+                      "priority":  "HIGH",
+                      "estimatedHours":  16,
+                      "value":  90,
+                      "recommendedModel":  [
+                                               "glm-4",
+                                               "glm-4-plus",
+                                               "deepseek-r1"
+                                           ],
+                      "modelRationale":  "Plugin architecture, safe load/unload, contract design. glm-4 (equivalent to gpt-4o-mini) for initial design. Escalate for complex interactions.",
+                      "dependencies":  [
+                                           "P2-T006",
+                                           "P9-T024"
+                                       ],
+                      "pipelineId":  "language-analysis",
+                      "pipelineStages":  [
+                                             "detect-language",
+                                             "load-plugin",
+                                             "check-tools",
+                                             "discover-files",
+                                             "run-analyzer",
+                                             "parse-diagnostics",
+                                             "normalize-issues",
+                                             "unload-plugin"
+                                         ],
+                      "deliverables":  [
+                                           "Define a common analyzer pipeline contract for built-in and plugin-provided languages",
+                                           "Record language, plugin version, external tools, diagnostics, degraded states, and normalized output",
+                                           "Support safe plugin load, unload, reload, and failure isolation",
+                                           "Add contract tests across JavaScript/TypeScript, C#, Python, Go, Rust, PHP, and Ruby adapters"
+                                       ],
+                      "executionRecord":  {
+                                              "required":  true,
+                                              "pipeline":  "pipeline-ledger"
+                                          },
+                      "tags":  [
+                                   "pipeline",
+                                   "languages",
+                                   "plugins",
+                                   "diagnostics"
+                               ],
+                      "artifacts":  [
+                                        "src/pipelines/language-analysis-pipeline.js"
+                                    ]
+                  },
+                  {
+                      "id":  "P9-T033",
+                      "name":  "Security Scanning Pipeline",
+                      "status":  "COMPLETED",
+                      "priority":  "HIGH",
+                      "estimatedHours":  16,
+                      "value":  95,
+                      "recommendedModel":  [
+                                               "glm-5",
+                                               "glm-4-plus",
+                                               "glm-5-plus"
+                                           ],
+                      "modelRationale":  "Security logic, secret redaction, risk scoring. glm-5 (equivalent to o1-mini) for security-critical reasoning. Escalate to glm-5-plus if needed.",
+                      "dependencies":  [
+                                           "P9-T025",
+                                           "P9-T024"
+                                       ],
+                      "pipelineId":  "security-scan",
+                      "pipelineStages":  [
+                                             "select-scope",
+                                             "scan-vulnerabilities",
+                                             "scan-secrets",
+                                             "scan-dependencies",
+                                             "normalize-findings",
+                                             "score-risk",
+                                             "apply-gates",
+                                             "publish-report"
+                                         ],
+                      "deliverables":  [
+                                           "Unify vulnerability, secret, and dependency scanners behind one security pipeline contract",
+                                           "Record scanner versions, scope, findings, redacted evidence, risk scores, and gate decisions",
+                                           "Ensure secrets are redacted from execution records and model context",
+                                           "Add tests for detection, suppression, false-positive handling, and unavailable dependency databases"
+                                       ],
+                      "executionRecord":  {
+                                              "required":  true,
+                                              "pipeline":  "pipeline-ledger"
+                                          },
+                      "tags":  [
+                                   "pipeline",
+                                   "security",
+                                   "secrets",
+                                   "vulnerabilities"
+                               ],
+                      "artifacts":  [
+                                        "src/pipelines/security-scan-pipeline.js"
+                                    ]
+                  },
+                  {
+                      "id":  "P9-T034",
+                      "name":  "Performance and Quality Metrics Pipeline",
+                      "status":  "COMPLETED",
+                      "priority":  "HIGH",
+                      "estimatedHours":  16,
+                      "value":  90,
+                      "recommendedModel":  [
+                                               "deepseek-v4-flash",
+                                               "gpt-4o-mini",
+                                               "claude-haiku-4"
+                                           ],
+                      "modelRationale":  "Metric calculation, aggregation, threshold checks. DeepSeek V4-Flash is cost-optimal for algorithmic work.",
+                      "dependencies":  [
+                                           "P9-T025",
+                                           "P9-T024"
+                                       ],
+                      "pipelineId":  "quality-metrics",
+                      "pipelineStages":  [
+                                             "select-scope",
+                                             "calculate-complexity",
+                                             "detect-duplicates",
+                                             "detect-performance-issues",
+                                             "aggregate-metrics",
+                                             "compare-history",
+                                             "apply-thresholds",
+                                             "publish-report"
+                                         ],
+                      "deliverables":  [
+                                           "Unify complexity, duplicate, performance, and quality calculations into a repeatable metrics pipeline",
+                                           "Record metric definitions, scopes, thresholds, baselines, and comparison history",
+                                           "Distinguish missing metrics from zero-valued metrics",
+                                           "Add tests for threshold crossings, empty projects, malformed source, and historical comparisons"
+                                       ],
+                      "executionRecord":  {
+                                              "required":  true,
+                                              "pipeline":  "pipeline-ledger"
+                                          },
+                      "tags":  [
+                                   "pipeline",
+                                   "metrics",
+                                   "complexity",
+                                   "performance",
+                                   "quality"
+                               ],
+                      "artifacts":  [
+                                        "src/pipelines/quality-metrics-pipeline.js"
+                                    ]
+                  },
+                  {
+                      "id":  "P9-T035",
+                      "name":  "VS Code Diagnostics and Quick-Fix Pipeline",
+                      "status":  "COMPLETED",
+                      "priority":  "HIGH",
+                      "estimatedHours":  20,
+                      "value":  95,
+                      "recommendedModel":  [
+                                               "deepseek-v4-flash",
+                                               "gpt-4o-mini",
+                                               "claude-haiku-4"
+                                           ],
+                      "modelRationale":  "VS Code API integration, diagnostics mapping. DeepSeek V4-Flash is optimal for well-documented extension patterns.",
+                      "dependencies":  [
+                                           "P9-T025",
+                                           "P9-T027",
+                                           "P9-T024"
+                                       ],
+                      "pipelineId":  "vscode-quality-feedback",
+                      "pipelineStages":  [
+                                             "activate-extension",
+                                             "load-config",
+                                             "analyze-workspace",
+                                             "map-diagnostics",
+                                             "render-status",
+                                             "offer-code-actions",
+                                             "apply-fix",
+                                             "refresh-diagnostics"
+                                         ],
+                      "deliverables":  [
+                                           "Instrument AqtService, diagnostics provider, code actions, status bar, and webview as one extension pipeline",
+                                           "Keep issue identity stable from analysis through diagnostic display and fix action",
+                                           "Record command, issue, user approval, fix result, and refreshed diagnostic state",
+                                           "Add offline extension tests for activation, analysis, diagnostics, quick fixes, errors, and refresh"
+                                       ],
+                      "executionRecord":  {
+                                              "required":  true,
+                                              "pipeline":  "pipeline-ledger"
+                                          },
+                      "tags":  [
+                                   "pipeline",
+                                   "vscode",
+                                   "diagnostics",
+                                   "quick-fix"
+                               ],
+                      "artifacts":  [
+                                        "src/pipelines/vscode-diagnostics-pipeline.js"
+                                    ]
+                  },
+                  {
+                      "id":  "P9-T036",
+                      "name":  "Chat UI and WebSocket Interaction Pipeline",
+                      "status":  "COMPLETED",
+                      "priority":  "HIGH",
+                      "estimatedHours":  16,
+                      "value":  90,
+                      "recommendedModel":  [
+                                               "deepseek-v4-flash",
+                                               "gpt-4o-mini",
+                                               "claude-haiku-4"
+                                           ],
+                      "modelRationale":  "WebSocket protocol, message routing, event handling. DeepSeek V4-Flash for standard patterns.",
+                      "dependencies":  [
+                                           "P9-T011",
+                                           "P9-T016",
+                                           "P9-T024"
+                                       ],
+                      "pipelineId":  "chat-interaction",
+                      "pipelineStages":  [
+                                             "connect",
+                                             "authenticate-session",
+                                             "receive-message",
+                                             "route-command",
+                                             "stream-progress",
+                                             "request-approval",
+                                             "publish-result",
+                                             "disconnect-or-resume"
+                                         ],
+                      "deliverables":  [
+                                           "Define message, progress, approval, error, cancellation, and result event contracts for the chat UI and websocket server",
+                                           "Correlate every UI action with a workspace, session, task, and pipeline run ID",
+                                           "Persist resumable conversation and pipeline events without duplicating sensitive source content",
+                                           "Add tests for reconnects, malformed messages, concurrent sessions, cancellation, and provider failure"
+                                       ],
+                      "executionRecord":  {
+                                              "required":  true,
+                                              "pipeline":  "pipeline-ledger"
+                                          },
+                      "tags":  [
+                                   "pipeline",
+                                   "chat",
+                                   "websocket",
+                                   "streaming",
+                                   "sessions"
+                               ],
+                      "artifacts":  [
+                                        "src/pipelines/chat-interaction-pipeline.js"
+                                    ]
+                  },
+                  {
+                      "id":  "P9-T037",
+                      "name":  "CLI Command Execution Pipelines",
+                      "status":  "COMPLETED",
+                      "priority":  "HIGH",
+                      "estimatedHours":  16,
+                      "value":  90,
+                      "recommendedModel":  [
+                                               "deepseek-v4-flash",
+                                               "gpt-4o-mini",
+                                               "claude-haiku-4"
+                                           ],
+                      "modelRationale":  "CLI argument parsing, command dispatch - standard CLI patterns. DeepSeek V4-Flash is cost-optimal.",
+                      "dependencies":  [
+                                           "P9-T024",
+                                           "P9-T017"
+                                       ],
+                      "pipelineId":  "cli-command",
+                      "pipelineStages":  [
+                                             "parse-arguments",
+                                             "resolve-workspace",
+                                             "load-config",
+                                             "dispatch-command",
+                                             "execute-operation",
+                                             "format-output",
+                                             "set-exit-code",
+                                             "record-run"
+                                         ],
+                      "deliverables":  [
+                                           "Define common lifecycle and result contracts for analyze, fix, generate-fixes, watch, monitor, and UI commands",
+                                           "Record command arguments with secrets redacted, selected configuration, stages, output format, and exit status",
+                                           "Ensure CLI output never reports unavailable work as completed",
+                                           "Add command-level tests for success, invalid arguments, missing tools, dry-run, and failure exit codes"
+                                       ],
+                      "executionRecord":  {
+                                              "required":  true,
+                                              "pipeline":  "pipeline-ledger"
+                                          },
+                      "tags":  [
+                                   "pipeline",
+                                   "cli",
+                                   "commands",
+                                   "exit-codes"
+                               ],
+                      "artifacts":  [
+                                        "src/pipelines/cli-command-pipeline.js"
+                                    ]
+                  },
+                  {
+                      "id":  "P9-T038",
+                      "name":  "Dashboard Reporting and Trend Pipeline",
+                      "status":  "COMPLETED",
+                      "priority":  "MEDIUM",
+                      "estimatedHours":  16,
+                      "value":  85,
+                      "recommendedModel":  [
+                                               "deepseek-v4-flash",
+                                               "gpt-4o-mini",
+                                               "claude-haiku-4"
+                                           ],
+                      "modelRationale":  "Data aggregation, trend calculation. DeepSeek V4-Flash handles data processing patterns well.",
+                      "dependencies":  [
+                                           "P9-T024",
+                                           "P9-T031",
+                                           "P9-T034"
+                                       ],
+                      "pipelineId":  "dashboard-reporting",
+                      "pipelineStages":  [
+                                             "load-records",
+                                             "aggregate-runs",
+                                             "calculate-trends",
+                                             "group-by-project",
+                                             "render-dashboard",
+                                             "export-report"
+                                         ],
+                      "deliverables":  [
+                                           "Build dashboard views from persisted pipeline and quality records rather than transient process state",
+                                           "Show run status, issue trends, gate history, fix outcomes, model usage, and verification results",
+                                           "Preserve source pipeline IDs and timestamps in dashboard data and exports",
+                                           "Add tests for empty, partial, historical, and corrupted report data"
+                                       ],
+                      "executionRecord":  {
+                                              "required":  true,
+                                              "pipeline":  "pipeline-ledger"
+                                          },
+                      "tags":  [
+                                   "pipeline",
+                                   "dashboard",
+                                   "reports",
+                                   "trends"
+                               ],
+                      "artifacts":  [
+                                        "src/pipelines/dashboard-reporting-pipeline.js"
+                                    ]
+                  },
+                  {
+                      "id":  "P9-T039",
+                      "name":  "Pipeline Replay and Contract Testing",
+                      "status":  "COMPLETED",
+                      "priority":  "HIGH",
+                      "estimatedHours":  24,
+                      "value":  95,
+                      "recommendedModel":  [
+                                               "glm-4",
+                                               "glm-4-plus",
+                                               "deepseek-r1"
+                                           ],
+                      "modelRationale":  "Test framework design, contract validation, replay logic. glm-4 (equivalent to gpt-4o-mini) for most cases. Escalate for complex testing scenarios.",
+                      "dependencies":  [
+                                           "P9-T024",
+                                           "P9-T035",
+                                           "P9-T037"
+                                       ],
+                      "pipelineId":  "pipeline-replay",
+                      "pipelineStages":  [
+                                             "load-run",
+                                             "validate-schema",
+                                             "replay-stubbed-stages",
+                                             "compare-events",
+                                             "report-differences"
+                                         ],
+                      "deliverables":  [
+                                           "Define versioned contracts for pipeline events, stage inputs, stage outputs, errors, and final results",
+                                           "Replay recorded runs with external tools and model providers replaced by deterministic stubs",
+                                           "Detect missing, reordered, duplicated, or fabricated stage events",
+                                           "Add regression fixtures for every registered pipeline and document schema migration behavior"
+                                       ],
+                      "executionRecord":  {
+                                              "required":  true,
+                                              "pipeline":  "pipeline-ledger"
+                                          },
+                      "tags":  [
+                                   "pipeline",
+                                   "replay",
+                                   "contracts",
+                                   "regression",
+                                   "testing"
+                               ],
+                      "artifacts":  [
+                                        "src/pipelines/pipeline-replay-pipeline.js"
+                                    ]
+                  },
+                  {
+                      "id":  "P9-T040",
+                      "name":  "Documentation Generation and Publishing Pipeline",
+                      "status":  "COMPLETED",
+                      "priority":  "MEDIUM",
+                      "estimatedHours":  20,
+                      "value":  85,
+                      "recommendedModel":  [
+                                               "deepseek-v4-flash",
+                                               "gpt-4o-mini",
+                                               "claude-haiku-4"
+                                           ],
+                      "modelRationale":  "Template-based generation, link validation, publishing. DeepSeek V4-Flash is cost-optimal for content generation patterns.",
+                      "dependencies":  [
+                                           "P9-T020",
+                                           "P9-T022",
+                                           "P9-T024"
+                                       ],
+                      "pipelineId":  "documentation-generation",
+                      "pipelineStages":  [
+                                             "select-task",
+                                             "collect-requirements",
+                                             "collect-code-and-doc-context",
+                                             "build-outline",
+                                             "generate-document",
+                                             "validate-links",
+                                             "review-diff",
+                                             "publish-or-archive"
+                                         ],
+                      "deliverables":  [
+                                           "Generate implementation notes, API references, setup guides, acceptance reports, and task completion summaries from approved task context",
+                                           "Preserve requirement IDs, pipeline run IDs, documentation citations, and generated-file provenance",
+                                           "Validate links, code examples, status claims, and archive placement before publishing",
+                                           "Require user approval for generated documentation changes and record rejected or revised drafts",
+                                           "Add offline tests for generated summaries, citations, stale requirements, invalid links, and archive decisions"
+                                       ],
+                      "executionRecord":  {
+                                              "required":  true,
+                                              "pipeline":  "pipeline-ledger"
+                                          },
+                      "tags":  [
+                                   "pipeline",
+                                   "documentation",
+                                   "generation",
+                                   "publishing",
+                                   "traceability"
+                               ],
+                      "artifacts":  [
+                                        "src/pipelines/documentation-generation-pipeline.js"
+                                    ]
+                  }
+              ]
+}

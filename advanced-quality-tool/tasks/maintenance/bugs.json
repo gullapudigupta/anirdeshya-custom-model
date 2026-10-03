@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "bug-index",
+  "description": "Master index for bug records. Bug details live in the linked shard files.",
+  "recordIdFormat": "BUG-### (globally increasing across shards)",
+  "maxRecordsPerShard": 100,
+  "requiredPhaseLink": ["phaseTaskId", "phaseTaskFile"],
+  "phaseLinkRule": "Each bug must point to the exact existing task in a phase1-tasks.json through phase9-tasks.json file. If no exact task exists, add it to the appropriate phase file before logging the bug.",
+  "shards": [
+    {
+      "file": "./bugs-tasks.json",
+      "recordCount": 4,
+      "firstId": "BUG-001",
+      "lastId": "BUG-004"
+    }
+  ]
+}
