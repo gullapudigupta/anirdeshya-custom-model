@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <!-- C# 8+ needed for switch expressions and static local functions -->
+    <LangVersion>8.0</LangVersion>
+    <AssemblyName>RoslynSymbolExtractor</AssemblyName>
+    <RootNamespace>RoslynSymbolExtractor</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Roslyn syntax parsing only — no MSBuild workspace needed -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+</Project>

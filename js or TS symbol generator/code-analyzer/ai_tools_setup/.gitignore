@@ -1,0 +1,7 @@
+node_modules/
+logs/*.log
+logs/*.jsonl
+.cache/
+*.pack
+RoslynSymbolExtractor/bin/
+RoslynSymbolExtractor/obj/

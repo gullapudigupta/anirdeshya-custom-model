@@ -1,0 +1,19 @@
+﻿2026-08-08T18:06:18.2666292+05:30 - Repository dir: C:\sarah laptop\erv-heart\MyFirstProject-v2\src
+2026-08-08T18:06:18.2836421+05:30 - Found 'git' for 'git' at: C:\Program Files\Git\cmd\git.exe
+2026-08-08T18:06:18.2956265+05:30 - git version output: version output not available
+2026-08-08T18:06:18.2996313+05:30 - Found 'ctags' for 'ctags' at: C:\Users\Gullapudisgupta\scoop\shims\ctags.exe
+2026-08-08T18:06:18.3016278+05:30 - ctags version output: version output not available
+2026-08-08T18:06:18.3046604+05:30 - Found 'rg' for 'rg' at: C:\Users\Gullapudisgupta\scoop\shims\rg.exe
+2026-08-08T18:06:18.3066298+05:30 - rg version output: version output not available
+2026-08-08T18:06:18.3086305+05:30 - Found 'node' for 'node' at: C:\Program Files\Volta\node.exe
+2026-08-08T18:06:18.3116581+05:30 - node version output: version output not available
+2026-08-08T18:06:18.3146273+05:30 - Found 'go' for 'go' at: C:\Users\Gullapudisgupta\scoop\shims\go.exe
+2026-08-08T18:06:18.3166583+05:30 - go version output: version output not available
+2026-08-08T18:06:18.3186487+05:30 - Tools folder exists: C:\sarah laptop\erv-heart\MyFirstProject-v2\src\tools
+2026-08-08T18:06:18.3276323+05:30 - Created wrapper: C:\sarah laptop\erv-heart\MyFirstProject-v2\src\tools\ctags.ps1 -> C:\Users\Gullapudisgupta\scoop\shims\ctags.exe
+2026-08-08T18:06:18.3316278+05:30 - Created wrapper: C:\sarah laptop\erv-heart\MyFirstProject-v2\src\tools\go.ps1 -> C:\Users\Gullapudisgupta\scoop\shims\go.exe
+2026-08-08T18:06:18.3339308+05:30 - Created wrapper: C:\sarah laptop\erv-heart\MyFirstProject-v2\src\tools\node.ps1 -> C:\Program Files\Volta\node.exe
+2026-08-08T18:06:18.3359320+05:30 - Created wrapper: C:\sarah laptop\erv-heart\MyFirstProject-v2\src\tools\rg.ps1 -> C:\Users\Gullapudisgupta\scoop\shims\rg.exe
+2026-08-08T18:06:18.3379316+05:30 - Created wrapper: C:\sarah laptop\erv-heart\MyFirstProject-v2\src\tools\git.ps1 -> C:\Program Files\Git\cmd\git.exe
+2026-08-08T18:06:18.3399319+05:30 - Wrote tools README
+2026-08-08T18:06:18.3412701+05:30 - Verification complete. See C:\sarah laptop\erv-heart\MyFirstProject-v2\src\ai_tools_setup\verify_tools.log for details.
