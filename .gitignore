@@ -1,0 +1,7 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs
+/c# symbol generator/ai_tools_setup/RoslynSymbolExtractor/bin/Debug/net48
+/c# symbol generator/ai_tools_setup/RoslynSymbolExtractor/obj
