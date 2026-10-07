@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Coding Agent — Strategy Hub</title>
+<style>
+  :root {
+    --bg: #0f1420; --card: #1a2133; --card2: #202a40; --text: #e6ebf5;
+    --muted: #9aa7c0; --accent: #6ea8fe; --border: #2b3550;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif; background: var(--bg);
+    color: var(--text); line-height: 1.55;
+  }
+  header {
+    padding: 48px 24px 28px; text-align: center;
+    background: radial-gradient(1200px 300px at 50% -40%, #24335c 0%, transparent 70%);
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { margin: 0 0 8px; font-size: 2rem; }
+  header p { margin: 4px auto; max-width: 720px; color: var(--muted); }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 28px 20px 64px; }
+  h2 { font-size: 1.15rem; margin: 34px 0 14px; color: var(--accent);
+       border-left: 3px solid var(--accent); padding-left: 10px; }
+  .grid { display: grid; gap: 14px;
+          grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); }
+  a.card {
+    display: block; text-decoration: none; color: inherit; background: var(--card);
+    border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px;
+    transition: transform .12s ease, border-color .12s ease, background .12s ease;
+  }
+  a.card:hover { transform: translateY(-3px); border-color: var(--accent);
+                 background: var(--card2); }
+  a.card .num { font-size: .72rem; color: var(--accent); letter-spacing: .08em;
+                text-transform: uppercase; }
+  a.card h3 { margin: 6px 0 6px; font-size: 1.02rem; }
+  a.card p { margin: 0; color: var(--muted); font-size: .88rem; }
+  .pill { display:inline-block; font-size:.7rem; color:var(--muted);
+          border:1px solid var(--border); border-radius:999px;
+          padding:2px 9px; margin-top:10px; }
+  footer { text-align: center; color: var(--muted); font-size: .82rem;
+           padding: 24px; border-top: 1px solid var(--border); }
+  code { background:#0b0f18; padding:1px 6px; border-radius:6px; font-size:.85em; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🤖 Brand‑New Coding Agent — Strategy Hub</h1>
+  <p>Single source of truth for the design, requirements, training, evaluation,
+     hardware, and operations plan. Click any card to open the document.</p>
+  <p><code>model/opus 4.8 sol</code></p>
+</header>
+
+<div class="wrap">
+
+  <h2>Start here</h2>
+  <div class="grid">
+    <a class="card" href="README.md">
+      <div class="num">Overview</div>
+      <h3>README</h3>
+      <p>TL;DR strategy and the full document map.</p>
+    </a>
+    <a class="card" href="roadmap.md">
+      <div class="num">Plan</div>
+      <h3>Roadmap</h3>
+      <p>Phased delivery from RAG MVP to advanced training, with gates.</p>
+    </a>
+  </div>
+
+  <h2>Requirements &amp; design</h2>
+  <div class="grid">
+    <a class="card" href="requirements.md">
+      <div class="num">01</div>
+      <h3>Requirements</h3>
+      <p>Functional + non‑functional requirements, personas, acceptance.</p>
+    </a>
+    <a class="card" href="design.md">
+      <div class="num">02</div>
+      <h3>System Design</h3>
+      <p>End‑to‑end architecture, components, request flows, ADRs.</p>
+    </a>
+    <a class="card" href="considerations.md">
+      <div class="num">03</div>
+      <h3>Things to Consider</h3>
+      <p>Decision checklist across strategy, data, agent, ops, safety.</p>
+    </a>
+  </div>
+
+  <h2>Documentation‑grounded suggestions &amp; RAG</h2>
+  <div class="grid">
+    <a class="card" href="documentation-driven-suggestions.md">
+      <div class="num">04</div>
+      <h3>Doc‑Driven Suggestions</h3>
+      <p>Options for coding suggestions grounded purely on documentation.</p>
+    </a>
+    <a class="card" href="rag-only-strategy.md">
+      <div class="num">10</div>
+      <h3>RAG‑Only Strategy</h3>
+      <p>What to do if we rely on retrieval only — patterns, limits, fixes.</p>
+    </a>
+  </div>
+
+  <h2>Hardware &amp; operations</h2>
+  <div class="grid">
+    <a class="card" href="hardware-requirements.md">
+      <div class="num">05</div>
+      <h3>Hardware Requirements</h3>
+      <p>Sizing for training, fine‑tuning, inference, and RAG infra.</p>
+    </a>
+    <a class="card" href="monitoring-strategy.md">
+      <div class="num">06</div>
+      <h3>Monitoring Strategy</h3>
+      <p>Tracing, metrics, drift, alerting, feedback loops.</p>
+    </a>
+    <a class="card" href="load-distribution.md">
+      <div class="num">11</div>
+      <h3>Load Distribution</h3>
+      <p>Splitting work across MCP servers, tools, and sub‑agents.</p>
+    </a>
+  </div>
+
+  <h2>Measurement</h2>
+  <div class="grid">
+    <a class="card" href="benchmarks.md">
+      <div class="num">07</div>
+      <h3>Benchmarks &amp; Eval</h3>
+      <p>How to measure benchmarks and build the evaluation harness.</p>
+    </a>
+    <a class="card" href="success-metrics.md">
+      <div class="num">08</div>
+      <h3>Success Metrics</h3>
+      <p>How to measure the success of the model and product.</p>
+    </a>
+  </div>
+
+  <h2>Training &amp; data</h2>
+  <div class="grid">
+    <a class="card" href="training-strategy.md">
+      <div class="num">09</div>
+      <h3>Training Strategy</h3>
+      <p>Minimum → maximum ways to train (the 0–7 ladder).</p>
+    </a>
+    <a class="card" href="data-strategy.md">
+      <div class="num">12</div>
+      <h3>Data Strategy</h3>
+      <p>Sourcing, licensing, cleaning, dedup, governance.</p>
+    </a>
+  </div>
+
+  <h2>Governance</h2>
+  <div class="grid">
+    <a class="card" href="security-privacy.md">
+      <div class="num">13</div>
+      <h3>Security &amp; Privacy</h3>
+      <p>Threat model, sandboxing, secrets, compliance, safety.</p>
+    </a>
+    <a class="card" href="cost-model.md">
+      <div class="num">14</div>
+      <h3>Cost Model</h3>
+      <p>Training + serving cost, TCO, build‑vs‑buy.</p>
+    </a>
+    <a class="card" href="risks-and-open-questions.md">
+      <div class="num">16</div>
+      <h3>Risks &amp; Open Questions</h3>
+      <p>Risk register and decisions still to be made.</p>
+    </a>
+    <a class="card" href="glossary.md">
+      <div class="num">17</div>
+      <h3>Glossary</h3>
+      <p>Shared terminology used across the documents.</p>
+    </a>
+  </div>
+
+</div>
+
+<footer>
+  Strategy hub · generated 2026‑10‑07 · open any <code>.md</code> file for details.
+</footer>
+</body>
+</html>

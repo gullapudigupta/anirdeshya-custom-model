@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A practical strategy for a new documentation-grounded coding agent: design, requirements, RAG, training, hardware, tools, monitoring, and evaluation.">
+  <title>Coding Agent Strategy | Documentation Index</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --background: #f3f6fb;
+      --surface: #ffffff;
+      --text: #18263c;
+      --muted: #46566d;
+      --accent: #174ca4;
+      --border: #cbd5e3;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--background);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      line-height: 1.65;
+    }
+    a { color: var(--accent); text-underline-offset: 0.18em; }
+    a:hover { text-decoration-thickness: 2px; }
+    a:focus-visible { outline: 3px solid #b34700; outline-offset: 4px; }
+    .skip {
+      position: absolute;
+      top: -100px;
+      left: 16px;
+      padding: 10px 16px;
+      background: var(--surface);
+      z-index: 1;
+    }
+    .skip:focus { top: 12px; }
+    .container { width: min(1120px, calc(100% - 40px)); margin: 0 auto; }
+    header {
+      padding: 52px 0 36px;
+      background: #142b4b;
+      color: #ffffff;
+      border-bottom: 5px solid #74b4ff;
+    }
+    header p { max-width: 800px; color: #e0eaff; }
+    .eyebrow { margin: 0 0 10px; font-size: 0.85rem; letter-spacing: 0.12em; text-transform: uppercase; }
+    h1 { font-size: clamp(2rem, 5vw, 3.3rem); line-height: 1.15; margin: 0 0 18px; }
+    h2 { margin-top: 0; line-height: 1.3; }
+    h3 { margin: 0 0 10px; line-height: 1.35; font-size: 1.12rem; }
+    p { margin: 0 0 14px; }
+    .badges { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
+    .badge { border: 1px solid #8faaca; padding: 4px 12px; border-radius: 20px; font-size: 0.86rem; }
+    nav { background: var(--surface); border-bottom: 1px solid var(--border); }
+    nav ul { display: flex; flex-wrap: wrap; gap: 12px 26px; list-style: none; padding: 16px 0; margin: 0; }
+    main { padding: 30px 0 48px; }
+    section { margin-bottom: 34px; scroll-margin-top: 20px; }
+    .callout { border-left: 5px solid var(--accent); padding: 22px 26px; background: var(--surface); border-radius: 4px; }
+    .callout p:last-child { margin-bottom: 0; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 22px; }
+    .card p { color: var(--muted); font-size: 0.95rem; }
+    .card p:last-child { margin-bottom: 0; }
+    .label { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+    .path { overflow-wrap: anywhere; font-family: ui-monospace, Consolas, monospace; }
+    .file-list { columns: 2; padding-left: 24px; }
+    .file-list li { padding: 4px 0; break-inside: avoid; }
+    footer { padding: 24px 0; border-top: 1px solid var(--border); color: var(--muted); background: var(--surface); }
+    footer p { margin: 0; }
+    @media (max-width: 850px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 560px) {
+      .container { width: calc(100% - 28px); }
+      header { padding: 36px 0 28px; }
+      .grid { grid-template-columns: 1fr; }
+      .file-list { columns: 1; }
+      .callout { padding: 18px; }
+    }
+    @media print {
+      header { background: none; color: var(--text); padding: 20px 0; }
+      header p { color: var(--text); }
+      nav, .skip { display: none; }
+      .card { break-inside: avoid; }
+      body { background: white; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to documents</a>
+  <header>
+    <div class="container">
+      <p class="eyebrow">Strategy pack / 2026-10-07</p>
+      <h1>Build a new coding agent.<br>Start with evidence.</h1>
+      <p>A complete planning pack for documentation-grounded suggestions, repository-aware assistance, and controlled coding workflows. Compare RAG-only, local and hosted models, training investments, hardware, and tool delegation.</p>
+      <div class="badges" aria-label="Planning status">
+        <span class="badge">Proposed, not implemented</span>
+        <span class="badge">RAG-first recommendation</span>
+        <span class="badge">Model-provider independent</span>
+      </div>
+    </div>
+  </header>
+  <nav aria-label="Document sections">
+    <div class="container">
+      <ul>
+        <li><a href="#start">Start here</a></li>
+        <li><a href="#foundation">Product and architecture</a></li>
+        <li><a href="#knowledge">Knowledge and training</a></li>
+        <li><a href="#operations">Operations and evaluation</a></li>
+        <li><a href="#delivery">Delivery and governance</a></li>
+        <li><a href="#files">All files</a></li>
+      </ul>
+    </div>
+  </nav>
+  <main id="main" class="container">
+    <section id="start" class="callout" aria-labelledby="start-title">
+      <h2 id="start-title">Recommended route</h2>
+      <p>Existing code-capable model + approved versioned documentation + hybrid RAG + deterministic tools + explicit permissions. Start read-only, add repository evidence, then previewable patches and isolated validation. Train only when measurements show a remaining behavioral gap.</p>
+      <p><strong>Reading order:</strong> <a href="README.md">Overview</a>, <a href="strategy.md">strategy</a>, <a href="requirements.md">requirements</a>, <a href="design.md">design</a>, then the specialist plans below.</p>
+      <p>Hardware, thresholds, costs, and timelines are planning estimates. No model has been selected or benchmarked. The folder name is an organizational label, not a model-availability claim.</p>
+    </section>
+    <section id="foundation" aria-labelledby="foundation-title">
+      <h2 id="foundation-title">Product and architecture</h2>
+      <div class="grid">
+        <article class="card">
+          <p class="label">01 / Decisions</p>
+          <h3><a href="strategy.md">Strategy</a></h3>
+          <p>Product options, key considerations, trade-offs, MVP stack, non-goals, and the recommended build sequence.</p>
+        </article>
+        <article class="card">
+          <p class="label">02 / Acceptance</p>
+          <h3><a href="requirements.md">Requirements</a></h3>
+          <p>Modes, permissions, functional requirements, reliability targets, quality gates, and validation traceability.</p>
+        </article>
+        <article class="card">
+          <p class="label">03 / Architecture</p>
+          <h3><a href="design.md">System design</a></h3>
+          <p>Components, schemas, evidence contracts, task lifecycle, model routing, deployment, and failure handling.</p>
+        </article>
+      </div>
+    </section>
+    <section id="knowledge" aria-labelledby="knowledge-title">
+      <h2 id="knowledge-title">Knowledge, models, and training</h2>
+      <div class="grid">
+        <article class="card">
+          <p class="label">04 / Documentation</p>
+          <h3><a href="documentation-only.md">Documentation-only suggestions</a></h3>
+          <p>Extractive search, templates, RAG, constrained generation, evidence limits, and honest output contracts.</p>
+        </article>
+        <article class="card">
+          <p class="label">05 / Retrieval</p>
+          <h3><a href="rag-only.md">RAG-only options</a></h3>
+          <p>No generator training: ingestion, hybrid retrieval, filters, reranking, freshness, ablations, and improvements.</p>
+        </article>
+        <article class="card">
+          <p class="label">06 / Learning</p>
+          <h3><a href="training.md">Minimum to maximum training</a></h3>
+          <p>Zero-training baseline, LoRA/QLoRA, supervised and preference training, execution feedback, and foundation training.</p>
+        </article>
+        <article class="card">
+          <p class="label">07 / Hardware</p>
+          <h3><a href="hardware.md">Hardware requirements</a></h3>
+          <p>Hosted, CPU-only, local GPU, serving, and training bands; weight and KV memory; a procurement test plan.</p>
+        </article>
+        <article class="card">
+          <p class="label">08 / Distribution</p>
+          <h3><a href="tool-delegation.md">MCP, tools, workers, and agents</a></h3>
+          <p>Split deterministic work from reasoning. Compare service scaling, model parallelism, and bounded specialist agents.</p>
+        </article>
+      </div>
+    </section>
+    <section id="operations" aria-labelledby="operations-title">
+      <h2 id="operations-title">Operations and evaluation</h2>
+      <div class="grid">
+        <article class="card">
+          <p class="label">09 / Observability</p>
+          <h3><a href="monitoring.md">Monitoring strategy</a></h3>
+          <p>Traces, metrics, dashboards, alert rules, SLOs, quality audits, retention, and incident runbooks.</p>
+        </article>
+        <article class="card">
+          <p class="label">10 / Measurement</p>
+          <h3><a href="benchmarks.md">Benchmarks</a></h3>
+          <p>Internal and public evaluation, metric formulas, hidden tests, reproducibility, confidence intervals, and contamination.</p>
+        </article>
+        <article class="card">
+          <p class="label">11 / Outcomes</p>
+          <h3><a href="success-metrics.md">Measuring success</a></h3>
+          <p>Model quality, verified outcomes, productivity trials, retention, repair effort, economics, and promotion gates.</p>
+        </article>
+        <article class="card">
+          <p class="label">12 / Economics</p>
+          <h3><a href="cost-capacity.md">Cost and capacity</a></h3>
+          <p>Token economics, local versus hosted costs, GPU utilization, queue capacity, training budgets, and cost controls.</p>
+        </article>
+      </div>
+    </section>
+    <section id="delivery" aria-labelledby="delivery-title">
+      <h2 id="delivery-title">Delivery, governance, and evidence</h2>
+      <div class="grid">
+        <article class="card">
+          <p class="label">13 / Protection</p>
+          <h3><a href="security-data.md">Security and data governance</a></h3>
+          <p>Threat model, privacy boundaries, sandboxing, secret protection, source/training rights, and deletion policy.</p>
+        </article>
+        <article class="card">
+          <p class="label">14 / Delivery</p>
+          <h3><a href="roadmap.md">Roadmap</a></h3>
+          <p>Phases, dependencies, estimated team effort, owners, decision gates, initial backlog, and rollback rules.</p>
+        </article>
+        <article class="card">
+          <p class="label">15 / References</p>
+          <h3><a href="sources.md">Sources and limitations</a></h3>
+          <p>Consulted primary references, repository context, planning assumptions, and what remains unverified.</p>
+        </article>
+      </div>
+    </section>
+    <section id="files" class="callout" aria-labelledby="files-title">
+      <h2 id="files-title">Every file in this folder</h2>
+      <p>16 Markdown documents and this HTML index. Links open local source files; Markdown rendering depends on your browser or editor. No server or external assets are required.</p>
+      <ul class="file-list">
+        <li><a href="README.md">README.md</a></li>
+        <li><a href="strategy.md">strategy.md</a></li>
+        <li><a href="requirements.md">requirements.md</a></li>
+        <li><a href="design.md">design.md</a></li>
+        <li><a href="documentation-only.md">documentation-only.md</a></li>
+        <li><a href="rag-only.md">rag-only.md</a></li>
+        <li><a href="training.md">training.md</a></li>
+        <li><a href="hardware.md">hardware.md</a></li>
+        <li><a href="tool-delegation.md">tool-delegation.md</a></li>
+        <li><a href="monitoring.md">monitoring.md</a></li>
+        <li><a href="benchmarks.md">benchmarks.md</a></li>
+        <li><a href="success-metrics.md">success-metrics.md</a></li>
+        <li><a href="security-data.md">security-data.md</a></li>
+        <li><a href="cost-capacity.md">cost-capacity.md</a></li>
+        <li><a href="roadmap.md">roadmap.md</a></li>
+        <li><a href="sources.md">sources.md</a></li>
+        <li><a href="index.html">index.html</a></li>
+      </ul>
+    </section>
+  </main>
+  <footer>
+    <div class="container">
+      <p>Location: <span class="path">model\gpt 6.1 sol</span> | Planning pack dated 2026-10-07 | <a href="README.md">Overview and assumptions</a></p>
+    </div>
+  </footer>
+</body>
+</html>
