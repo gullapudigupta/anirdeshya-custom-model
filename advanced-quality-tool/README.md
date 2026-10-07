@@ -145,6 +145,23 @@ Pre-built orchestration workflows for common tasks:
 - **Security scan button** — run security scan directly from UI
 - **Export** — download issues as JSON, CSV, Markdown, or SARIF
 - **Metrics Dashboard** — complexity, maintainability, LOC per file
+- **Settings dialog** — configure AI provider/model/budget; API keys are kept in memory only
+
+### Local Usage Analytics
+
+Usage analytics are opt-in and disabled by default. Enable or manage them with:
+
+```bash
+aqt analytics enable
+aqt analytics report --days 30
+aqt analytics disable
+aqt analytics clear
+```
+
+When enabled, AQT stores only command names, success/failure totals, and elapsed
+time in `.aqt/usage-metrics.json`. Nothing is uploaded; source code, prompts,
+file paths, and credentials are not collected. See the [AI generator guide](docs/AI-GENERATOR.md)
+and [API documentation](docs/API.md) for configuration and integration details.
 
 ## Project Structure
 

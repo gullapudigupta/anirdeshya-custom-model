@@ -30,6 +30,8 @@ const fs = require('fs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const SRC_DIR = path.join(ROOT, 'src');
+const { getAnalyzerRoots } = require('./src/analyzer-roots');
+const ANALYZER_ROOTS = getAnalyzerRoots(ROOT);
 
 // ─── Imports ─────────────────────────────────────────────────────────────────
 
@@ -266,7 +268,7 @@ async function runSymbols(flags) {
   printBanner('Symbol Extraction');
   
   const queryEngine = new QueryEngine(ROOT);
-  const stats = queryEngine.buildIndex(SRC_DIR);
+  const stats = queryEngine.buildIndex(ANALYZER_ROOTS);
   
   log(c.green, '✓', `Indexed ${stats.totalSymbols} symbols across ${stats.files} files`);
   console.log('');
@@ -315,7 +317,7 @@ async function runQuery(flags) {
   printBanner(`Symbol Query: "${query}"`);
   
   const queryEngine = new QueryEngine(ROOT);
-  queryEngine.buildIndex(SRC_DIR);
+  queryEngine.buildIndex(ANALYZER_ROOTS);
   
   // Parse filter flags
   const typeFlag = flags.find(f => f.startsWith('--type='));

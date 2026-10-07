@@ -29,7 +29,12 @@
 
 'use strict';
 
+const fs = require('fs/promises');
+const path = require('path');
 const { InterfaceAdapter } = require('../core/interface-adapter');
+const { DashboardIntegration } = require('../dashboard/dashboard-integration');
+const { loadDashboardConfig, saveDashboardConfig } = require('../commands/dashboard-command');
+const { PluginManager } = require('../plugins/plugin-system');
 
 // ─── Tool schema registry ─────────────────────────────────────────────────────
 
@@ -348,6 +353,77 @@ const MCP_TOOLS = [
       },
       required: []
     }
+  },
+  {
+    name: 'aqt_dashboard_configure',
+    description: 'Enable or configure local-only dashboard metrics recording.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        enabled: { type: 'boolean' },
+        port: { type: 'integer', minimum: 1, maximum: 65535 },
+        dataDir: { type: 'string' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'aqt_dashboard_record_metrics',
+    description: 'Record analysis results in local dashboard history when recording is enabled.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        results: { type: 'array', items: { type: 'object' } },
+        metadata: { type: 'object' }
+      },
+      required: ['results']
+    }
+  },
+  {
+    name: 'aqt_dashboard_status',
+    description: 'Get local dashboard configuration and current metrics.',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'aqt_plugin_list',
+    description: 'List plugins available in the configured workspace.',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'aqt_plugin_install',
+    description: 'Install a trusted local plugin path from inside the configured workspace.',
+    inputSchema: {
+      type: 'object',
+      properties: { path: { type: 'string' } },
+      required: ['path']
+    }
+  },
+  {
+    name: 'aqt_plugin_remove',
+    description: 'Unload and remove an installed plugin by ID.',
+    inputSchema: {
+      type: 'object',
+      properties: { pluginId: { type: 'string' } },
+      required: ['pluginId']
+    }
+  },
+  {
+    name: 'aqt_plugin_info',
+    description: 'Get the manifest and runtime status for a loaded plugin.',
+    inputSchema: {
+      type: 'object',
+      properties: { pluginId: { type: 'string' } },
+      required: ['pluginId']
+    }
+  },
+  {
+    name: 'aqt_plugin_execute_hook',
+    description: 'Execute a named hook from trusted, loaded plugins.',
+    inputSchema: {
+      type: 'object',
+      properties: { hookName: { type: 'string' }, data: {} },
+      required: ['hookName']
+    }
   }
 ];
 
@@ -365,6 +441,9 @@ class MCPServer extends InterfaceAdapter {
     // MCP message ID counter for request/response correlation
     this._msgId    = 0;
     this._transport = config.transport || null; // injected for testing
+    this.workspace = path.resolve(config.projectRoot || process.cwd());
+    this.pluginManager = null;
+    this.pluginManagerInitialization = null;
     
     // Rate limiting configuration
     this._rateLimit = config.rateLimit || {
@@ -717,12 +796,138 @@ class MCPServer extends InterfaceAdapter {
           workspace: args.workspace || process.cwd()
         });
         break;
+      case 'aqt_dashboard_configure':
+        serviceResult = this._configureDashboard(args);
+        break;
+      case 'aqt_dashboard_record_metrics':
+        serviceResult = this._recordDashboardMetrics(args);
+        break;
+      case 'aqt_dashboard_status':
+        serviceResult = this._getDashboardStatus();
+        break;
+      case 'aqt_plugin_list':
+        serviceResult = await this._listPlugins();
+        break;
+      case 'aqt_plugin_install':
+        serviceResult = await this._installPlugin(args.path);
+        break;
+      case 'aqt_plugin_remove':
+        serviceResult = await this._removePlugin(args.pluginId);
+        break;
+      case 'aqt_plugin_info':
+        serviceResult = await this._getPluginInfo(args.pluginId);
+        break;
+      case 'aqt_plugin_execute_hook':
+        serviceResult = await this._executePluginHook(args.hookName, args.data);
+        break;
       default:
         return this._jsonrpcError(id, -32601, `Unhandled tool: ${toolName}`);
     }
 
     // Translate result to MCP tool response format
     return this._jsonrpc(id, this._translateOutput(serviceResult));
+  }
+
+  _configureDashboard(updates) {
+    const config = loadDashboardConfig(this.workspace);
+    if (updates.enabled !== undefined && typeof updates.enabled !== 'boolean') {
+      return { success: false, error: 'enabled must be a boolean' };
+    }
+    if (updates.port !== undefined &&
+        (!Number.isInteger(updates.port) || updates.port < 1 || updates.port > 65535)) {
+      return { success: false, error: 'port must be an integer between 1 and 65535' };
+    }
+    if (updates.enabled !== undefined) config.enabled = updates.enabled;
+    if (updates.port !== undefined) config.port = updates.port;
+    if (typeof updates.dataDir === 'string' && updates.dataDir.trim()) {
+      config.dataDir = path.resolve(this.workspace, updates.dataDir);
+    }
+    saveDashboardConfig(this.workspace, config);
+    return { success: true, data: config };
+  }
+
+  _getDashboard(config = loadDashboardConfig(this.workspace)) {
+    return new DashboardIntegration({ port: config.port, dataDir: config.dataDir });
+  }
+
+  _recordDashboardMetrics({ results, metadata = {} }) {
+    if (!Array.isArray(results)) return { success: false, error: 'results must be an array' };
+    const config = loadDashboardConfig(this.workspace);
+    if (!config.enabled) return { success: false, error: 'Dashboard recording is disabled' };
+    return { success: true, data: this._getDashboard(config).recordScan(results, metadata) };
+  }
+
+  _getDashboardStatus() {
+    const config = loadDashboardConfig(this.workspace);
+    return {
+      success: true,
+      data: { enabled: config.enabled, port: config.port, ...this._getDashboard(config).getDashboardData() }
+    };
+  }
+
+  async _getPluginManager() {
+    if (!this.pluginManager) {
+      this.pluginManager = new PluginManager({
+        pluginDirs: [path.join(this.workspace, '.aqt', 'plugins')]
+      });
+    }
+    if (!this.pluginManagerInitialization) {
+      this.pluginManagerInitialization = this.pluginManager.initialize();
+    }
+    await this.pluginManagerInitialization;
+    return this.pluginManager;
+  }
+
+  async _listPlugins() {
+    const manager = await this._getPluginManager();
+    return { success: true, data: { plugins: manager.listPlugins(), stats: manager.getStats() } };
+  }
+
+  async _installPlugin(sourcePath) {
+    const source = path.resolve(this.workspace, sourcePath);
+    const relative = path.relative(this.workspace, source);
+    if (!relative || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+      return { success: false, error: 'Plugin source must be inside the configured workspace' };
+    }
+    const sourceStat = await fs.stat(source);
+    if (!sourceStat.isFile() && !sourceStat.isDirectory()) {
+      return { success: false, error: 'Plugin source must be a file or directory' };
+    }
+    const pluginDirectory = path.join(this.workspace, '.aqt', 'plugins');
+    await fs.mkdir(pluginDirectory, { recursive: true });
+    const destination = path.join(pluginDirectory, path.basename(source));
+    await fs.cp(source, destination, { recursive: true, errorOnExist: true });
+    const manager = await this._getPluginManager();
+    await manager.loadPlugin(destination);
+    return { success: true, data: { path: destination, plugins: manager.listPlugins() } };
+  }
+
+  async _removePlugin(pluginId) {
+    const manager = await this._getPluginManager();
+    const pluginPath = manager.pluginPaths.get(pluginId);
+    if (!pluginPath) return { success: false, error: `Plugin not found: ${pluginId}` };
+    const pluginRoot = path.join(this.workspace, '.aqt', 'plugins');
+    const relative = path.relative(pluginRoot, path.resolve(pluginPath));
+    if (!relative || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+      return { success: false, error: 'Refusing to remove a plugin outside the managed plugin directory' };
+    }
+    if (!(await manager.removePlugin(pluginId))) {
+      return { success: false, error: `Plugin could not be unloaded: ${pluginId}` };
+    }
+    await fs.rm(pluginPath, { recursive: true, force: false });
+    return { success: true, data: { removed: pluginId } };
+  }
+
+  async _getPluginInfo(pluginId) {
+    const manager = await this._getPluginManager();
+    const plugin = manager.getPlugin(pluginId);
+    if (!plugin) return { success: false, error: `Plugin not found or disabled: ${pluginId}` };
+    return { success: true, data: { ...plugin.manifest, path: plugin.path, enabled: true } };
+  }
+
+  async _executePluginHook(hookName, data) {
+    const manager = await this._getPluginManager();
+    return { success: true, data: await manager.executeHook(hookName, data) };
   }
 
   // ─── InterfaceAdapter contract ────────────────────────────────────────────

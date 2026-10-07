@@ -34,6 +34,8 @@ This module is fully implemented and exposed via:
 | `line-editor.js` | Performs precise line-level edits |
 | `config.js` | Configuration including rate limiting and cost tracking |
 | `ai-safety.js` | Safety validation and content filtering |
+| `quality-metrics.js` | Aggregates AI-generation outcomes, durations, and costs |
+| `template-manager.js` | Validates and stores project-local prompt templates |
 
 ## Architecture
 
@@ -82,7 +84,25 @@ aqt ai generate doc src/api/routes.js --format jsdoc
 ```bash
 aqt ai fix <issue-id>
 aqt ai fix <issue-id> --dry-run  # Preview without applying
+aqt fix --use-ai-fixes            # Allow AI fallback for eligible issues
 ```
+
+#### Custom Prompt Templates
+
+Templates live in `.aqt/ai-templates/` and accept `{{severity}}`, `{{category}}`,
+`{{summary}}`, `{{what}}`, `{{why}}`, `{{how}}`, `{{context}}`, and
+`{{outputContract}}` placeholders. Create and use one with:
+
+```bash
+aqt ai templates create concise prompt.txt
+aqt ai templates list
+aqt ai fix issue-123 --template concise
+```
+
+The template manager rejects unknown placeholders and constrains template names
+to safe filename characters. Generation outcome metrics are available on the
+orchestrator result as `qualityMetrics`; they contain aggregate outcomes and do
+not store issue text or source code.
 
 #### Refactor Code
 ```bash
@@ -149,6 +169,9 @@ AI generation tools are available via MCP for AI assistant integration:
 | `aqt_ai_cost_tracking` | Get cost tracking data |
 
 See [MCP Tools Documentation](../../docs/MCP-TOOLS.md) for details.
+
+See the [AI Generator Guide](../../docs/AI-GENERATOR.md) for provider setup,
+safety, custom prompts, and quality metrics.
 
 ### UI Integration
 

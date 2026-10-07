@@ -55,7 +55,7 @@ class ExternalLanguageAnalyzer {
     try {
       const value = JSON.parse(output);
       const entries = Array.isArray(value) ? value : (value.issues || value.results || []);
-      return entries.map(issue => this.issue(toolName, filePath, {
+      return entries.map(issue => this.issue(toolName, issue.filePath || issue.path || filePath, {
         line: issue.line || issue.line_number,
         column: issue.column || issue.column_number,
         ruleId: issue.code || issue.rule || issue.ruleId || issue.test_id,
@@ -70,7 +70,7 @@ class ExternalLanguageAnalyzer {
   parseRubocop(output, filePath) {
     try {
       const value = JSON.parse(output);
-      return (value.files || []).flatMap(file => (file.offenses || []).map(offense => this.issue('rubocop', filePath, {
+      return (value.files || []).flatMap(file => (file.offenses || []).map(offense => this.issue('rubocop', file.path || filePath, {
         line: offense.location && offense.location.start_line,
         column: offense.location && offense.location.start_column,
         ruleId: offense.cop_name,
@@ -85,9 +85,9 @@ class ExternalLanguageAnalyzer {
   parsePhpcs(output, filePath) {
     try {
       const value = JSON.parse(output);
-      return Object.values(value.files || {}).flatMap(file => [
+      return Object.entries(value.files || {}).flatMap(([source, file]) => [
         ...(file.messages || []), ...(file.errors || []), ...(file.warnings || [])
-      ].map(issue => this.issue('phpcs', filePath, {
+      ].map(issue => this.issue('phpcs', source || filePath, {
         line: issue.line, column: issue.column, ruleId: issue.source,
         message: issue.message, severity: issue.type
       })));
@@ -100,7 +100,7 @@ class ExternalLanguageAnalyzer {
     return output.split(/\r?\n/).filter(Boolean).flatMap(line => {
       const match = line.match(/^(.*?):(\d+)(?::(\d+))?[^:]*:\s*(?:(\w+)[ :]+)?(.+)$/);
       if (!match) return [];
-      return [this.issue(toolName, filePath, {
+      return [this.issue(toolName, match[1] || filePath, {
         line: Number(match[2]), column: match[3] ? Number(match[3]) : 1,
         ruleId: match[4], message: match[5], severity: match[4]
       })];

@@ -13,6 +13,13 @@ The `src/fixers` module provides the auto-fix engine and various fixer implement
 | `ai-fixer.js` | Uses AI to generate fixes for complex issues |
 | `csharp-fixer.js` | C#-specific pattern fixes |
 
+## AI Fallback
+
+`aqt fix` runs deterministic rule fixes and uses the AI fixer for issues
+classified as AI-required. Use `--use-ai-fixes` to explicitly enable that path,
+or `--no-ai-fixes` to leave those issues for manual review. Generated changes
+must pass the fixer's confidence threshold and syntax checks before application.
+
 ## Architecture
 
 ```

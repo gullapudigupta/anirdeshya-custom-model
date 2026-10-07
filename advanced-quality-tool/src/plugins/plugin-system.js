@@ -29,9 +29,15 @@ class PluginManager {
       path.join(process.cwd(), 'plugins'),
       path.join(process.cwd(), '.quality-tool', 'plugins')
     ];
+    this.stateFile = options.stateFile || path.join(
+      this.pluginDirs[0] || path.join(process.cwd(), '.aqt', 'plugins'),
+      '.aqt-plugin-state.json'
+    );
 
     // Loaded plugins
     this.plugins = new Map();
+    this.pluginPaths = new Map();
+    this.disabledPlugins = new Set();
     this.hooks = new Map();
     this.customRules = new Map();
 
@@ -52,6 +58,13 @@ class PluginManager {
    */
   async initialize() {
     this.log('Initializing plugin system...');
+    if (fs.existsSync(this.stateFile)) {
+      const state = JSON.parse(fs.readFileSync(this.stateFile, 'utf8'));
+      if (!Array.isArray(state.disabled)) {
+        throw new Error(`Invalid plugin state file: ${this.stateFile}`);
+      }
+      this.disabledPlugins = new Set(state.disabled.filter(id => typeof id === 'string'));
+    }
 
     // Create plugin directories if they don't exist
     for (const dir of this.pluginDirs) {
@@ -135,6 +148,9 @@ class PluginManager {
         this.stats.pluginsFailed++;
         return;
       }
+
+      this.pluginPaths.set(manifest.id, pluginPath);
+      if (this.disabledPlugins.has(manifest.id)) return;
 
       // Check if already loaded
       if (this.plugins.has(manifest.id)) {
@@ -233,7 +249,7 @@ class PluginManager {
       });
 
       // Get plugin export
-      const PluginClass = context.exports || context.module.exports;
+      const PluginClass = context.module.exports;
 
       // Instantiate plugin
       const instance = typeof PluginClass === 'function' 
@@ -256,6 +272,7 @@ class PluginManager {
    * Create plugin context (sandbox)
    */
   createPluginContext(manifest) {
+    const pluginModule = { exports: {} };
     const api = {
       // Plugin info
       plugin: {
@@ -307,8 +324,8 @@ class PluginManager {
         }
         throw new Error(`Module '${name}' not allowed in plugins`);
       },
-      module: { exports: {} },
-      exports: {},
+      module: pluginModule,
+      exports: pluginModule.exports,
       api,
       Buffer,
       setTimeout,
@@ -445,13 +462,55 @@ class PluginManager {
    * List plugins
    */
   listPlugins() {
-    return Array.from(this.plugins.values()).map(plugin => ({
+    const active = Array.from(this.plugins.values()).map(plugin => ({
       id: plugin.manifest.id,
       name: plugin.manifest.name,
       version: plugin.manifest.version,
       description: plugin.manifest.description,
-      author: plugin.manifest.author
+      author: plugin.manifest.author,
+      enabled: true
     }));
+    const disabled = Array.from(this.disabledPlugins).flatMap(id => {
+      const pluginPath = this.pluginPaths.get(id);
+      const plugin = pluginPath && this.plugins.get(id);
+      return plugin ? [] : [{ id, enabled: false, path: pluginPath || null }];
+    });
+    return [...active, ...disabled];
+  }
+
+  async disablePlugin(pluginId) {
+    const plugin = this.plugins.get(pluginId);
+    if (!plugin && !this.pluginPaths.has(pluginId)) return false;
+    if (plugin && !(await this.unloadPlugin(pluginId))) return false;
+    this.disabledPlugins.add(pluginId);
+    this._savePluginState();
+    return true;
+  }
+
+  async enablePlugin(pluginId) {
+    const pluginPath = this.pluginPaths.get(pluginId);
+    if (!pluginPath || !fs.existsSync(pluginPath)) return false;
+    this.disabledPlugins.delete(pluginId);
+    this._savePluginState();
+    await this.loadPlugin(pluginPath);
+    return this.plugins.has(pluginId);
+  }
+
+  async removePlugin(pluginId) {
+    const pluginPath = this.pluginPaths.get(pluginId);
+    if (!pluginPath) return false;
+    if (this.plugins.has(pluginId) && !(await this.unloadPlugin(pluginId))) return false;
+    this.disabledPlugins.delete(pluginId);
+    this.pluginPaths.delete(pluginId);
+    this._savePluginState();
+    return true;
+  }
+
+  _savePluginState() {
+    fs.mkdirSync(path.dirname(this.stateFile), { recursive: true });
+    fs.writeFileSync(this.stateFile, JSON.stringify({
+      disabled: Array.from(this.disabledPlugins).sort()
+    }, null, 2), 'utf8');
   }
 
   /**

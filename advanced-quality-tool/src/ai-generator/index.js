@@ -33,6 +33,8 @@ const { IssueClassifier, estimateTokens } = require('./issue-classifier');
 const { CodeContextAnalyzer } = require('./code-context-analyzer');
 const { ContextAggregator } = require('./context-aggregator');
 const { PromptBuilder, OUTPUT_CONTRACT, SYSTEM_PROMPT } = require('./prompt-builder');
+const { TemplateManager } = require('./template-manager');
+const { AIGenerationQualityMetrics } = require('./quality-metrics');
 const { LineEditor } = require('./line-editor');
 const { SearchCache } = require('./search-cache');
 const { BaseSearcher } = require('./base-searcher');
@@ -74,6 +76,8 @@ module.exports = {
   CodeContextAnalyzer,
   ContextAggregator,
   PromptBuilder,
+  TemplateManager,
+  AIGenerationQualityMetrics,
   LineEditor,
   // search & docs
   SearchCache,

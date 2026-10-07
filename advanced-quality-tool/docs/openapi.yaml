@@ -63,6 +63,10 @@ tags:
     description: AI-powered code generation
   - name: Security
     description: Security scanning operations
+  - name: Dashboard
+    description: Workspace-local quality history
+  - name: Plugins
+    description: Workspace plugin management
 
 paths:
   # ============================================================================
@@ -561,7 +565,6 @@ paths:
         '404':
           description: Work item not found
 
-  /api/agent/{id}:
     delete:
       tags: [Agent]
       summary: Cancel agent work
@@ -1200,6 +1203,174 @@ paths:
                       breakdown:
                         type: object
                         additionalProperties: true
+
+  /api/dashboard/configure:
+    post:
+      tags: [Dashboard]
+      summary: Configure local dashboard recording
+      description: Requires management authentication.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                port:
+                  type: integer
+                  minimum: 1
+                  maximum: 65535
+                dataDir:
+                  type: string
+      responses:
+        '200':
+          description: Dashboard configuration updated
+        '400':
+          description: Invalid configuration
+        '401':
+          description: Management authentication required
+
+  /api/dashboard/record:
+    post:
+      tags: [Dashboard]
+      summary: Record dashboard metrics
+      description: Requires management authentication and enabled local recording.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [results]
+              properties:
+                results:
+                  type: array
+                  items:
+                    type: object
+                metadata:
+                  type: object
+      responses:
+        '200':
+          description: Metrics recorded
+        '400':
+          description: Invalid results
+        '409':
+          description: Dashboard recording is disabled
+
+  /api/dashboard/status:
+    get:
+      tags: [Dashboard]
+      summary: Get dashboard status and history
+      responses:
+        '200':
+          description: Dashboard status and current metrics
+
+  /api/dashboard/metrics:
+    get:
+      tags: [Dashboard]
+      summary: Get current dashboard metrics
+      responses:
+        '200':
+          description: Current metrics
+
+  /api/plugins:
+    get:
+      tags: [Plugins]
+      summary: List project plugins
+      responses:
+        '200':
+          description: Plugin list and statistics
+
+  /api/plugins/install:
+    post:
+      tags: [Plugins]
+      summary: Install a workspace-local plugin
+      description: Requires management authentication. Plugin code is executed by the plugin manager.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path]
+              properties:
+                path:
+                  type: string
+                  description: Relative path inside the configured workspace
+      responses:
+        '201':
+          description: Plugin installed
+        '400':
+          description: Invalid plugin source
+        '401':
+          description: Management authentication required
+
+  /api/plugins/{id}:
+    get:
+      tags: [Plugins]
+      summary: Get plugin information
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Plugin information
+        '404':
+          description: Plugin not found or disabled
+    delete:
+      tags: [Plugins]
+      summary: Remove a managed plugin
+      description: Requires management authentication.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Plugin removed
+        '401':
+          description: Management authentication required
+
+  /api/plugins/{id}/enable:
+    post:
+      tags: [Plugins]
+      summary: Enable a plugin
+      description: Requires management authentication.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Plugin enabled
+        '404':
+          description: Plugin could not be enabled
+
+  /api/plugins/{id}/disable:
+    post:
+      tags: [Plugins]
+      summary: Disable a plugin
+      description: Requires management authentication.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Plugin disabled
+        '404':
+          description: Plugin could not be disabled
 
 components:
   schemas:

@@ -20,6 +20,8 @@ const { WorkItem, WorkItemStatus } = require('../agent/work-item');
 const { getRegistry } = require('../pipelines/pipeline-registry');
 const { PipelineExecutor } = require('../pipelines/pipeline-executor');
 const { ExecutionLedger, RunStatus } = require('../pipelines/execution-ledger');
+const { DashboardIntegration } = require('../dashboard/dashboard-integration');
+const { PluginManager } = require('../plugins/plugin-system');
 
 class HttpApiServer {
   constructor(config = {}) {
@@ -53,6 +55,16 @@ class HttpApiServer {
     // Agent and Pipeline storage
     this.agentWorkStore = new Map(); // Work ID -> { orchestrator, item, options }
     this.pipelineExecutors = new Map(); // Run ID -> executor instance
+    this.dashboardIntegration = null;
+    this.pluginManager = null;
+    this.pluginManagerInitialization = null;
+    this.aiProviderConfig = this._loadAiProviderConfig();
+    this.sessionApiKeys = new Map();
+    this.originalApiKeys = {
+      openai: process.env.OPENAI_API_KEY,
+      anthropic: process.env.ANTHROPIC_API_KEY,
+      google: process.env.GOOGLE_API_KEY
+    };
     
     this.setupMiddleware();
     this.setupRoutes();
@@ -309,7 +321,6 @@ class HttpApiServer {
     const ip = (req.connection && req.connection.remoteAddress) || (req.socket && req.socket.remoteAddress) || 'unknown';
     return `ip:${ip}`;
   }
-  }
 
   authMiddleware(req, res, next) {
     const authHeader = req.headers.authorization;
@@ -360,6 +371,7 @@ class HttpApiServer {
           'POST /api/ai/fix',
           'POST /api/ai/refactor',
           'POST /api/ai/configure',
+          'GET /api/ai/config',
           'GET /api/ai/cost',
           'POST /api/agent/start',
           'GET /api/agent',
@@ -372,7 +384,17 @@ class HttpApiServer {
           'POST /api/pipelines/:name/execute',
           'GET /api/pipelines/executions',
           'GET /api/pipelines/executions/:id',
-          'POST /api/pipelines/executions/:id/replay'
+          'POST /api/pipelines/executions/:id/replay',
+          'POST /api/dashboard/configure',
+          'POST /api/dashboard/record',
+          'GET /api/dashboard/status',
+          'GET /api/dashboard/metrics',
+          'GET /api/plugins',
+          'POST /api/plugins/install',
+          'GET /api/plugins/:id',
+          'DELETE /api/plugins/:id',
+          'POST /api/plugins/:id/enable',
+          'POST /api/plugins/:id/disable'
         ]
       });
     });
@@ -404,6 +426,7 @@ class HttpApiServer {
     this.app.post('/api/ai/fix', this.handleAIFixIssue.bind(this));
     this.app.post('/api/ai/refactor', this.handleAIRefactor.bind(this));
     this.app.post('/api/ai/configure', this.handleAIConfigure.bind(this));
+    this.app.get('/api/ai/config', this.handleAIConfigGet.bind(this));
     this.app.get('/api/ai/cost', this.handleAICost.bind(this));
 
     // Agent System Endpoints (P11-T004)
@@ -427,6 +450,277 @@ class HttpApiServer {
     this.app.get('/api/security/vulnerabilities', this.handleGetVulnerabilities.bind(this));
     this.app.get('/api/security/secrets', this.handleGetSecrets.bind(this));
     this.app.get('/api/security/dependencies', this.handleGetDependencies.bind(this));
+
+    // Dashboard endpoints (P11-T051)
+    this.app.post('/api/dashboard/configure', this.handleDashboardConfigure.bind(this));
+    this.app.post('/api/dashboard/record', this.handleDashboardRecord.bind(this));
+    this.app.get('/api/dashboard/status', this.handleDashboardStatus.bind(this));
+    this.app.get('/api/dashboard/metrics', this.handleDashboardMetrics.bind(this));
+
+    // Plugin management endpoints (P11-T054)
+    this.app.get('/api/plugins', this.handlePluginList.bind(this));
+    this.app.post('/api/plugins/install', this.handlePluginInstall.bind(this));
+    this.app.get('/api/plugins/:id', this.handlePluginInfo.bind(this));
+    this.app.delete('/api/plugins/:id', this.handlePluginRemove.bind(this));
+    this.app.post('/api/plugins/:id/enable', this.handlePluginEnable.bind(this));
+    this.app.post('/api/plugins/:id/disable', this.handlePluginDisable.bind(this));
+  }
+
+  _aiProviderConfigPath() {
+    return path.join(this.config.projectRoot || process.cwd(), '.aqt', 'ai-provider.json');
+  }
+
+  _loadAiProviderConfig() {
+    const defaults = {
+      provider: 'ollama',
+      model: '',
+      maxCost: 1,
+      monthlyBudget: 100,
+      requestsPerMinute: 20
+    };
+    const configPath = this._aiProviderConfigPath();
+    if (!fsSync.existsSync(configPath)) return defaults;
+    const stored = JSON.parse(fsSync.readFileSync(configPath, 'utf8'));
+    return { ...defaults, ...stored };
+  }
+
+  handleAIConfigGet(req, res) {
+    const provider = this.aiProviderConfig.provider;
+    const envKey = {
+      openai: process.env.OPENAI_API_KEY,
+      anthropic: process.env.ANTHROPIC_API_KEY,
+      google: process.env.GOOGLE_API_KEY
+    }[provider];
+    res.json({
+      success: true,
+      data: {
+        ...this.aiProviderConfig,
+        credentialsConfigured: provider === 'ollama' || Boolean(this.sessionApiKeys.get(provider) || envKey),
+        credentialsSource: provider === 'ollama' ? 'local' :
+          this.sessionApiKeys.has(provider) ? 'runtime' : envKey ? 'environment' : 'missing'
+      }
+    });
+  }
+
+  _dashboardConfigPath() {
+    return path.join(this.config.projectRoot || process.cwd(), '.aqt', 'dashboard.json');
+  }
+
+  _readDashboardConfig() {
+    const configPath = this._dashboardConfigPath();
+    if (!fsSync.existsSync(configPath)) {
+      return {
+        enabled: false,
+        port: 3210,
+        dataDir: path.join(path.dirname(path.dirname(configPath)), '.aqt', 'dashboard-data')
+      };
+    }
+    const config = JSON.parse(fsSync.readFileSync(configPath, 'utf8'));
+    return {
+      enabled: config.enabled === true,
+      port: config.port || 3210,
+      dataDir: config.dataDir || path.join(path.dirname(path.dirname(configPath)), '.aqt', 'dashboard-data')
+    };
+  }
+
+  _getDashboardIntegration(config = this._readDashboardConfig()) {
+    if (!this.dashboardIntegration) {
+      this.dashboardIntegration = new DashboardIntegration({
+        port: config.port,
+        dataDir: config.dataDir
+      });
+    }
+    return this.dashboardIntegration;
+  }
+
+  _requireManagementAuth(req, res) {
+    if (this.config.auth) return true;
+    res.status(401).json({ error: 'Authentication is required for management changes' });
+    return false;
+  }
+
+  async _getPluginManager() {
+    if (!this.pluginManager) {
+      const root = path.resolve(this.config.projectRoot || process.cwd());
+      this.pluginManager = new PluginManager({
+        pluginDirs: [path.join(root, '.aqt', 'plugins')]
+      });
+    }
+    if (!this.pluginManagerInitialization) {
+      this.pluginManagerInitialization = this.pluginManager.initialize();
+    }
+    await this.pluginManagerInitialization;
+    return this.pluginManager;
+  }
+
+  async handlePluginList(req, res) {
+    try {
+      const manager = await this._getPluginManager();
+      res.json({ success: true, data: { plugins: manager.listPlugins(), stats: manager.getStats() } });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to list plugins', message: error.message });
+    }
+  }
+
+  async handlePluginInfo(req, res) {
+    try {
+      const manager = await this._getPluginManager();
+      const plugin = manager.getPlugin(req.params.id);
+      if (!plugin) return res.status(404).json({ error: 'Plugin not found or disabled' });
+      res.json({
+        success: true,
+        data: {
+          ...plugin.manifest,
+          path: plugin.path,
+          enabled: true,
+          registeredHooks: Array.from(manager.hooks.entries())
+            .filter(([, hooks]) => hooks.some(hook => hook.pluginId === req.params.id))
+            .map(([name]) => name)
+        }
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get plugin information', message: error.message });
+    }
+  }
+
+  async handlePluginInstall(req, res) {
+    if (!this._requireManagementAuth(req, res)) return;
+    try {
+      const root = path.resolve(this.config.projectRoot || process.cwd());
+      const source = path.resolve(root, String((req.body || {}).path || ''));
+      const relative = path.relative(root, source);
+      if (!relative || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+        return res.status(400).json({ error: 'Plugin source must be inside the configured project workspace' });
+      }
+      if (!fsSync.existsSync(source)) return res.status(404).json({ error: 'Plugin source not found' });
+      const pluginDirectory = path.join(root, '.aqt', 'plugins');
+      await fs.mkdir(pluginDirectory, { recursive: true });
+      const destination = path.join(pluginDirectory, path.basename(source));
+      if (fsSync.existsSync(destination)) return res.status(409).json({ error: 'A plugin with that path already exists' });
+      await fs.cp(source, destination, { recursive: true, errorOnExist: true });
+      const manager = await this._getPluginManager();
+      await manager.loadPlugin(destination);
+      res.status(201).json({
+        success: true,
+        data: {
+          path: destination,
+          plugins: manager.listPlugins(),
+          stats: manager.getStats()
+        }
+      });
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to install plugin', message: error.message });
+    }
+  }
+
+  async handlePluginRemove(req, res) {
+    if (!this._requireManagementAuth(req, res)) return;
+    try {
+      const manager = await this._getPluginManager();
+      const pluginPath = manager.pluginPaths.get(req.params.id);
+      if (!pluginPath) return res.status(404).json({ error: 'Plugin not found' });
+      const root = path.resolve(this.config.projectRoot || process.cwd());
+      const pluginRoot = path.join(root, '.aqt', 'plugins');
+      const relative = path.relative(pluginRoot, path.resolve(pluginPath));
+      if (relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+        return res.status(400).json({ error: 'Refusing to remove a plugin outside the managed plugin directory' });
+      }
+      if (!(await manager.removePlugin(req.params.id))) {
+        return res.status(409).json({ error: 'Plugin could not be unloaded safely' });
+      }
+      await fs.rm(pluginPath, { recursive: true, force: false });
+      res.json({ success: true, data: { removed: req.params.id } });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to remove plugin', message: error.message });
+    }
+  }
+
+  async handlePluginEnable(req, res) {
+    if (!this._requireManagementAuth(req, res)) return;
+    try {
+      const manager = await this._getPluginManager();
+      if (!(await manager.enablePlugin(req.params.id))) return res.status(404).json({ error: 'Plugin could not be enabled' });
+      res.json({ success: true, data: { plugin: req.params.id, enabled: true } });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to enable plugin', message: error.message });
+    }
+  }
+
+  async handlePluginDisable(req, res) {
+    if (!this._requireManagementAuth(req, res)) return;
+    try {
+      const manager = await this._getPluginManager();
+      if (!(await manager.disablePlugin(req.params.id))) return res.status(404).json({ error: 'Plugin could not be disabled' });
+      res.json({ success: true, data: { plugin: req.params.id, enabled: false } });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to disable plugin', message: error.message });
+    }
+  }
+
+  async handleDashboardConfigure(req, res) {
+    if (!this._requireManagementAuth(req, res)) return;
+    try {
+      const current = this._readDashboardConfig();
+      const updates = req.body || {};
+      if (updates.enabled !== undefined && typeof updates.enabled !== 'boolean') {
+        return res.status(400).json({ error: 'enabled must be a boolean' });
+      }
+      if (updates.port !== undefined &&
+          (!Number.isInteger(updates.port) || updates.port < 1 || updates.port > 65535)) {
+        return res.status(400).json({ error: 'port must be an integer between 1 and 65535' });
+      }
+      const next = {
+        ...current,
+        ...(updates.enabled !== undefined ? { enabled: updates.enabled } : {}),
+        ...(updates.port !== undefined ? { port: updates.port } : {}),
+        ...(typeof updates.dataDir === 'string' && updates.dataDir.trim()
+          ? { dataDir: path.resolve(this.config.projectRoot || process.cwd(), updates.dataDir) }
+          : {})
+      };
+      const configPath = this._dashboardConfigPath();
+      await fs.mkdir(path.dirname(configPath), { recursive: true });
+      await fs.writeFile(configPath, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+      this.dashboardIntegration = new DashboardIntegration({ port: next.port, dataDir: next.dataDir });
+      res.json({ success: true, data: { ...next, scans: this.dashboardIntegration.history.length } });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to configure dashboard', message: error.message });
+    }
+  }
+
+  async handleDashboardRecord(req, res) {
+    if (!this._requireManagementAuth(req, res)) return;
+    try {
+      const { results, metadata } = req.body || {};
+      if (!Array.isArray(results)) return res.status(400).json({ error: 'results must be an array' });
+      const config = this._readDashboardConfig();
+      if (!config.enabled) return res.status(409).json({ error: 'Dashboard recording is disabled' });
+      const record = this._getDashboardIntegration(config).recordScan(results, metadata || {});
+      res.json({ success: true, data: record });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to record dashboard metrics', message: error.message });
+    }
+  }
+
+  async handleDashboardStatus(req, res) {
+    try {
+      const config = this._readDashboardConfig();
+      const dashboard = this._getDashboardIntegration(config);
+      res.json({
+        success: true,
+        data: { enabled: config.enabled, port: config.port, dataDir: config.dataDir, ...dashboard.getDashboardData() }
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to read dashboard status', message: error.message });
+    }
+  }
+
+  async handleDashboardMetrics(req, res) {
+    try {
+      const config = this._readDashboardConfig();
+      res.json({ success: true, data: this._getDashboardIntegration(config).currentMetrics });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to read dashboard metrics', message: error.message });
+    }
   }
 
   async handleAnalyze(req, res) {
@@ -943,23 +1237,68 @@ class HttpApiServer {
   }
 
   async handleAIConfigure(req, res) {
+    if (!this._requireManagementAuth(req, res)) return;
     try {
-      const { provider, model, maxCost, monthlyBudget } = req.body;
+      const body = req.body || {};
+      const providers = ['openai', 'anthropic', 'google', 'ollama'];
+      if (body.provider !== undefined && !providers.includes(body.provider)) {
+        return res.status(400).json({ error: 'provider must be openai, anthropic, google, or ollama' });
+      }
+      const next = { ...this.aiProviderConfig };
+      if (body.provider !== undefined) next.provider = body.provider;
+      if (body.model !== undefined) {
+        if (typeof body.model !== 'string' || body.model.length > 128) {
+          return res.status(400).json({ error: 'model must be a string no longer than 128 characters' });
+        }
+        next.model = body.model.trim();
+      }
+      for (const key of ['maxCost', 'monthlyBudget']) {
+        if (body[key] !== undefined &&
+            (typeof body[key] !== 'number' || !Number.isFinite(body[key]) || body[key] < 0)) {
+          return res.status(400).json({ error: `${key} must be a non-negative number` });
+        }
+        if (body[key] !== undefined) next[key] = body[key];
+      }
+      if (body.requestsPerMinute !== undefined &&
+          (!Number.isInteger(body.requestsPerMinute) || body.requestsPerMinute < 1)) {
+        return res.status(400).json({ error: 'requestsPerMinute must be a positive integer' });
+      }
+      if (body.requestsPerMinute !== undefined) next.requestsPerMinute = body.requestsPerMinute;
+      if (body.clearApiKey === true) {
+        const envNames = { openai: 'OPENAI_API_KEY', anthropic: 'ANTHROPIC_API_KEY', google: 'GOOGLE_API_KEY' };
+        const previousProvider = next.provider;
+        if (this.sessionApiKeys.has(previousProvider)) {
+          const envName = envNames[previousProvider];
+          if (this.originalApiKeys[previousProvider]) process.env[envName] = this.originalApiKeys[previousProvider];
+          else delete process.env[envName];
+          this.sessionApiKeys.delete(previousProvider);
+        }
+      }
+      if (body.apiKey !== undefined && body.apiKey !== '') {
+        if (next.provider === 'ollama') {
+          return res.status(400).json({ error: 'Ollama does not use an API key' });
+        }
+        if (typeof body.apiKey !== 'string' || body.apiKey.trim().length < 20 || /\s/.test(body.apiKey)) {
+          return res.status(400).json({ error: 'API key must contain at least 20 non-whitespace characters' });
+        }
+        const envName = { openai: 'OPENAI_API_KEY', anthropic: 'ANTHROPIC_API_KEY', google: 'GOOGLE_API_KEY' }[next.provider];
+        process.env[envName] = body.apiKey.trim();
+        this.sessionApiKeys.set(next.provider, body.apiKey.trim());
+      }
 
-      const result = await this.sharedServices.aiConfigure({
-        provider,
-        model,
-        maxCost,
-        monthlyBudget
-      });
-      
+      const configPath = this._aiProviderConfigPath();
+      await fs.mkdir(path.dirname(configPath), { recursive: true });
+      await fs.writeFile(configPath, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+      this.aiProviderConfig = next;
+      const configured = next.provider === 'ollama' ||
+        Boolean(this.sessionApiKeys.get(next.provider) ||
+          ({ openai: process.env.OPENAI_API_KEY, anthropic: process.env.ANTHROPIC_API_KEY, google: process.env.GOOGLE_API_KEY }[next.provider]));
       res.json({
         success: true,
-        data: result,
+        data: { ...next, credentialsConfigured: configured, credentialsSaved: false },
         timestamp: new Date().toISOString()
       });
     } catch (error) {
-      console.error('AI configuration error:', error);
       res.status(500).json({ 
         error: 'Configuration failed', 
         message: error.message 

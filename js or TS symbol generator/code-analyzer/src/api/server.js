@@ -35,6 +35,7 @@ const { CallersService } = require('../services/callers-service');
 const { DiffContextService } = require('../services/diff-context-service');
 const { ContextComposer } = require('../services/context-composer');
 const { QueryEngine } = require('../query-engine');
+const { getAnalyzerRoots } = require('../analyzer-roots');
 const { TokenAnalytics } = require('../utils/token-analytics');
 const { LRUCache } = require('../utils/cache');
 const { AutoRefresh } = require('../utils/auto-refresh');
@@ -63,7 +64,7 @@ function createServer(rootDir, options = {}) {
   let indexed = false;
   function ensureIndex() {
     if (!indexed) {
-      queryEngine.buildIndex();
+      queryEngine.buildIndex(getAnalyzerRoots(rootDir));
       indexed = true;
     }
   }

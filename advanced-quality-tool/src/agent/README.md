@@ -6,7 +6,9 @@ The `src/agent` module provides an autonomous agent system that can plan, execut
 
 📋 **[View Gap Analysis](./GAPS.md)** - See missing features and improvement opportunities
 
-⚠️ **IMPORTANT**: This module is fully implemented but NOT exposed in any user interface (CLI, API, MCP, or Chat UI).
+Agent operations are exposed through the agent CLI, HTTP API, and MCP
+integration; see [API documentation](../../docs/API.md) and
+[MCP tool documentation](../../docs/MCP-TOOLS.md).
 
 ## Contents
 

@@ -24,7 +24,9 @@
 
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
+const { ListToolsRequestSchema, CallToolRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
 const path = require('path');
+const fs = require('fs');
 
 // ─── Core Imports ────────────────────────────────────────────────────────────
 
@@ -44,6 +46,8 @@ const { QualityGate, RELAXED_GATE } = require('./src/quality-gate');
 
 const ROOT = path.resolve(__dirname, '../..');
 const SRC_DIR = path.join(ROOT, 'src');
+const { getAnalyzerRoots } = require('./src/analyzer-roots');
+const ANALYZER_ROOTS = getAnalyzerRoots(ROOT);
 
 // ─── Lazy-loaded cached state ────────────────────────────────────────────────
 
@@ -55,10 +59,21 @@ function getQueryEngine() {
   const now = Date.now();
   if (!queryEngine || now - lastIndexTime > INDEX_TTL) {
     queryEngine = new QueryEngine(ROOT);
-    queryEngine.buildIndex(SRC_DIR);
+    queryEngine.buildIndex(ANALYZER_ROOTS);
     lastIndexTime = now;
   }
   return queryEngine;
+}
+
+let invalidateDebounce = null;
+for (const analyzerRoot of ANALYZER_ROOTS) {
+  try {
+    fs.watch(analyzerRoot, { recursive: true }, (eventType, filename) => {
+      if (filename && !/\.(ts|js|html|scss|css)$/.test(filename)) return;
+      clearTimeout(invalidateDebounce);
+      invalidateDebounce = setTimeout(() => { lastIndexTime = 0; }, 300);
+    });
+  } catch (e) { /* fs.watch recursive unsupported on this platform */ }
 }
 
 // ─── MCP Server Setup ────────────────────────────────────────────────────────
@@ -70,7 +85,7 @@ const server = new Server(
 
 // ─── Tool Definitions ────────────────────────────────────────────────────────
 
-server.setRequestHandler('tools/list', async () => ({
+server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: 'query_symbols',
@@ -187,7 +202,7 @@ server.setRequestHandler('tools/list', async () => ({
 
 // ─── Tool Handlers ───────────────────────────────────────────────────────────
 
-server.setRequestHandler('tools/call', async (request) => {
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   try {

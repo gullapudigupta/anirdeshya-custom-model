@@ -69,6 +69,10 @@ Add to your `.kiro/settings/mcp.json`:
 
 ## Tool Reference
 
+Dashboard and plugin tools use project-local storage. Dashboard history remains
+local to the workspace, while plugin lifecycle operations may load and execute
+project plugin code; only install plugins that have been reviewed.
+
 ### Agent Tools
 
 Agent tools provide access to AQT's autonomous agent system.

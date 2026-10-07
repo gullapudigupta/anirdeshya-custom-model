@@ -16,8 +16,33 @@ The `src/commands` module provides the CLI command implementations for Advanced 
 | `monitor-command.js` | Implements the `monitor` command for CI/CD integration |
 | `watch-command.js` | Implements the `watch` command for file watching |
 | `ui-command.js` | Implements the `ui` command for launching the web UI |
+| `report-command.js` | Generates JSON, Markdown, HTML, and SARIF reports |
+| `metrics-command.js` | Calculates JavaScript complexity metrics |
+| `dashboard-command.js` | Manages opt-in local dashboard history |
+| `analytics-command.js` | Manages opt-in, local-only command usage metrics |
+| `ai-command.js` | Generates code and manages custom AI templates |
 
 ## Command Reference
+
+### report, metrics, dashboard, and analytics
+
+```bash
+aqt report --input analysis.json --format sarif --output report.sarif
+aqt metrics src/ --format markdown
+aqt dashboard enable
+aqt analytics status
+aqt analytics enable
+aqt analytics report --days 30
+aqt analytics disable
+aqt analytics clear
+```
+
+Usage analytics are disabled by default. When enabled, only command names,
+success/failure counts, and elapsed time are kept in `.aqt/usage-metrics.json`;
+data is never uploaded and may be removed with `aqt analytics clear`.
+
+AI-assisted fixes are available with `aqt fix --use-ai-fixes`; `--no-ai-fixes`
+leaves issues that lack deterministic fixes for manual review.
 
 ### fix
 

@@ -1,17 +1,17 @@
 {
-  "id": "session-1790871266352-08120896",
+  "id": "session-1791350697750-ce4162e9",
   "workspace": "/workspace",
   "model": null,
   "provider": null,
-  "createdAt": 1790871266352,
-  "updatedAt": 1790871266352,
+  "createdAt": 1791350697750,
+  "updatedAt": 1791350697750,
   "events": [
     {
-      "id": "de8223d959c97a6b15b341719e421879",
+      "id": "d3cc2f3ea45c2691655dff963a552329",
       "type": "session-start",
-      "timestamp": 1790871266352,
+      "timestamp": 1791350697750,
       "data": {
-        "sessionId": "session-1790871266352-08120896",
+        "sessionId": "session-1791350697750-ce4162e9",
         "workspace": "/workspace"
       }
     }

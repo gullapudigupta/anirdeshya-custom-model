@@ -20,7 +20,8 @@ const { estimateTokens } = require('./issue-classifier');
 
 const DEFAULT_OPTIONS = {
   tokenBudget: 2000,   // total prompt budget (system + user)
-  maxContextTokens: 300
+  maxContextTokens: 300,
+  template: null
 };
 
 /**
@@ -59,7 +60,9 @@ class PromptBuilder {
    */
   build(classification, context) {
     const contextBlock = this._buildContextBlock(context);
-    const user = this._assembleUser(classification, contextBlock);
+    const user = this.options.template
+      ? this._renderTemplate(classification, contextBlock)
+      : this._assembleUser(classification, contextBlock);
 
     let prompt = { system: SYSTEM_PROMPT, user };
     let tokens = estimateTokens(prompt.system) + estimateTokens(prompt.user);
@@ -67,7 +70,9 @@ class PromptBuilder {
     if (tokens > this.options.tokenBudget) {
       // Rebuild with a trimmed context block.
       const trimmed = this._trimContextBlock(contextBlock);
-      prompt.user = this._assembleUser(classification, trimmed);
+      prompt.user = this.options.template
+        ? this._renderTemplate(classification, trimmed)
+        : this._assembleUser(classification, trimmed);
       tokens = estimateTokens(prompt.system) + estimateTokens(prompt.user);
     }
 
@@ -76,6 +81,26 @@ class PromptBuilder {
       tokens,
       withinBudget: tokens <= this.options.tokenBudget
     };
+  }
+
+  _renderTemplate(classification, contextBlock) {
+    const { explanation = {}, summary = '', severity = 'unknown', category = 'unknown' } = classification || {};
+    const values = {
+      severity,
+      category,
+      summary,
+      what: explanation.what || 'A code quality issue was detected.',
+      why: explanation.why || 'It deviates from project standards.',
+      how: explanation.how || 'Adjust the flagged code to satisfy the rule.',
+      context: contextBlock,
+      outputContract: OUTPUT_CONTRACT
+    };
+    return this.options.template.replace(/{{\s*([a-zA-Z][a-zA-Z0-9]*)\s*}}/g, (token, field) => {
+      if (!Object.prototype.hasOwnProperty.call(values, field)) {
+        throw new Error(`Unknown AI template placeholder: ${field}`);
+      }
+      return String(values[field]);
+    });
   }
 
   // ─── Assembly ────────────────────────────────────────────────────────────────

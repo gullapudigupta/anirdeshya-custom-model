@@ -59,6 +59,8 @@ async function run(args) {
     }
 
     const { issues, issueCount } = result.data;
+    const { recordIfEnabled } = require('./dashboard-command');
+    recordIfEnabled(workspace, [{ ...result.data, filePath: workspace }], { workspace });
 
     // ── format: json ──────────────────────────────────────────────────────────
     if (options.format === 'json') {

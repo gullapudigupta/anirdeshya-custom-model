@@ -9,6 +9,7 @@ The `src/metrics` module provides code metrics calculation including complexity 
 | File | Description |
 |------|-------------|
 | `complexity-calculator.js` | Calculates various code complexity metrics |
+| `usage-analytics.js` | Stores opt-in local command usage aggregates |
 
 ## Key Components
 
@@ -158,3 +159,17 @@ for (const [metric, limits] of Object.entries(THRESHOLDS)) {
 
 - AST parser (acorn, babel, etc.)
 - File system access
+
+## Local Usage Analytics
+
+`UsageAnalytics` is disabled by default and never sends data over the network.
+Enable it with `aqt analytics enable`; it records only normalized command names,
+success/failure counts, and elapsed milliseconds in `.aqt/usage-metrics.json`.
+It does not collect source code, prompts, file paths, or credentials.
+
+```javascript
+const { UsageAnalytics } = require('./metrics/usage-analytics');
+const analytics = new UsageAnalytics({ workspace: process.cwd() });
+analytics.record('analyze', { success: true, durationMs: 125 });
+console.log(analytics.report(30));
+```

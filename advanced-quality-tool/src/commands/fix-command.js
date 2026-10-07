@@ -11,6 +11,7 @@
  *   --priority        Prioritize by: 'severity', 'category', 'priority'
  *   --max-fixes       Maximum number of fixes to apply
  *   --local-ai        Use local AI (Ollama)
+ *   --use-ai-fixes    Allow validated AI-generated fixes (enabled by default)
  *   --cloud-ai        Use cloud AI (requires API key)
  *   --api-key         API key for cloud AI
  *   --no-backup       Disable backups
@@ -21,10 +22,16 @@
 
 const { AutoFixEngine } = require('../fixers/auto-fix-engine');
 const path = require('path');
+const fs = require('fs');
 
 async function run(args) {
   // Parse arguments
   const options = parseArguments(args);
+
+  if (options.help) {
+    printHelp();
+    return;
+  }
 
   console.log('\n🔧 Auto-Fix Command\n');
 
@@ -38,6 +45,7 @@ async function run(args) {
     verbose: options.verbose,
     backup: options.backup,
     strategy: options.strategy,
+    useAiFixes: options.useAiFixes,
     minConfidence: options.minConfidence || 0.7,
     localAI: {
       enabled: options.localAI,
@@ -83,14 +91,14 @@ async function run(args) {
 
     // Exit with appropriate code
     const exitCode = results.some(r => !r.success) ? 1 : 0;
-    process.exit(exitCode);
+    process.exitCode = exitCode;
 
   } catch (error) {
     console.error(`\n❌ Error: ${error.message}\n`);
     if (options.verbose) {
       console.error(error.stack);
     }
-    process.exit(1);
+    process.exitCode = 1;
   }
 }
 
@@ -98,31 +106,41 @@ async function run(args) {
  * Run analysis to get issues
  */
 async function runAnalysis(files) {
-  // Placeholder: integrate with linter integration
-  // For now, return mock data for testing
-
-  try {
-    const linterIntegration = require('../linters/linter-integration');
-    const normalizer = require('../normalizers/issue-normalizer');
-
-    const orchestrator = new linterIntegration.LinterOrchestrator({
-      targetDirectory: files[0] || process.cwd()
-    });
-
-    const results = await orchestrator.runAll();
-    const normalized = normalizer.normalizeIssues(results);
-
-    return {
-      issues: normalized.issues,
-      files: files
-    };
-  } catch (error) {
-    console.warn('Using fallback analysis');
-    return {
-      issues: [],
-      files: files
-    };
+  const { LinterOrchestrator } = require('../integrations/linter-cli');
+  const projectRoot = process.cwd();
+  const orchestrator = new LinterOrchestrator(projectRoot);
+  const results = await orchestrator.runAll(files, { verbose: false });
+  const successfulLinters = Object.values(results.summary).filter(result => result.success).length;
+  const failures = Object.entries(results.summary)
+    .filter(([, result]) => !result.success)
+    .map(([name, result]) => `${name}: ${result.error}`);
+  failures.forEach(failure => console.warn(`Linter warning: ${failure}`));
+  if (successfulLinters === 0) {
+    throw new Error(failures.length
+      ? `All available linters failed (${failures.join('; ')})`
+      : 'No supported linters are available for the requested files');
   }
+  return {
+    issues: results.issues.map(issue => normalizeLinterIssue(issue, projectRoot)),
+    files
+  };
+}
+
+function normalizeLinterIssue(issue, projectRoot) {
+  const file = issue.filePath || issue.file;
+  if (typeof file !== 'string' || !file) {
+    throw new Error(`Linter issue is missing a file path: ${issue.message || issue.ruleId || 'unknown issue'}`);
+  }
+  const filePath = path.resolve(projectRoot, file);
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    throw new Error(`Linter returned an issue for a file that does not exist: ${filePath}`);
+  }
+  return {
+    ...issue,
+    filePath,
+    line: issue.line || issue.startLine,
+    ruleId: issue.ruleId || issue.rule || issue.type
+  };
 }
 
 /**
@@ -156,6 +174,7 @@ function parseArguments(args) {
     priority: null,
     maxFixes: Infinity,
     localAI: true,
+    useAiFixes: true,
     cloudAI: false,
     apiKey: process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY,
     cloudProvider: 'openai',
@@ -163,14 +182,21 @@ function parseArguments(args) {
     localAiModel: null,
     backup: true,
     verbose: false,
+    help: false,
     minConfidence: 0.7
   };
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
 
-    if (arg === '--dry-run') {
+    if (arg === '--help' || arg === '-h') {
+      options.help = true;
+    } else if (arg === '--dry-run') {
       options.dryRun = true;
+    } else if (arg === '--use-ai-fixes') {
+      options.useAiFixes = true;
+    } else if (arg === '--no-ai-fixes') {
+      options.useAiFixes = false;
     } else if (arg === '--strategy') {
       options.strategy = args[++i];
     } else if (arg === '--auto-fix-level') {
@@ -226,6 +252,8 @@ Options:
   --priority <type>      Prioritize by: 'severity', 'category', 'priority'
   --max-fixes <n>        Maximum number of fixes to apply
   --local-ai             Use local AI (Ollama) - Enabled by default
+  --use-ai-fixes         Allow AI fixes after rule-based fixes (enabled by default)
+  --no-ai-fixes          Disable AI-generated fixes
   --cloud-ai             Use cloud AI (requires API key)
   --api-key <key>        API key for cloud AI
   --cloud-provider <p>   Cloud provider: 'openai', 'anthropic'
@@ -259,5 +287,8 @@ Note:
 
 module.exports = {
   run,
-  printHelp
+  printHelp,
+  parseArguments,
+  runAnalysis,
+  normalizeLinterIssue
 };

@@ -18,6 +18,7 @@ const { CodeContextAnalyzer } = require('./code-context-analyzer');
 const { ContextAggregator } = require('./context-aggregator');
 const { PromptBuilder } = require('./prompt-builder');
 const { LineEditor } = require('./line-editor');
+const { AIGenerationQualityMetrics } = require('./quality-metrics');
 
 const DEFAULT_OPTIONS = {
   rootDir: process.cwd(),
@@ -46,8 +47,9 @@ class AIGenerationOrchestrator {
     this.classifier = this.options.classifier || new IssueClassifier({ queryEngine });
     this.contextAnalyzer = this.options.contextAnalyzer || new CodeContextAnalyzer({ queryEngine, rootDir });
     this.aggregator = this.options.aggregator || new ContextAggregator();
-    this.promptBuilder = this.options.promptBuilder || new PromptBuilder();
+    this.promptBuilder = this.options.promptBuilder || new PromptBuilder({ template: this.options.template || null });
     this.lineEditor = this.options.lineEditor || new LineEditor({ rootDir, dryRun: this.options.dryRun });
+    this.qualityMetrics = this.options.qualityMetrics || new AIGenerationQualityMetrics();
 
     this.metrics = { processed: 0, fixed: 0, failed: 0, skipped: 0, recovered: 0, totalCostUsd: 0 };
   }
@@ -61,11 +63,12 @@ class AIGenerationOrchestrator {
       results.push(res);
       this._progress({ type: 'issue-end', index: i, total: issues.length, result: res });
     }
-    return { results, metrics: { ...this.metrics } };
+    return { results, metrics: { ...this.metrics }, qualityMetrics: this.qualityMetrics.report() };
   }
 
   /** Full pipeline for a single issue. */
   async processIssue(issue) {
+    const startedAt = Date.now();
     this.metrics.processed++;
     const state = { issue, stage: 'classify' };
 
@@ -93,26 +96,49 @@ class AIGenerationOrchestrator {
       // 6. Execute (rate limit + budget aware)
       state.stage = 'execute';
       const gate = this._checkGates();
-      if (!gate.ok) { this.metrics.skipped++; return this._result(state, false, gate.reason); }
+      if (!gate.ok) {
+        this.metrics.skipped++;
+        return this._completeQuality(state, this._result(state, false, gate.reason), startedAt, { skipped: true });
+      }
 
       const exec = await this._execute(prompt);
-      if (!exec || !exec.ok) { this.metrics.failed++; return this._result(state, false, (exec && exec.error) || 'execution failed'); }
+      if (!exec || !exec.ok) {
+        this.metrics.failed++;
+        return this._completeQuality(state, this._result(state, false, (exec && exec.error) || 'execution failed'), startedAt);
+      }
       if (typeof exec.cost === 'number' && this.options.costTracker) {
         this.options.costTracker.record(exec.cost, { issue: issue.id, provider: exec.provider });
         this.metrics.totalCostUsd = Number((this.metrics.totalCostUsd + exec.cost).toFixed(6));
       }
+      state.costUsd = typeof exec.cost === 'number' ? exec.cost : 0;
 
       // 7. Apply line edits (+ optional recovery)
       state.stage = 'apply';
       const applied = await this._applyWithRecovery(issue, exec.text);
-      if (applied.success) { this.metrics.fixed++; if (applied.recovered) this.metrics.recovered++; return this._result(state, true, null, { applied, aggregated }); }
+      if (applied.success) {
+        this.metrics.fixed++;
+        if (applied.recovered) this.metrics.recovered++;
+        return this._completeQuality(state, this._result(state, true, null, { applied, aggregated }), startedAt, { recovered: applied.recovered });
+      }
 
       this.metrics.failed++;
-      return this._result(state, false, applied.error || 'apply failed', { aggregated });
+      return this._completeQuality(state, this._result(state, false, applied.error || 'apply failed', { aggregated }), startedAt);
     } catch (err) {
       this.metrics.failed++;
-      return this._result(state, false, err.message);
+      return this._completeQuality(state, this._result(state, false, err.message), startedAt);
     }
+  }
+
+  _completeQuality(state, result, startedAt, extra = {}) {
+    this.qualityMetrics.record({
+      success: result.success,
+      skipped: extra.skipped,
+      recovered: extra.recovered,
+      category: state.classification && state.classification.category,
+      costUsd: state.costUsd || 0,
+      durationMs: Date.now() - startedAt
+    });
+    return result;
   }
 
   // ─── Stages ─────────────────────────────────────────────────────────────────

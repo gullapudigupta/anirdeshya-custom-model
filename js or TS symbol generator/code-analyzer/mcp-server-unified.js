@@ -37,6 +37,8 @@ const fs = require('fs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const SRC_DIR = path.join(ROOT, 'src');
+const { getAnalyzerRoots } = require('./src/analyzer-roots');
+const ANALYZER_ROOTS = getAnalyzerRoots(ROOT);
 
 // ─── Quality Analysis Imports ────────────────────────────────────────────────
 
@@ -76,7 +78,7 @@ function ensureServices() {
   const now = Date.now();
   if (!queryEngine || now - lastIndexTime > INDEX_TTL) {
     queryEngine = new QueryEngine(ROOT);
-    queryEngine.buildIndex(SRC_DIR);
+    queryEngine.buildIndex(ANALYZER_ROOTS);
     snippetService = new SnippetService(ROOT);
     signatureService = new SignatureService(ROOT, queryEngine);
     outlineService = new OutlineService(ROOT, queryEngine);
@@ -89,13 +91,15 @@ function ensureServices() {
 
 // Invalidate the cached index as soon as a source file is saved, instead of waiting for INDEX_TTL to expire.
 let invalidateDebounce = null;
-try {
-  fs.watch(SRC_DIR, { recursive: true }, (eventType, filename) => {
-    if (filename && !/\.(ts|html|scss|css)$/.test(filename)) return;
-    clearTimeout(invalidateDebounce);
-    invalidateDebounce = setTimeout(() => { lastIndexTime = 0; }, 300);
-  });
-} catch (e) { /* fs.watch recursive unsupported on this platform */ }
+for (const analyzerRoot of ANALYZER_ROOTS) {
+  try {
+    fs.watch(analyzerRoot, { recursive: true }, (eventType, filename) => {
+      if (filename && !/\.(ts|js|html|scss|css)$/.test(filename)) return;
+      clearTimeout(invalidateDebounce);
+      invalidateDebounce = setTimeout(() => { lastIndexTime = 0; }, 300);
+    });
+  } catch (e) { /* fs.watch recursive unsupported on this platform */ }
+}
 
 // ─── MCP Server ──────────────────────────────────────────────────────────────
 

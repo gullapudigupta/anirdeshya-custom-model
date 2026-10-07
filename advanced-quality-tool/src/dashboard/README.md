@@ -40,6 +40,13 @@ const metrics = dashboard.aggregateMetrics(results);
 
 ## Features
 
+### CLI, HTTP, and MCP
+
+Use `aqt dashboard status|enable|disable|report` to inspect local history and
+control recording. The HTTP API and MCP server expose equivalent status,
+history, and recording operations. Dashboard history stays in the workspace;
+recording is disabled until enabled explicitly.
+
 ### Scan Recording
 
 Records each scan with metadata:

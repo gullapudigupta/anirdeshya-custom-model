@@ -46,6 +46,7 @@ class AutoFixEngine {
     // Fix strategy
     this.strategy = options.strategy || 'three-tier'; // 'rule-only', 'ai-only', 'three-tier'
     this.minConfidence = options.minConfidence || 0.7;
+    this.useAiFixes = options.useAiFixes !== false;
     this.maxAttempts = options.maxAttempts || 3;
 
     // Initialize fixers
@@ -158,8 +159,10 @@ class AutoFixEngine {
 
       // Categorize issues
       const ruleFixable = issues.filter(i => this.canFixByRule(i));
-      const aiRequired = issues.filter(i => !this.canFixByRule(i) && this.requiresAI(i));
-      const manualFix = issues.filter(i => !this.canFixByRule(i) && !this.requiresAI(i));
+      const aiRequired = this.useAiFixes
+        ? issues.filter(i => !this.canFixByRule(i) && this.requiresAI(i))
+        : [];
+      const manualFix = issues.filter(i => !this.canFixByRule(i) && !aiRequired.includes(i));
 
       this.log(`  Rule-fixable: ${ruleFixable.length}`);
       this.log(`  AI-required: ${aiRequired.length}`);
@@ -176,7 +179,7 @@ class AutoFixEngine {
       }
 
       // Phase 2: AI fixes
-      if (aiRequired.length > 0 && this.strategy !== 'rule-only') {
+      if (this.useAiFixes && aiRequired.length > 0 && this.strategy !== 'rule-only') {
         this.log(`\nPhase 2: Applying AI fixes...`);
         const aiResult = await this.applyAIFixes(filePath, aiRequired);
 

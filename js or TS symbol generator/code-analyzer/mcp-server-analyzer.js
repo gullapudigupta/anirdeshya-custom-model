@@ -21,6 +21,8 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '../..');
 const SRC_DIR = path.join(ROOT, 'src');
+const { getAnalyzerRoots } = require('./src/analyzer-roots');
+const ANALYZER_ROOTS = getAnalyzerRoots(ROOT);
 
 const { getSourceFiles, getStyleFiles, getTemplateFiles } = require('./src/ast-utils');
 const fs = require('fs');
@@ -42,20 +44,22 @@ function ensureIndex() {
   const now = Date.now();
   if (!queryEngine || now - lastIndexTime > INDEX_TTL) {
     queryEngine = new QueryEngine(ROOT);
-    queryEngine.buildIndex(SRC_DIR);
+    queryEngine.buildIndex(ANALYZER_ROOTS);
     lastIndexTime = now;
   }
 }
 
 // Invalidate the cached index as soon as a source file is saved, instead of waiting for INDEX_TTL to expire.
 let invalidateDebounce = null;
-try {
-  fs.watch(SRC_DIR, { recursive: true }, (eventType, filename) => {
-    if (filename && !/\.(ts|html|scss|css)$/.test(filename)) return;
-    clearTimeout(invalidateDebounce);
-    invalidateDebounce = setTimeout(() => { lastIndexTime = 0; }, 300);
-  });
-} catch (e) { /* fs.watch recursive unsupported on this platform */ }
+for (const analyzerRoot of ANALYZER_ROOTS) {
+  try {
+    fs.watch(analyzerRoot, { recursive: true }, (eventType, filename) => {
+      if (filename && !/\.(ts|js|html|scss|css)$/.test(filename)) return;
+      clearTimeout(invalidateDebounce);
+      invalidateDebounce = setTimeout(() => { lastIndexTime = 0; }, 300);
+    });
+  } catch (e) { /* fs.watch recursive unsupported on this platform */ }
+}
 
 const server = new Server(
   { name: 'parikrama-code-analyzer', version: '1.0.0' },

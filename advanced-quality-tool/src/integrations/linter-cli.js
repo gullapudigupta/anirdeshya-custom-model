@@ -5,26 +5,40 @@
  * and normalizes their output into a common issue format.
  */
 
-const { execSync, spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const { ExternalLanguageAnalyzer } = require('../languages/external-language-analyzer');
+
+const EXTERNAL_LINTERS = {
+  pylint: { command: 'pylint', extensions: ['.py'], args: files => ['--output-format=json', ...files], parser: 'json' },
+  flake8: { command: 'flake8', extensions: ['.py'], args: files => ['--format=%(path)s:%(row)d:%(col)d: %(code)s %(text)s', ...files], parser: 'text' },
+  black: { command: 'black', extensions: ['.py'], args: files => ['--check', ...files], parser: 'format' },
+  rubocop: { command: 'rubocop', extensions: ['.rb'], args: files => ['--format', 'json', ...files], parser: 'rubocop' },
+  golint: { command: 'golint', extensions: ['.go'], args: files => files, parser: 'text' },
+  staticcheck: { command: 'staticcheck', extensions: ['.go'], args: files => files, parser: 'text' },
+  clippy: { command: 'cargo', extensions: ['.rs'], args: () => ['clippy', '--message-format=short'], parser: 'text' },
+  phpcs: { command: 'phpcs', extensions: ['.php'], args: files => ['--report=json', ...files], parser: 'phpcs' },
+  swiftlint: { command: 'swiftlint', extensions: ['.swift'], args: files => ['lint', '--quiet', ...files], parser: 'text' }
+};
+
+function executableAvailable(command, projectRoot) {
+  const binName = process.platform === 'win32' ? `${command}.cmd` : command;
+  const localBin = path.join(projectRoot, 'node_modules', '.bin', binName);
+  const localBinWithoutCmd = path.join(projectRoot, 'node_modules', '.bin', command);
+  if (fs.existsSync(localBin) || fs.existsSync(localBinWithoutCmd)) return true;
+  const locator = process.platform === 'win32' ? 'where.exe' : 'which';
+  return spawnSync(locator, [command], { encoding: 'utf8', windowsHide: true }).status === 0;
+}
 
 /**
  * Detect which linters are available in the project
  */
 function detectAvailableLinters(projectRoot) {
   const packageJsonPath = path.join(projectRoot, 'package.json');
-
-  if (!fs.existsSync(packageJsonPath)) {
-    return {
-      eslint: false,
-      prettier: false,
-      stylelint: false,
-      tslint: false
-    };
-  }
-
-  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+  const packageJson = fs.existsSync(packageJsonPath)
+    ? JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'))
+    : {};
   const allDeps = {
     ...packageJson.dependencies,
     ...packageJson.devDependencies
@@ -35,7 +49,9 @@ function detectAvailableLinters(projectRoot) {
     prettier: !!allDeps['prettier'],
     stylelint: !!allDeps['stylelint'],
     tslint: !!allDeps['tslint'], // Deprecated but still check
-    typescript: !!allDeps['typescript']
+    typescript: !!allDeps['typescript'],
+    ...Object.fromEntries(Object.entries(EXTERNAL_LINTERS).map(([name, tool]) =>
+      [name, executableAvailable(tool.command, projectRoot)]))
   };
 }
 
@@ -92,8 +108,12 @@ class LinterIntegration {
 
       child.on('close', (code) => {
         // ESLint exits with 1 if there are issues, which is not an error
-        if (code !== 0 && code !== 1) {
-          reject(new Error(`Command failed with code ${code}: ${stderr}`));
+        if (code !== 0 && code !== 1 && !options.allowNonZero) {
+          const error = new Error(`Command failed with code ${code}: ${stderr}`);
+          error.stdout = stdout;
+          error.stderr = stderr;
+          error.exitCode = code;
+          reject(error);
         } else {
           resolve({ stdout, stderr, exitCode: code });
         }
@@ -104,6 +124,63 @@ class LinterIntegration {
       });
     });
   }
+}
+
+class ExternalCliIntegration extends LinterIntegration {
+  constructor(projectRoot, name, definition = EXTERNAL_LINTERS[name]) {
+    super(projectRoot);
+    if (!definition) throw new Error(`Unknown external linter: ${name}`);
+    this.name = name;
+    this.definition = definition;
+    this.normalizer = new ExternalLanguageAnalyzer({ language: name });
+  }
+
+  isAvailable() {
+    return executableAvailable(this.definition.command, this.projectRoot);
+  }
+
+  async run(files = []) {
+    const candidates = files.length
+      ? files.filter(file => this.definition.extensions.includes(path.extname(file).toLowerCase()))
+      : findFilesForExtensions(this.projectRoot, this.definition.extensions);
+    if (candidates.length === 0) return '';
+    const args = this.definition.args(candidates);
+    const result = await this.exec(this.definition.command, args, { allowNonZero: true });
+    if (!result.stdout.trim() && !result.stderr.trim()) {
+      if (result.exitCode !== 0) throw new Error(`${this.name} exited with code ${result.exitCode} without diagnostics`);
+      return '';
+    }
+    return result.stdout || result.stderr;
+  }
+
+  parse(rawOutput) {
+    if (!rawOutput.trim()) return [];
+    if (this.definition.parser === 'format') {
+      return rawOutput.split(/\r?\n/).flatMap(line => {
+        const match = line.match(/^\s*would reformat\s+(.+?)\s*$/i);
+        return match ? [this.normalizer.issue(this.name, match[1], {
+          ruleId: 'format', message: 'File is not formatted by Black', severity: 'warning'
+        })] : [];
+      });
+    }
+    return this.normalizer.parseOutput(this.name, rawOutput, this.projectRoot, this.definition.parser);
+  }
+}
+
+function findFilesForExtensions(root, extensions) {
+  const files = [];
+  const ignored = new Set(['.git', 'node_modules', 'dist', 'build', 'vendor', 'target']);
+  const visit = directory => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (!ignored.has(entry.name)) visit(path.join(directory, entry.name));
+      } else if (extensions.includes(path.extname(entry.name).toLowerCase())) {
+        files.push(path.join(directory, entry.name));
+      }
+    }
+  };
+  visit(root);
+  return files;
 }
 
 /**
@@ -525,6 +602,9 @@ class LinterOrchestrator {
       prettier: new PrettierIntegration(projectRoot),
       stylelint: new StyleLintIntegration(projectRoot)
     };
+    for (const name of Object.keys(EXTERNAL_LINTERS)) {
+      this.integrations[name] = new ExternalCliIntegration(projectRoot, name);
+    }
   }
 
   /**
@@ -622,5 +702,8 @@ module.exports = {
   TypeScriptESLintIntegration,
   PrettierIntegration,
   StyleLintIntegration,
+  ExternalCliIntegration,
+  EXTERNAL_LINTERS,
+  findFilesForExtensions,
   detectAvailableLinters
 };

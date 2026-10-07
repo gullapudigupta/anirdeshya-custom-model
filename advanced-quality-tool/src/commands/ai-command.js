@@ -21,6 +21,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const chalk = require('chalk');
 const { AIGenerationOrchestrator, loadConfig, CostTracker, CloudExecutor, LocalExecutor } = require('../ai-generator');
+const { TemplateManager } = require('../ai-generator/template-manager');
 
 class AICommand {
   constructor(config = {}) {
@@ -36,6 +37,7 @@ class AICommand {
     this.costTracker = new CostTracker({
       monthlyBudget: parseFloat(process.env.AQT_AI_MONTHLY_BUDGET) || 100.0
     });
+    this.templateManager = new TemplateManager({ rootDir: this.config.projectRoot });
   }
 
   /**
@@ -57,6 +59,8 @@ class AICommand {
           return await this.handleConfig(argv);
         case 'cost':
           return await this.handleCost(argv);
+        case 'templates':
+          return await this.handleTemplates(action, argv);
         default:
           this.showHelp();
           return { success: false, error: 'Unknown subcommand' };
@@ -371,6 +375,7 @@ class AICommand {
       rootDir: this.config.projectRoot,
       cloudExecutor: this.getExecutor(),
       costTracker: this.costTracker,
+      template: argv.template ? this.templateManager.get(argv.template) : null,
       dryRun: argv.dryRun || false,
       onProgress: (event) => {
         if (event.type === 'issue-start') {
@@ -398,6 +403,36 @@ class AICommand {
       success: true,
       data: result
     };
+  }
+
+  async handleTemplates(action, argv) {
+    const name = argv._[3];
+    if (action === 'list') {
+      const templates = this.templateManager.list();
+      console.log(templates.join('\n') || 'No custom templates found.');
+      return { success: true, data: templates };
+    }
+    if (action === 'show') {
+      if (!name) throw new Error('Usage: aqt ai templates show <name>');
+      const content = this.templateManager.get(name);
+      console.log(content);
+      return { success: true, data: content };
+    }
+    if (action === 'create') {
+      const templateFile = argv._[4];
+      if (!name || !templateFile) throw new Error('Usage: aqt ai templates create <name> <template-file>');
+      const sourcePath = path.resolve(this.config.projectRoot, templateFile);
+      const result = this.templateManager.save(name, await fs.readFile(sourcePath, 'utf8'));
+      console.log(chalk.green(`Saved AI template: ${name}`));
+      return { success: true, data: result };
+    }
+    if (action === 'delete') {
+      if (!name) throw new Error('Usage: aqt ai templates delete <name>');
+      const result = this.templateManager.remove(name);
+      console.log(chalk.green(`Deleted AI template: ${name}`));
+      return { success: true, data: result };
+    }
+    throw new Error('Usage: aqt ai templates <list|show|create|delete>');
   }
 
   /**
@@ -782,6 +817,9 @@ class AICommand {
     console.log('  refactor <file> <description>  Refactor code with AI');
     console.log('  config [provider]              Configure AI provider');
     console.log('  cost                           Show cost tracking\n');
+    console.log('  templates list                 List custom prompt templates');
+    console.log('  templates create <n> <file>    Add a prompt template');
+    console.log('  templates delete <name>        Remove a prompt template\n');
     
     console.log(chalk.yellow('Options:'));
     console.log('  --provider <name>        AI provider (openai, anthropic, google, ollama)');

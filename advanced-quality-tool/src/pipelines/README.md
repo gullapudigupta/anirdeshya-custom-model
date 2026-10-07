@@ -6,7 +6,8 @@ The `src/pipelines` module provides a comprehensive pipeline architecture for or
 
 📋 **[View Gap Analysis](./GAPS.md)** - See missing features and improvement opportunities
 
-⚠️ **CRITICAL**: 20+ pipelines implemented but NOT accessible via CLI, API, MCP, or UI!
+Pipelines can be listed and executed through the pipeline CLI, HTTP API, and
+MCP integration; the execution ledger records local run state.
 
 ## Contents
 

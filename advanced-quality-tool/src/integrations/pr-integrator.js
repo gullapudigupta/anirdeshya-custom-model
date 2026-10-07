@@ -24,6 +24,7 @@ const { URL } = require('url');
 const PROVIDERS = {
   GITHUB: 'github',
   GITLAB: 'gitlab',
+  BITBUCKET: 'bitbucket',
   GENERIC: 'generic'
 };
 
@@ -51,7 +52,11 @@ class PRIntegrator {
     this.apiBase = options.apiBase ||
                    (this.provider === PROVIDERS.GITLAB
                      ? 'https://gitlab.com/api/v4'
-                     : 'https://api.github.com');
+                     : this.provider === PROVIDERS.BITBUCKET
+                       ? 'https://api.bitbucket.org/2.0'
+                       : 'https://api.github.com');
+    this.maxRetries = Number.isInteger(options.maxRetries) ? Math.max(0, options.maxRetries) : 2;
+    this.retryDelayMs = Number.isFinite(options.retryDelayMs) ? Math.max(0, options.retryDelayMs) : 250;
   }
 
   // ─── Public API ────────────────────────────────────────────────────────────
@@ -83,6 +88,8 @@ class PRIntegrator {
         return await this._githubPostComment(repo, prNumber, body, updateExisting);
       } else if (this.provider === PROVIDERS.GITLAB) {
         return await this._gitlabPostComment(repo, prNumber, body);
+      } else if (this.provider === PROVIDERS.BITBUCKET) {
+        return await this._bitbucketPostComment(repo, prNumber, body);
       } else {
         return { success: false, error: `Unsupported provider: ${this.provider}` };
       }
@@ -119,10 +126,97 @@ class PRIntegrator {
         return await this._githubSetStatus(repo, sha, state, desc, targetUrl);
       } else if (this.provider === PROVIDERS.GITLAB) {
         return await this._gitlabSetStatus(repo, sha, state, desc, targetUrl);
+      } else if (this.provider === PROVIDERS.BITBUCKET) {
+        return await this._bitbucketSetStatus(repo, sha, state, desc, targetUrl);
       }
       return { success: false, error: `Unsupported provider: ${this.provider}` };
     } catch (err) {
       return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Post a review comment attached to a specific changed file and line.
+   * GitLab requires all three diff SHAs to construct an inline position.
+   */
+  async postInlineComment(params) {
+      const { repo, prNumber, path, line, body, commitSha, baseSha, startSha, headSha } = params || {};
+      this._validateRequired({ repo, prNumber, path, line, body });
+      if (!Number.isInteger(Number(line)) || Number(line) < 1) {
+        throw new Error('PRIntegrator: line must be a positive integer');
+      }
+      if (this.dryRun) return { success: true, dryRun: true, path, line, body };
+
+      try {
+        let result;
+        if (this.provider === PROVIDERS.GITHUB) {
+          this._validateRequired({ commitSha });
+          result = await this._githubRequest('POST', `/repos/${repo}/pulls/${prNumber}/comments`, {
+            body, commit_id: commitSha, path, line: Number(line), side: 'RIGHT'
+          });
+        } else if (this.provider === PROVIDERS.GITLAB) {
+          this._validateRequired({ baseSha, startSha, headSha });
+          result = await this._gitlabRequest(
+            'POST',
+            `/projects/${encodeURIComponent(repo)}/merge_requests/${prNumber}/discussions`,
+            {
+              body,
+              position: {
+                position_type: 'text', base_sha: baseSha, start_sha: startSha, head_sha: headSha,
+                new_path: path, new_line: Number(line)
+              }
+            }
+          );
+        } else if (this.provider === PROVIDERS.BITBUCKET) {
+          const slug = this._bitbucketSlug(repo);
+          result = await this._bitbucketRequest(
+            'POST',
+            `/repositories/${slug}/pullrequests/${prNumber}/comments`,
+            { content: { raw: body }, inline: { path, to: Number(line) } }
+          );
+        } else {
+          return { success: false, error: `Inline comments are unsupported for provider: ${this.provider}` };
+        }
+        return result.ok
+          ? { success: true, commentId: result.data.id, url: result.data.html_url || result.data.links?.html?.href }
+          : { success: false, error: result.error };
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    }
+
+  async postFileComment(params) {
+    return this.postInlineComment(params);
+  }
+
+  async updatePRDescription(params) {
+      const { repo, prNumber, description } = params || {};
+      this._validateRequired({ repo, prNumber, description });
+      if (this.dryRun) return { success: true, dryRun: true, description };
+
+      try {
+        let result;
+        if (this.provider === PROVIDERS.GITHUB) {
+          result = await this._githubRequest('PATCH', `/repos/${repo}/pulls/${prNumber}`, { body: description });
+        } else if (this.provider === PROVIDERS.GITLAB) {
+          result = await this._gitlabRequest(
+            'PUT',
+            `/projects/${encodeURIComponent(repo)}/merge_requests/${prNumber}`,
+            { description }
+          );
+        } else if (this.provider === PROVIDERS.BITBUCKET) {
+          result = await this._bitbucketRequest(
+            'PUT',
+            `/repositories/${this._bitbucketSlug(repo)}/pullrequests/${prNumber}`,
+            { description }
+          );
+        } else {
+          return { success: false, error: `Description updates are unsupported for provider: ${this.provider}` };
+        }
+        return result.ok ? { success: true, url: result.data.html_url || result.data.links?.html?.href } :
+          { success: false, error: result.error };
+      } catch (err) {
+        return { success: false, error: err.message };
     }
   }
 
@@ -263,9 +357,74 @@ class PRIntegrator {
     return this._request(options, body);
   }
 
+  _bitbucketSlug(repo) {
+    const parts = String(repo).split('/');
+    if (parts.length !== 2 || parts.some(part => !part || part === '.' || part === '..')) {
+      throw new Error("PRIntegrator: Bitbucket repo must be 'workspace/repository'");
+    }
+    return parts.map(encodeURIComponent).join('/');
+  }
+
+  async _bitbucketPostComment(repo, prNumber, body) {
+    const result = await this._bitbucketRequest(
+      'POST',
+      `/repositories/${this._bitbucketSlug(repo)}/pullrequests/${prNumber}/comments`,
+      { content: { raw: body } }
+    );
+    if (!result.ok) return { success: false, error: result.error };
+    return { success: true, commentId: result.data.id, url: result.data.links?.html?.href };
+  }
+
+  async _bitbucketSetStatus(repo, sha, state, description, targetUrl) {
+    const stateMap = { success: 'SUCCESSFUL', failure: 'FAILED', pending: 'INPROGRESS' };
+    const result = await this._bitbucketRequest(
+      'POST',
+      `/repositories/${this._bitbucketSlug(repo)}/commit/${encodeURIComponent(sha)}/statuses/build`,
+      {
+        key: 'AQT',
+        name: 'Advanced Quality Tool',
+        state: stateMap[state] || 'FAILED',
+        description,
+        ...(targetUrl ? { url: targetUrl } : {})
+      }
+    );
+    return result.ok ? { success: true, state } : { success: false, error: result.error };
+  }
+
+  async _bitbucketRequest(method, requestPath, body) {
+    const base = new URL(this.apiBase);
+    return this._request({
+      hostname: base.hostname,
+      path: base.pathname.replace(/\/$/, '') + requestPath,
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.token ? { 'Authorization': 'Bearer ' + this.token } : {})
+      }
+    }, body);
+  }
+
   // ─── HTTP helper ────────────────────────────────────────────────────────────
 
-  _request(options, body) {
+  async _request(options, body) {
+    let result;
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      result = await this._requestOnce(options, body);
+      const transient = result.statusCode === 429 ||
+        result.statusCode === 500 || result.statusCode === 502 ||
+        result.statusCode === 503 || result.statusCode === 504 ||
+        result.statusCode === 0;
+      if (!transient || attempt === this.maxRetries) return result;
+      const delay = result.retryAfterMs || this.retryDelayMs * (2 ** attempt);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+    return result;
+  }
+
+  _requestOnce(options, body) {
+    if (typeof this.options.requestFn === 'function') {
+      return Promise.resolve(this.options.requestFn(options, body));
+    }
     return new Promise((resolve) => {
       const payload = body ? JSON.stringify(body) : null;
       if (payload) options.headers['Content-Length'] = Buffer.byteLength(payload);
@@ -278,13 +437,17 @@ class PRIntegrator {
           try {
             const data = raw ? JSON.parse(raw) : {};
             const ok = res.statusCode >= 200 && res.statusCode < 300;
-            resolve({ ok, statusCode: res.statusCode, data, error: ok ? null : (data.message || raw) });
+            const retryAfter = Number(res.headers['retry-after']);
+            resolve({
+              ok, statusCode: res.statusCode, data, error: ok ? null : (data.message || raw),
+              retryAfterMs: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 0
+            });
           } catch {
             resolve({ ok: false, statusCode: res.statusCode, data: null, error: raw });
           }
         });
       });
-      req.on('error', err => resolve({ ok: false, error: err.message }));
+      req.on('error', err => resolve({ ok: false, statusCode: 0, error: err.message }));
       if (payload) req.write(payload);
       req.end();
     });

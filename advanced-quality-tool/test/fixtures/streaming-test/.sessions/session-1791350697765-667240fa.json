@@ -1,17 +1,17 @@
 {
-  "id": "session-1790871266369-c7320035",
+  "id": "session-1791350697765-667240fa",
   "workspace": "/workspace",
   "model": null,
   "provider": null,
-  "createdAt": 1790871266369,
-  "updatedAt": 1790871266369,
+  "createdAt": 1791350697765,
+  "updatedAt": 1791350697765,
   "events": [
     {
-      "id": "de9f9ad60a99a5a22b1388b4450f8aeb",
+      "id": "93fc20ede0dca0a021ffcec14393b4f2",
       "type": "session-start",
-      "timestamp": 1790871266369,
+      "timestamp": 1791350697765,
       "data": {
-        "sessionId": "session-1790871266369-c7320035",
+        "sessionId": "session-1791350697765-667240fa",
         "workspace": "/workspace"
       }
     }
@@ -26,7 +26,7 @@
       {
         "path": "/file1.js",
         "type": "applied",
-        "timestamp": 1790871266370,
+        "timestamp": 1791350697765,
         "additions": 5
       }
     ],
@@ -34,7 +34,7 @@
       {
         "path": "/file2.js",
         "type": "rejected",
-        "timestamp": 1790871266370,
+        "timestamp": 1791350697766,
         "reason": "User rejected"
       }
     ],

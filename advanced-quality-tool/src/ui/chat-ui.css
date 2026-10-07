@@ -2645,3 +2645,96 @@ mark {
 .export-cancel-btn:hover {
   background: #ebebeb;
 }
+
+.settings-button {
+  margin-left: 16px;
+  padding: 9px 14px;
+  border: 1px solid #d7dbea;
+  border-radius: 8px;
+  background: #fff;
+  color: #34405e;
+  cursor: pointer;
+}
+
+.settings-dialog {
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  color: #283047;
+  box-shadow: 0 18px 60px rgba(18, 26, 47, 0.28);
+}
+
+.settings-dialog::backdrop {
+  background: rgba(19, 26, 43, 0.55);
+}
+
+.settings-dialog form {
+  display: grid;
+  gap: 10px;
+  padding: 22px;
+  overflow: auto;
+}
+
+.settings-dialog-header,
+.settings-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-dialog-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.settings-dialog label {
+  margin-top: 5px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-dialog input,
+.settings-dialog select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #d7dbea;
+  border-radius: 7px;
+}
+
+.settings-description {
+  margin: 0 0 4px;
+  color: #65708a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.settings-status {
+  min-height: 18px;
+  color: #54617a;
+  font-size: 12px;
+}
+
+.settings-dialog-actions {
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.settings-dialog-actions button,
+.settings-dialog-header button {
+  padding: 8px 14px;
+  border: 1px solid #d7dbea;
+  border-radius: 7px;
+  background: #f8f9fc;
+  cursor: pointer;
+}
+
+#settingsSaveBtn {
+  border-color: #5367d5;
+  background: #5367d5;
+  color: #fff;
+}

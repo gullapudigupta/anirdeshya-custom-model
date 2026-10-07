@@ -1,41 +1,41 @@
 {
-  "id": "session-1790871266358-2b375873",
+  "id": "session-1791350697756-3073ecd2",
   "workspace": "/workspace",
   "model": "test-model",
   "provider": null,
-  "createdAt": 1790871266358,
-  "updatedAt": 1790871266359,
+  "createdAt": 1791350697756,
+  "updatedAt": 1791350697757,
   "events": [
     {
-      "id": "d326f853ac2b244438a18caaf59b3c2b",
+      "id": "94f0a33410e33db169e07327febbb94b",
       "type": "session-start",
-      "timestamp": 1790871266358,
+      "timestamp": 1791350697756,
       "data": {
-        "sessionId": "session-1790871266358-2b375873",
+        "sessionId": "session-1791350697756-3073ecd2",
         "workspace": "/workspace",
         "model": "test-model"
       }
     },
     {
-      "id": "19627540bd2e4ac9f66b6d84ffc1daae",
+      "id": "a4fe5104d5ac69817a577b6cdd24b18d",
       "type": "model-token",
-      "timestamp": 1790871266359,
+      "timestamp": 1791350697757,
       "data": {
         "token": "test"
       }
     },
     {
-      "id": "db56ff229014b25873012e419e9db41b",
+      "id": "b916c3f81d3d1501e94e667a2a5f08b2",
       "type": "model-complete",
-      "timestamp": 1790871266359,
+      "timestamp": 1791350697757,
       "data": {
         "text": "complete"
       }
     },
     {
-      "id": "f6741023c32d991d5035e901a9cc4a41",
+      "id": "7c528b3c2660b621e00b47c6c27cdda8",
       "type": "session-end",
-      "timestamp": 1790871266359,
+      "timestamp": 1791350697757,
       "data": {
         "status": "completed"
       }

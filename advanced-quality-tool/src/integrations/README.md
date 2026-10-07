@@ -20,6 +20,26 @@ The `src/integrations` module provides integrations with external tools, CI/CD s
 | `notification-system.js` | Multi-channel notification system |
 | `team-collaboration.js` | Team collaboration features |
 
+## Team Collaboration
+
+`team-collaboration.js` provides local issue assignment, comments, tags, workflow
+state transitions, and audit history. It persists JSON records under
+`.quality-tool/collaboration/` by default; it does not synchronize across
+machines or provide hosted identity/access control. Applications that need
+shared state should integrate an authenticated storage service rather than
+sharing this local folder.
+
+## Dashboard and Plugin Interfaces
+
+The HTTP API exposes dashboard history/status and plugin listing/lifecycle
+operations; MCP offers corresponding dashboard and plugin tools. Plugin state
+and dashboard data are project-local. Protect mutation endpoints with API
+authentication when binding the server beyond localhost.
+
+PR integrations support GitHub, GitLab, and Bitbucket. Configure the provider
+token through the process environment; transient provider failures are retried
+with bounded backoff.
+
 ## Key Components
 
 ### MCPServer

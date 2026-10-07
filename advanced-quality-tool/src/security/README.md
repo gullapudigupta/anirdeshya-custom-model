@@ -86,6 +86,11 @@ const issues = await scanner.scanProject();
 
 ## Usage Examples
 
+The security scanners are also available through the `aqt security` CLI, HTTP
+API, and MCP tools. Apply server authentication and rate limits when using
+remote interfaces, and treat scan output as potentially sensitive because it
+can include file locations and vulnerability details.
+
 ### Full Security Scan
 
 ```javascript

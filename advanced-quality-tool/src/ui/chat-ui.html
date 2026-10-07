@@ -28,6 +28,7 @@
           <div class="stat-label">Success</div>
         </div>
       </div>
+      <button id="settingsBtn" class="settings-button" type="button" aria-haspopup="dialog">⚙ Settings</button>
     </div>
 
     <div class="chat-container">
@@ -732,6 +733,39 @@
       </div>
     </div>
   </div>
+
+  <dialog id="settingsDialog" class="settings-dialog" aria-labelledby="settingsDialogTitle">
+    <form id="settingsForm" method="dialog">
+      <div class="settings-dialog-header">
+        <h2 id="settingsDialogTitle">Settings</h2>
+        <button id="settingsCloseBtn" type="button" aria-label="Close settings">×</button>
+      </div>
+      <p class="settings-description">Provider settings apply to this running API server. API keys are held in memory only and are never written to configuration files.</p>
+      <label for="aiSettingsProvider">AI provider</label>
+      <select id="aiSettingsProvider" name="provider">
+        <option value="openai">OpenAI</option>
+        <option value="anthropic">Anthropic</option>
+        <option value="google">Google</option>
+        <option value="ollama">Ollama (local)</option>
+      </select>
+      <label for="aiSettingsModel">Model</label>
+      <input id="aiSettingsModel" name="model" maxlength="128" autocomplete="off">
+      <label for="aiSettingsApiKey">API key (optional; session-only)</label>
+      <input id="aiSettingsApiKey" name="apiKey" type="password" autocomplete="new-password">
+      <div id="aiCredentialStatus" class="settings-status" role="status"></div>
+      <label for="aiSettingsMaxCost">Maximum cost per generation (USD)</label>
+      <input id="aiSettingsMaxCost" name="maxCost" type="number" min="0" step="0.01">
+      <label for="aiSettingsMonthlyBudget">Monthly budget (USD)</label>
+      <input id="aiSettingsMonthlyBudget" name="monthlyBudget" type="number" min="0" step="0.01">
+      <label for="aiSettingsRateLimit">Requests per minute</label>
+      <input id="aiSettingsRateLimit" name="requestsPerMinute" type="number" min="1" step="1">
+      <div id="settingsSaveStatus" class="settings-status" role="status"></div>
+      <div class="settings-dialog-actions">
+        <button id="settingsCancelBtn" type="button">Cancel</button>
+        <button id="settingsSaveBtn" type="submit">Save settings</button>
+      </div>
+    </form>
+  </dialog>
 
   <script src="chat-ui.js"></script>
 </body>

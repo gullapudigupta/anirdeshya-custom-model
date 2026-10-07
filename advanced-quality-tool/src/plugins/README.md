@@ -136,6 +136,13 @@ module.exports = {
 
 ## Plugin Discovery
 
+Project plugins use a `plugin.json` manifest with `id`, `name`, `version`, and
+`apiVersion` fields and an `index.js` module exporting a plugin class. `onLoad`
+may register hooks (`api.registerHook`) and custom rules (`api.registerRule`).
+The manager persists disabled plugin IDs alongside the configured plugin
+directory. Review third-party plugin code before installing it; the plugin
+runtime is not a security boundary for hostile code.
+
 Plugins are discovered from:
 
 1. Built-in plugins directory

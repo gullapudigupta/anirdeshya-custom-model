@@ -235,6 +235,11 @@ const result = ui.testRule(rule, sampleCode);
 
 ## Configuration
 
+The chat UI's Settings dialog configures AI provider/model/budget preferences.
+API keys are held only in the running server process and are not written to the
+project configuration file. Workspace dashboard history and usage analytics
+remain separate; analytics requires explicit opt-in via `aqt analytics enable`.
+
 ### WebSocketServer
 
 ```javascript

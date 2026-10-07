@@ -28,8 +28,10 @@ class QueryEngine {
    * Build the symbol index
    */
   buildIndex(srcDir) {
-    const sourceDir = srcDir || path.join(this.rootDir, 'src');
-    const files = getSourceFiles(sourceDir, ['.ts']);
+    const sourceDirs = Array.isArray(srcDir)
+      ? srcDir
+      : [srcDir || path.join(this.rootDir, 'src')];
+    const files = sourceDirs.flatMap(sourceDir => getSourceFiles(sourceDir, ['.ts', '.js']));
     
     for (const file of files) {
       if (!file.includes('.spec.') && !file.includes('node_modules')) {

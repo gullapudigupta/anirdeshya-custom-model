@@ -47,6 +47,11 @@ ${c.bold}Commands:${c.reset}
   ${c.green}security${c.reset}            Security scanning and vulnerability detection
   ${c.green}config${c.reset}              Manage tool configuration (.aqt/config.json)
   ${c.green}plugin${c.reset}              Manage plugins (.aqt/plugins/)
+  ${c.green}report${c.reset}              Generate reports from analysis JSON
+  ${c.green}metrics${c.reset}             Calculate code complexity metrics
+  ${c.green}dashboard${c.reset}           Configure local quality metrics history
+  ${c.green}analytics${c.reset}           Manage opt-in local usage metrics
+  ${c.green}ai${c.reset}                  AI generation and prompt templates
   ${c.green}help${c.reset}                Show this help message
 
 ${c.bold}Examples:${c.reset}
@@ -91,6 +96,9 @@ ${c.bold}Phase Status:${c.reset}
 }
 
 async function runCommand(command, args) {
+  const startedAt = Date.now();
+  const previousExitCode = process.exitCode;
+  let succeeded = false;
   try {
     switch (command) {
       case 'detect':
@@ -143,6 +151,29 @@ async function runCommand(command, args) {
         await require('./src/commands/plugin-command').run(args);
         break;
 
+      case 'report':
+        await require('./src/commands/report-command').run(args);
+        break;
+
+      case 'metrics':
+        await require('./src/commands/metrics-command').run(args);
+        break;
+
+      case 'dashboard':
+        await require('./src/commands/dashboard-command').run(args);
+        break;
+
+      case 'analytics':
+        await require('./src/commands/analytics-command').run(args);
+        break;
+
+      case 'ai': {
+        const argv = parseAIArguments(args);
+        const result = await new (require('./src/commands/ai-command').AICommand)().execute(argv);
+        if (!result.success) process.exitCode = 1;
+        break;
+      }
+
       case 'help':
       case '--help':
       case '-h':
@@ -159,15 +190,55 @@ async function runCommand(command, args) {
       default:
         console.log(`${c.red}Unknown command: ${command}${c.reset}`);
         console.log(`Run ${c.cyan}aqt help${c.reset} for available commands\n`);
-        process.exit(1);
+        process.exitCode = 1;
+        return;
     }
+    succeeded = true;
   } catch (error) {
     console.error(`\n${c.red}Error: ${error.message}${c.reset}\n`);
     if (process.env.DEBUG) {
       console.error(error.stack);
     }
-    process.exit(1);
+    process.exitCode = 1;
+  } finally {
+    try {
+      if (command !== 'analytics') {
+        const { UsageAnalytics } = require('./src/metrics/usage-analytics');
+        new UsageAnalytics().record(command, {
+          success: succeeded && process.exitCode === previousExitCode,
+          durationMs: Date.now() - startedAt
+        });
+      }
+    } catch (error) {
+      console.error(`${c.red}Unable to record local usage metrics: ${error.message}${c.reset}`);
+      process.exitCode = 1;
+    }
   }
+}
+
+function parseAIArguments(args) {
+  const positional = ['ai'];
+  const options = { _: positional };
+  const booleanOptions = new Set(['auto-apply', 'dry-run', 'force', 'verbose']);
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (!arg.startsWith('--')) {
+      positional.push(arg);
+      continue;
+    }
+    const [rawName, inlineValue] = arg.slice(2).split('=', 2);
+    const name = rawName.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+    if (booleanOptions.has(rawName)) {
+      options[name] = inlineValue === undefined ? true : inlineValue !== 'false';
+    } else if (inlineValue !== undefined) {
+      options[name] = inlineValue;
+    } else if (args[i + 1] && !args[i + 1].startsWith('--')) {
+      options[name] = args[++i];
+    } else {
+      options[name] = true;
+    }
+  }
+  return options;
 }
 
 async function main() {

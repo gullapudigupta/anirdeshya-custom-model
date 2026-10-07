@@ -2219,6 +2219,90 @@ function initializeAIPanel() {
   // Load cost tracking from localStorage
   loadCostTracking();
   updateCostDisplay();
+  initializeSettingsPanel();
+}
+
+function initializeSettingsPanel() {
+  const dialog = document.getElementById('settingsDialog');
+  const settingsBtn = document.getElementById('settingsBtn');
+  const form = document.getElementById('settingsForm');
+  const provider = document.getElementById('aiSettingsProvider');
+  const keyInput = document.getElementById('aiSettingsApiKey');
+  const status = document.getElementById('settingsSaveStatus');
+  const credentialStatus = document.getElementById('aiCredentialStatus');
+  const apiBase = window.AQT_API_BASE || 'http://localhost:3000';
+
+  if (!dialog || !form || !settingsBtn) return;
+
+  settingsBtn.addEventListener('click', async () => {
+    status.textContent = '';
+    if (typeof dialog.showModal === 'function') dialog.showModal();
+    else dialog.setAttribute('open', '');
+    await loadSettings();
+  });
+  document.getElementById('settingsCloseBtn')?.addEventListener('click', () => dialog.close());
+  document.getElementById('settingsCancelBtn')?.addEventListener('click', () => dialog.close());
+
+  provider.addEventListener('change', () => {
+    const local = provider.value === 'ollama';
+    keyInput.disabled = local;
+    keyInput.placeholder = local ? 'Ollama does not require a key' : 'Enter a provider API key';
+    credentialStatus.textContent = local
+      ? 'Ollama runs locally; no cloud credential is used.'
+      : 'API keys supplied here remain in the running server process only.';
+  });
+
+  async function loadSettings() {
+    try {
+      const response = await fetch(`${apiBase}/api/ai/config`);
+      const body = await response.json();
+      if (!response.ok || !body.success) throw new Error(body.message || body.error || response.statusText);
+      const data = body.data;
+      provider.value = data.provider;
+      document.getElementById('aiSettingsModel').value = data.model || '';
+      document.getElementById('aiSettingsMaxCost').value = data.maxCost;
+      document.getElementById('aiSettingsMonthlyBudget').value = data.monthlyBudget;
+      document.getElementById('aiSettingsRateLimit').value = data.requestsPerMinute;
+      keyInput.value = '';
+      provider.dispatchEvent(new Event('change'));
+      credentialStatus.textContent = data.credentialsConfigured
+        ? `Provider credential status: configured via ${data.credentialsSource || 'server settings'}.`
+        : 'No provider credential is configured. Use an API key or configure the server environment.';
+    } catch (error) {
+      status.textContent = `Could not load settings: ${error.message}`;
+    }
+  }
+
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    status.textContent = 'Saving settings…';
+    const payload = {
+      provider: provider.value,
+      model: document.getElementById('aiSettingsModel').value.trim(),
+      maxCost: Number(document.getElementById('aiSettingsMaxCost').value),
+      monthlyBudget: Number(document.getElementById('aiSettingsMonthlyBudget').value),
+      requestsPerMinute: Number(document.getElementById('aiSettingsRateLimit').value)
+    };
+    if (keyInput.value) payload.apiKey = keyInput.value;
+
+    try {
+      const response = await fetch(`${apiBase}/api/ai/configure`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const body = await response.json();
+      if (!response.ok || !body.success) throw new Error(body.message || body.error || response.statusText);
+      keyInput.value = '';
+      document.getElementById('aiProvider').value = payload.provider;
+      status.textContent = 'Settings saved. API keys are not persisted to disk.';
+      credentialStatus.textContent = body.data.credentialsConfigured
+        ? 'Provider credential is configured for this server.'
+        : 'Provider credential is not configured.';
+    } catch (error) {
+      status.textContent = `Settings were not saved: ${error.message}`;
+    }
+  });
 }
 
 // Show AI Panel
@@ -2890,4 +2974,3 @@ if (document.readyState === 'loading') {
       }
       return rules;
     }
-
