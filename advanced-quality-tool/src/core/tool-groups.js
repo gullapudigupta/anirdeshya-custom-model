@@ -70,6 +70,8 @@ const TOOL_GROUPS = [
       'GET /api/agent/:id',
       'DELETE /api/agent/:id',
       'POST /api/agent/:id/approve',
+      'POST /api/agent/:id/pause',
+      'POST /api/agent/:id/resume',
       'GET /api/agent/:id/logs'
     ],
     mcpTools: [
@@ -90,6 +92,7 @@ const TOOL_GROUPS = [
       'POST /api/pipelines/:name/execute',
       'GET /api/pipelines/executions',
       'GET /api/pipelines/executions/:id',
+      'DELETE /api/pipelines/executions/:id',
       'POST /api/pipelines/executions/:id/replay'
     ],
     mcpTools: [

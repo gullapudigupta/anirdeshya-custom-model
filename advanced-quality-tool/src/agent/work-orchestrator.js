@@ -30,6 +30,8 @@ class WorkOrchestrator {
     // Concurrency control
     this.maxConcurrent = options.maxConcurrent || 3;
     this.activeWork = new Map();
+    this.pausedFrom = new Map();
+    this.pausePollMs = options.pausePollMs || 50;
     
     // Permissions
     this.permissionLimits = options.permissionLimits || {
@@ -164,6 +166,7 @@ class WorkOrchestrator {
   cancel(itemId) {
     const item = this.workItems.get(itemId);
     if (!item) return;
+    this.pausedFrom.delete(itemId);
 
     if (this.activeWork.has(itemId)) {
       // Cancel active work
@@ -178,6 +181,42 @@ class WorkOrchestrator {
       item.updateStatus(WorkItemStatus.CANCELLED, { reason: 'Cancelled before execution' });
       this._progress({ type: 'work-cancelled', item: item.getSummary() });
     }
+  }
+
+  /**
+   * Pause a queued or working item. Running work pauses at the next step boundary.
+   * @param {string} itemId
+   * @returns {{ paused: boolean, status: string|null, reason?: string }}
+   */
+  pause(itemId) {
+    const item = this.workItems.get(itemId);
+    if (!item) return { paused: false, status: null, reason: 'Work item not found' };
+    if (item.status === WorkItemStatus.PAUSED) return { paused: true, status: item.status };
+    if (![WorkItemStatus.QUEUED, WorkItemStatus.WORKING].includes(item.status)) {
+      return { paused: false, status: item.status, reason: `Cannot pause work in '${item.status}' state` };
+    }
+    this.pausedFrom.set(itemId, item.status);
+    item.updateStatus(WorkItemStatus.PAUSED, { resumeTo: item.status });
+    this._progress({ type: 'work-paused', item: item.getSummary() });
+    return { paused: true, status: item.status };
+  }
+
+  /**
+   * Resume a paused item.
+   * @param {string} itemId
+   * @returns {{ resumed: boolean, status: string|null, reason?: string }}
+   */
+  resume(itemId) {
+    const item = this.workItems.get(itemId);
+    if (!item) return { resumed: false, status: null, reason: 'Work item not found' };
+    if (item.status !== WorkItemStatus.PAUSED) {
+      return { resumed: false, status: item.status, reason: `Cannot resume work in '${item.status}' state` };
+    }
+    const resumeTo = this.pausedFrom.get(itemId) || WorkItemStatus.QUEUED;
+    this.pausedFrom.delete(itemId);
+    item.updateStatus(resumeTo, { resumedFrom: WorkItemStatus.PAUSED });
+    this._progress({ type: 'work-resumed', item: item.getSummary() });
+    return { resumed: true, status: item.status };
   }
 
   /**
@@ -215,6 +254,13 @@ class WorkOrchestrator {
   async _executeWorkItem(item, results) {
     const executeAsync = async () => {
       try {
+        await this._waitWhilePaused(item);
+        if (item.status === WorkItemStatus.CANCELLED) {
+          results.cancelled++;
+          results.items.push({ itemId: item.id, status: 'cancelled', reason: 'Cancelled before execution' });
+          return;
+        }
+
         this._progress({ type: 'work-start', item: item.getSummary() });
         item.updateStatus(WorkItemStatus.PLANNING);
 
@@ -262,6 +308,13 @@ class WorkOrchestrator {
         const output = await this._executeSteps(item, plan);
         item.setOutput(output);
 
+        if (item.status === WorkItemStatus.CANCELLED) {
+          results.cancelled++;
+          results.items.push({ itemId: item.id, status: 'cancelled', reason: 'Cancelled during execution', output });
+          this._progress({ type: 'work-cancelled', item: item.getSummary() });
+          return;
+        }
+
         // 5. Verify results
         item.updateStatus(WorkItemStatus.VERIFYING);
         const verificationResults = await this._verifyWork(item, plan);
@@ -304,6 +357,8 @@ class WorkOrchestrator {
     const output = { completedSteps: [], results: {} };
 
     for (const step of plan.steps) {
+      await this._waitWhilePaused(item);
+
       // Check for cancellation
       if (item.status === WorkItemStatus.CANCELLED) {
         break;
@@ -396,6 +451,7 @@ class WorkOrchestrator {
     for (const itemId of this.workQueue) {
       const item = this.workItems.get(itemId);
       if (!item) continue;
+      if (item.status === WorkItemStatus.PAUSED) continue;
       
       const readiness = item.checkReadiness(this.workItems);
       if (readiness.ready) {
@@ -412,6 +468,12 @@ class WorkOrchestrator {
     });
 
     return ready;
+  }
+
+  async _waitWhilePaused(item) {
+    while (item.status === WorkItemStatus.PAUSED) {
+      await new Promise(resolve => setTimeout(resolve, this.pausePollMs));
+    }
   }
 
   async _waitForActiveWork() {

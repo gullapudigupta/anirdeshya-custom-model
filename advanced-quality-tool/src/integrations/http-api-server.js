@@ -380,12 +380,15 @@ class HttpApiServer {
           'GET /api/agent/:id',
           'DELETE /api/agent/:id',
           'POST /api/agent/:id/approve',
+          'POST /api/agent/:id/pause',
+          'POST /api/agent/:id/resume',
           'GET /api/agent/:id/logs',
           'GET /api/pipelines',
           'GET /api/pipelines/:name',
           'POST /api/pipelines/:name/execute',
           'GET /api/pipelines/executions',
           'GET /api/pipelines/executions/:id',
+          'DELETE /api/pipelines/executions/:id',
           'POST /api/pipelines/executions/:id/replay',
           'POST /api/dashboard/configure',
           'POST /api/dashboard/record',
@@ -454,6 +457,8 @@ class HttpApiServer {
     this.app.get('/api/agent', this.handleAgentList.bind(this));
     this.app.delete('/api/agent/:id', this.handleAgentCancel.bind(this));
     this.app.post('/api/agent/:id/approve', this.handleAgentApprove.bind(this));
+    this.app.post('/api/agent/:id/pause', this.handleAgentPause.bind(this));
+    this.app.post('/api/agent/:id/resume', this.handleAgentResume.bind(this));
     this.app.get('/api/agent/:id/logs', this.handleAgentLogs.bind(this));
 
     // Pipeline System Endpoints (P11-T005)
@@ -461,6 +466,7 @@ class HttpApiServer {
     this.app.get('/api/pipelines/:name', this.handlePipelineInfo.bind(this));
     this.app.post('/api/pipelines/:name/execute', this.handlePipelineExecute.bind(this));
     this.app.get('/api/pipelines/executions/:id', this.handlePipelineStatus.bind(this));
+    this.app.delete('/api/pipelines/executions/:id', this.handlePipelineCancel.bind(this));
     this.app.post('/api/pipelines/executions/:id/replay', this.handlePipelineReplay.bind(this));
     this.app.get('/api/pipelines/executions', this.handlePipelineHistory.bind(this));
 
@@ -1621,6 +1627,47 @@ class HttpApiServer {
     }
   }
 
+  async handleAgentPause(req, res) {
+    return this._changeAgentPauseState(req, res, 'pause');
+  }
+
+  async handleAgentResume(req, res) {
+    return this._changeAgentPauseState(req, res, 'resume');
+  }
+
+  _changeAgentPauseState(req, res, action) {
+    try {
+      const { id } = req.params;
+      const stored = this.agentWorkStore.get(id);
+      if (!stored) {
+        return res.status(404).json({ error: 'Active work item not found' });
+      }
+
+      const outcome = action === 'pause'
+        ? stored.orchestrator.pause(id)
+        : stored.orchestrator.resume(id);
+      const changed = action === 'pause' ? outcome.paused : outcome.resumed;
+      if (!changed) {
+        return res.status(409).json({ error: outcome.reason, currentStatus: outcome.status });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          id,
+          status: outcome.status,
+          message: action === 'pause'
+            ? 'Work paused; running work stops at the next step boundary'
+            : 'Work resumed'
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error(`Agent ${action} error:`, error);
+      res.status(500).json({ error: `Failed to ${action} agent work`, message: error.message });
+    }
+  }
+
   async handleAgentLogs(req, res) {
     try {
       const { id } = req.params;
@@ -1765,9 +1812,13 @@ class HttpApiServer {
         taskId,
         workspace: workspacePath,
         stageHandlers: handlers,
-        onProgress: watch ? (event) => {
-          console.log(`[Pipeline] ${event.type}: ${event.runId}`);
-        } : null
+        onProgress: (event) => {
+          if (event.type === 'run-start') {
+            const entry = this.pipelineExecutors.get(runId);
+            if (entry) entry.executorRunId = event.runId;
+          }
+          if (watch) console.log(`[Pipeline] ${event.type}: ${event.runId}`);
+        }
       });
       
       // Wait for run to start and return immediately
@@ -1864,6 +1915,40 @@ class HttpApiServer {
         error: 'Failed to get pipeline status', 
         message: error.message 
       });
+    }
+  }
+
+  async handlePipelineCancel(req, res) {
+    try {
+      const { id } = req.params;
+      const stored = this.pipelineExecutors.get(id);
+      if (!stored) {
+        return res.status(404).json({ error: 'Active pipeline execution not found' });
+      }
+      if (stored.completed) {
+        return res.status(409).json({
+          error: 'Pipeline execution has already finished',
+          status: stored.result?.status || (stored.error ? 'failed' : 'completed')
+        });
+      }
+      if (!stored.executorRunId) {
+        return res.status(409).json({ error: 'Pipeline execution has not started yet' });
+      }
+
+      stored.executor.cancel(stored.executorRunId);
+      stored.cancelRequested = new Date().toISOString();
+      res.json({
+        success: true,
+        data: {
+          runId: id,
+          status: 'cancelling',
+          message: 'Cancellation requested; the run stops before its next stage'
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Pipeline cancel error:', error);
+      res.status(500).json({ error: 'Failed to cancel pipeline execution', message: error.message });
     }
   }
 

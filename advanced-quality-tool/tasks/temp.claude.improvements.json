@@ -1,0 +1,201 @@
+{
+  "title": "AQT improvement work tracker",
+  "updatedOn": "2026-10-07",
+  "statusLegend": {
+    "done": "Implemented and verified",
+    "implemented-unverified": "Code written; tests not yet confirmed passing",
+    "in_progress": "Partially implemented",
+    "pending": "Not started",
+    "blocked": "Needs access, people, or decisions outside the repository"
+  },
+  "verificationNote": "The full test run after the latest changes (expanded test discovery and the new tests) was moved to the background and its result has not been reviewed yet. Nothing that depends on that run is marked done.",
+  "workstreams": [
+    {
+      "id": "stabilize-tests-task-data",
+      "title": "Stabilize tests and task data",
+      "status": "done",
+      "summary": "Fixed the test harness (sequential runs, per-file hooks), pipeline/diff/CLI bugs, and malformed task JSON; reconciled task rollups. Suite reached 382 passing, 0 failing."
+    },
+    {
+      "id": "close-validation-gaps",
+      "title": "Close behavior and validation gaps",
+      "status": "done",
+      "summary": "Added TypeScript compiler-backed validation, honest scaffold/empty code-generation results, and working UI history/detail/replay-preview/export."
+    },
+    {
+      "id": "improve-ci-language-confidence",
+      "title": "Improve CI adoption and language confidence",
+      "status": "done",
+      "summary": "Node >=20, committed lockfile, CI matrix (Node 20/22/24 on Ubuntu/Windows/macOS), Clippy and PHPCS parser fixes, explicit errors for missing analyzer tools, language support documentation."
+    },
+    {
+      "id": "complete-uat-release-readiness",
+      "title": "Complete UAT and release readiness",
+      "status": "blocked",
+      "summary": "Release checklist and UAT plan written.",
+      "blockedOn": [
+        "Hosted CI matrix results",
+        "npm audit triage",
+        "Authorized beta/release decision and credentials",
+        "External UAT testers and sign-off",
+        "Hosting and monitoring access"
+      ]
+    },
+    {
+      "id": "tool-groups",
+      "title": "Group capabilities across CLI, HTTP API, and MCP",
+      "status": "done",
+      "summary": "Added the shared capability catalog, `aqt tools`, GET /api/capabilities[/:group], and the aqt_tools_list MCP tool; wired `aqt agent` and `aqt pipeline` into the main CLI. Suite reached 393 passing, 0 failing."
+    },
+    {
+      "id": "autonomy-roadmap",
+      "title": "Plan Level 2 and Level 3 autonomous code generation",
+      "status": "done",
+      "summary": "Created phase12-tasks.json (Level 2, 12 tasks) and phase13-tasks.json (Level 3, 12 tasks); cross-checked Phase 12 (fixed dependency ordering, added reuse mapping and tool-registry hardening) and revised its estimate from 188 to 138 hours."
+    },
+    {
+      "id": "fix-false-completions",
+      "title": "Fix tasks marked complete whose claims did not match the code",
+      "status": "implemented-unverified",
+      "items": [
+        {
+          "task": "P11-T004 / P11-T019",
+          "change": "Added POST /api/agent/:id/pause and /resume, backed by new WorkOrchestrator.pause()/resume() and a PAUSED work-item status; running work pauses at the next step boundary. The UI now reports refused pause/resume requests.",
+          "status": "implemented-unverified"
+        },
+        {
+          "task": "Orchestrator bug (found while fixing P11-T004)",
+          "change": "Cancelled work was still verified and marked completed; it is now reported as cancelled.",
+          "status": "implemented-unverified"
+        },
+        {
+          "task": "P11-T005",
+          "change": "Added DELETE /api/pipelines/executions/:id; maps the API run ID to the executor's run ID and stops the run before its next stage.",
+          "status": "implemented-unverified"
+        },
+        {
+          "task": "P11-T056",
+          "change": "Added the four example plugins (custom-analyzer, custom-reporter, slack-notification, custom-fix-strategy) and examples/plugins/README.md. The Slack example prepares a payload only, because plugins have no network access.",
+          "status": "implemented-unverified"
+        },
+        {
+          "task": "Existing no-todo-rule example and plugin guide",
+          "change": "Fixed the rule's check signature to (filePath, ast, context); it previously searched the file path for TODO.",
+          "status": "implemented-unverified"
+        },
+        {
+          "task": "API documentation",
+          "change": "Updated openapi.yaml, /api/info, and the capability catalog for the three new endpoints.",
+          "status": "done"
+        },
+        {
+          "task": "Regression tests",
+          "change": "Added test/__tests__/agent-pipeline-controls.test.js and test/__tests__/example-plugins.test.js.",
+          "status": "implemented-unverified"
+        },
+        {
+          "task": "Task records",
+          "change": "Update P11-T004, P11-T005, P11-T019, and P11-T056 notes to reflect the actual implementation.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "unify-test-runner",
+      "title": "Run every test suite through npm test and CI",
+      "status": "in_progress",
+      "items": [
+        {
+          "change": "test/run.js now discovers *.test.js under test/, tests/, and src/**/__tests__ (fixtures are excluded).",
+          "status": "implemented-unverified"
+        },
+        {
+          "change": "Harness gained beforeAll/afterAll, toMatchObject, toHaveBeenCalled, and toHaveBeenCalledWith; mockReturnValue now configures the mock instead of returning a new function.",
+          "status": "implemented-unverified"
+        },
+        {
+          "change": "Removed require('@jest/globals') from six suites; the harness supplies the same globals.",
+          "status": "implemented-unverified"
+        },
+        {
+          "change": "Added jsdom and supertest as devDependencies (jsdom requires Node ^20.19, ^22.13, or >=24).",
+          "status": "done"
+        },
+        {
+          "change": "tests/ai-generator/generator.test.js registers with the shared runner and still runs standalone.",
+          "status": "implemented-unverified"
+        },
+        {
+          "change": "Fix the 7 failing standalone-cli tests (argument parsing; model-required exit code returns 1 instead of 3).",
+          "status": "pending"
+        },
+        {
+          "change": "Fix any further failures exposed by the newly included suites.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "fix-task-data-drift",
+      "title": "Fix task data drift",
+      "status": "pending",
+      "items": [
+        { "change": "Correct phase header hours: phase1 160->216, phase4 200->480, phase5 120->124, phase9 740->778, phase11 918->562 (and its estimatedCosts breakdown)", "status": "pending" },
+        { "change": "Correct the phase10 summary totalEstimatedHours from 77 to 79", "status": "pending" },
+        { "change": "Remove P11-T048's obsolete dependency on pending P11-T046 (analytics is local-only)", "status": "pending" },
+        { "change": "Fix stale artifact paths: docs/guides/AI_ISSUE_GENERATOR.md, examples/ai-generator-config.json, docs/standards/METADATA_STANDARD.md, docs/PLUGIN-DEVELOPMENT.md, phase6 documentation field, P11-T041 migration guide, P11-T076/T077 README paths", "status": "pending" },
+        { "change": "Fix master index references: active-session-notes.md, PROGRESS_SUMMARY.md, TASKS.json -> TASKS_archive.json, tools/... support-doc paths", "status": "pending" },
+        { "change": "Update bug and change-request index rules that still reference phase1-phase9 only", "status": "pending" },
+        { "change": "Add a task-data validation test to npm test (headers, rollups, paths, dependencies)", "status": "pending" }
+      ]
+    },
+    {
+      "id": "normalize-task-schema",
+      "title": "Normalize task schema",
+      "status": "pending",
+      "items": [
+        { "change": "Convert phase1-5 tasks from {completed, pending} groups to a flat array", "status": "pending" },
+        { "change": "Add statusSummary to phases 1-5 and 10", "status": "pending" },
+        { "change": "Record completedDate provenance for the 78 completed tasks without one (no invented dates)", "status": "pending" },
+        { "change": "Add acceptanceCriteria to the six open Phase 11 tasks (P11-T042 to P11-T047)", "status": "pending" },
+        { "change": "Add ARCHIVED and BLOCKED to the status legend; mark the six operator-dependent Phase 11 tasks BLOCKED", "status": "pending" },
+        { "change": "Phase 13 reuse mapping and hour revision (estimated 10-15 hours saved)", "status": "pending" }
+      ]
+    }
+  ],
+  "otherObservations": [
+    "Another session ('complete these taks', fa982751, now idle) created untracked src/agent/contracts.js and src/agent/workspace-context.js; they are recorded as partial P12-T001/P12-T004 work and were not modified.",
+    "The plugin system does not invoke hooks or custom rules from analyze/report/fix; hooks currently run only via the aqt_plugin_execute_hook MCP tool."
+  ],
+  "handoff": {
+    "projectRoot": "advanced-quality-tool (git root is its parent folder; branch develop; nothing committed)",
+    "environment": "Windows, Node 24.11.0, PowerShell (no && operator). Test runner is the zero-dependency harness: npm test -> node test/run.js",
+    "lastTestRun": "Full npm test was started after the latest changes but its result was not reviewed. Re-run npm test first; the previous verified baseline (before expanded discovery) was 393 passed, 0 failed.",
+    "filesChangedInCurrentWorkstreams": [
+      "src/agent/work-item.js (PAUSED status)",
+      "src/agent/work-orchestrator.js (pause/resume, cancelled work no longer completes, paused items skipped by scheduler)",
+      "src/integrations/http-api-server.js (agent pause/resume and pipeline cancel handlers and routes, /api/info list)",
+      "src/core/tool-groups.js (new endpoints in agents/pipelines groups)",
+      "src/ui/chat-ui.js (pause/resume error reporting)",
+      "docs/openapi.yaml, docs/PLUGIN-DEVELOPMENT.md",
+      "examples/plugins/custom-analyzer-plugin.js, custom-reporter-plugin.js, slack-notification-plugin.js, custom-fix-strategy-plugin.js, README.md (new); no-todo-rule/index.js (signature fix)",
+      "test/harness.js, test/run.js",
+      "test/__tests__/agent-pipeline-controls.test.js, test/__tests__/example-plugins.test.js (new)",
+      "tests/ai-generator/generator.test.js (registers with shared runner)",
+      "src/commands/__tests__/security-command.test.js, src/integrations/__tests__/{agent-mcp-tools,pipeline-security-mcp-tools,security-api}.test.js, src/ui/__tests__/{issue-filtering,search-functionality}.test.js (removed @jest/globals import)",
+      "package.json, package-lock.json (jsdom, supertest devDependencies)"
+    ],
+    "nextSteps": [
+      "1. Run npm test; fix failures in the newly included suites, starting with src/commands/__tests__/standalone-cli.test.js (7 known failures). Determine whether each failure is a product bug or an outdated test before changing either.",
+      "2. Mark fix-false-completions and unify-test-runner items done only after npm test passes; then update P11-T004, P11-T005, P11-T019, and P11-T056 notes in tasks/phase11-tasks.json.",
+      "3. Complete fix-task-data-drift items, then add a task-data validation test so header hours, rollups, paths, and dependencies cannot drift again.",
+      "4. Complete normalize-task-schema items. Do not invent completion dates; record provenance instead. Keep master_tasks_index.json and meta.json rollups reconciled with task records after every change.",
+      "5. Update this file's statuses as work completes."
+    ],
+    "cautions": [
+      "Do not mark operator-dependent Phase 11 tasks (P11-T042 to P11-T047) complete.",
+      "Do not modify or delete the other session's untracked src/agent/contracts.js and src/agent/workspace-context.js without the user's decision.",
+      "test/fixtures/diff-review-test and test/fixtures/streaming-test show as modified only because of line endings; their content is unchanged."
+    ]
+  }
+}

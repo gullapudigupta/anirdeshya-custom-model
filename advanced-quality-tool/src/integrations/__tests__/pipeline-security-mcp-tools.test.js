@@ -4,7 +4,6 @@
 
 'use strict';
 
-const { describe, test, expect, beforeAll, afterAll } = require('@jest/globals');
 const { MCPServer } = require('../mcp-server');
 
 describe('Pipeline and Security MCP Tools (P11-T008 & P11-T009)', () => {

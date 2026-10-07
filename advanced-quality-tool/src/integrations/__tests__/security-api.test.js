@@ -4,7 +4,6 @@
 
 'use strict';
 
-const { describe, test, expect, beforeAll, afterAll } = require('@jest/globals');
 const { HttpApiServer } = require('../http-api-server');
 const request = require('supertest');
 const path = require('path');

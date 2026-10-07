@@ -15,9 +15,14 @@ const results = { passed: 0, failed: 0, failures: [] };
 const suiteStack = [];
 const beforeEachStack = [];
 const afterEachStack = [];
+const scopeStack = [];
 const fileHooks = new Map();
 const tests = [];
 let currentFile = null;
+
+function createScope(name) {
+  return { name, beforeAll: [], afterAll: [], remaining: 0, started: false, setupError: null };
+}
 
 function currentName(name) {
   return [...suiteStack, name].join(' › ');
@@ -27,13 +32,30 @@ function describe(name, fn) {
   suiteStack.push(name);
   beforeEachStack.push([]);
   afterEachStack.push([]);
+  scopeStack.push(createScope(name));
   try {
     fn();
   } finally {
     suiteStack.pop();
     beforeEachStack.pop();
     afterEachStack.pop();
+    scopeStack.pop();
   }
+}
+
+function currentScope() {
+  if (scopeStack.length) return scopeStack[scopeStack.length - 1];
+  return currentFile ? fileHooks.get(currentFile).scope : null;
+}
+
+function beforeAll(fn) {
+  const scope = currentScope();
+  if (scope) scope.beforeAll.push(fn);
+}
+
+function afterAll(fn) {
+  const scope = currentScope();
+  if (scope) scope.afterAll.push(fn);
 }
 
 function beforeEach(fn) {
@@ -53,8 +75,9 @@ function setCurrentFile(file) {
   suiteStack.length = 0;
   beforeEachStack.length = 0;
   afterEachStack.length = 0;
+  scopeStack.length = 0;
   if (!fileHooks.has(file)) {
-    fileHooks.set(file, { beforeEach: [], afterEach: [] });
+    fileHooks.set(file, { beforeEach: [], afterEach: [], scope: createScope(file) });
   }
 }
 
@@ -85,10 +108,13 @@ function runWithOptionalDone(fn) {
 
 function test(name, fn) {
   const label = currentName(name);
-  const hooks = currentFile ? fileHooks.get(currentFile) : { beforeEach: [], afterEach: [] };
+  const hooks = currentFile ? fileHooks.get(currentFile) : { beforeEach: [], afterEach: [], scope: null };
+  const scopes = [hooks.scope, ...scopeStack].filter(Boolean);
+  scopes.forEach(scope => { scope.remaining++; });
   tests.push({
     label,
     fn,
+    scopes,
     beforeEach: [...hooks.beforeEach, ...beforeEachStack.flatMap((level) => level)],
     afterEach: [
       ...afterEachStack.slice().reverse().flatMap((level) => level.slice().reverse()),
@@ -97,10 +123,41 @@ function test(name, fn) {
   });
 }
 
+async function startScopes(scopes) {
+  for (const scope of scopes) {
+    if (scope.setupError) throw scope.setupError;
+    if (scope.started) continue;
+    scope.started = true;
+    try {
+      for (const hook of scope.beforeAll) await runWithOptionalDone(hook);
+    } catch (error) {
+      scope.setupError = new Error(`beforeAll failed: ${error.message}`);
+      throw scope.setupError;
+    }
+  }
+}
+
+async function finishScopes(scopes) {
+  let failure;
+  for (const scope of scopes.slice().reverse()) {
+    scope.remaining--;
+    if (scope.remaining > 0 || !scope.started) continue;
+    for (const hook of scope.afterAll.slice().reverse()) {
+      try {
+        await runWithOptionalDone(hook);
+      } catch (error) {
+        failure ||= new Error(`afterAll failed: ${error.message}`);
+      }
+    }
+  }
+  if (failure) throw failure;
+}
+
 async function runTests() {
   for (const registeredTest of tests) {
     let failure;
     try {
+      await startScopes(registeredTest.scopes);
       for (const hook of registeredTest.beforeEach) await hook();
       await runWithOptionalDone(registeredTest.fn);
     } catch (error) {
@@ -112,6 +169,11 @@ async function runTests() {
       } catch (error) {
         failure ||= error;
       }
+    }
+    try {
+      await finishScopes(registeredTest.scopes);
+    } catch (error) {
+      failure ||= error;
     }
     if (failure) {
       results.failed++;
@@ -134,6 +196,33 @@ function fmt(v) {
   }
 }
 
+function deepEqual(a, b) {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  return keysA.every(key => Object.prototype.hasOwnProperty.call(b, key) && deepEqual(a[key], b[key]));
+}
+
+function matchesObject(actual, expected) {
+  if (expected === null || typeof expected !== 'object') return Object.is(actual, expected);
+  if (actual === null || typeof actual !== 'object') return false;
+  if (Array.isArray(expected)) {
+    return Array.isArray(actual) && actual.length === expected.length &&
+      expected.every((value, index) => matchesObject(actual[index], value));
+  }
+  return Object.keys(expected).every(key => matchesObject(actual[key], expected[key]));
+}
+
+function mockCalls(fn) {
+  if (!fn || !fn.mock || !Array.isArray(fn.mock.calls)) {
+    throw new Error('expected a mock function created by jest.fn() or jest.spyOn()');
+  }
+  return fn.mock.calls;
+}
+
 function makeExpect(actual, negated = false) {
   const assert = (pass, msg) => {
     const ok = negated ? !pass : pass;
@@ -148,6 +237,17 @@ function makeExpect(actual, negated = false) {
     },
     toEqual(expected) {
       assert(JSON.stringify(actual) === JSON.stringify(expected), `expected ${fmt(actual)} ${negated ? 'not ' : ''}to equal ${fmt(expected)}`);
+    },
+    toMatchObject(expected) {
+      assert(matchesObject(actual, expected), `expected ${fmt(actual)} ${negated ? 'not ' : ''}to match object ${fmt(expected)}`);
+    },
+    toHaveBeenCalled() {
+      assert(mockCalls(actual).length > 0, `expected mock ${negated ? 'not ' : ''}to have been called`);
+    },
+    toHaveBeenCalledWith(...expectedArgs) {
+      const calls = mockCalls(actual);
+      assert(calls.some(args => deepEqual(args, expectedArgs)),
+        `expected mock ${negated ? 'not ' : ''}to have been called with ${fmt(expectedArgs)}; calls: ${fmt(calls)}`);
     },
     toMatch(re) {
       const rx = re instanceof RegExp ? re : new RegExp(re);
@@ -242,7 +342,10 @@ function jestFn(impl) {
     return impl ? impl(...args) : undefined;
   };
   mockFn.mock = { calls: [] };
-  mockFn.mockReturnValue = (v) => jestFn(() => v);
+  mockFn.mockReturnValue = (v) => {
+    impl = () => v;
+    return mockFn;
+  };
   mockFn.mockImplementation = (f) => {
     impl = f;
     return mockFn;
@@ -274,6 +377,8 @@ global.test = test;
 global.it = test;
 global.beforeEach = beforeEach;
 global.afterEach = afterEach;
+global.beforeAll = beforeAll;
+global.afterAll = afterAll;
 global.expect = expect;
 
 module.exports = { results, runTests, setCurrentFile };

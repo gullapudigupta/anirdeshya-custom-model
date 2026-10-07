@@ -191,7 +191,7 @@
       "name": "Level 2 Supervised Autonomous Code-Generation Agent",
       "priority": "CRITICAL",
       "status": "PLANNED",
-      "estimatedHours": 188,
+      "estimatedHours": 138,
       "taskCount": 12,
       "statusSummary": { "completed": 0, "in_progress": 0, "pending": 12 },
       "reconciledOn": "2026-10-07",
@@ -267,7 +267,7 @@
       "in_progress": 0,
       "pending": 30
     },
-    "totalEstimatedHours": 3445,
+    "totalEstimatedHours": 3395,
     "completionPercentage": "88.4%",
     "calculatedOn": "2026-10-07",
     "note": "Computed from task records in all phase files. Phase 12 delivers supervised Level 2 autonomy; Phase 13 extends it to policy-bounded Level 3. Archived tasks are included in totalTasks but excluded from the completion percentage denominator."

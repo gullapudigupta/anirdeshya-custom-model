@@ -27,11 +27,20 @@ module.exports = class SampleRulePlugin {
       id: 'no-todo-marker',
       name: 'Avoid TODO markers',
       severity: 'low',
-      check: (source) => source.includes('TODO')
+      // Rules receive (filePath, ast, context).
+      check: (filePath, ast, context = {}) => {
+        const source = typeof context.source === 'string' ? context.source : this.api.fs.readFile(filePath);
+        return source.includes('TODO')
+          ? { file: filePath, severity: 'low', message: 'TODO marker found' }
+          : null;
+      }
     });
   }
 };
 ```
+
+A plugin can also be a single `.js` file whose manifest is a `/* @plugin { ... } */`
+comment at the top; see the single-file examples below.
 
 The plugin API includes `registerRule`, `registerHook`, `log`, a read-only
 `fs.readFile`, and restricted path helpers. Only `path` and `crypto` are
@@ -39,4 +48,6 @@ available through `require`. Do not treat VM isolation as a security boundary:
 only install reviewed plugins. Lifecycle can be managed using `aqt plugin list`,
 `aqt plugin disable <id>`, and `aqt plugin enable <id>`.
 
-Runnable examples are in [`examples/plugins/`](../examples/plugins/).
+Runnable examples are in [`examples/plugins/`](../examples/plugins/); see its
+[README](../examples/plugins/README.md) for what each example demonstrates and
+how its hooks are invoked.

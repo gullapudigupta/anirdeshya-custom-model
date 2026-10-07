@@ -4,7 +4,6 @@
 
 'use strict';
 
-const { describe, test, expect, beforeAll, afterAll } = require('@jest/globals');
 const securityCommand = require('../security-command');
 const path = require('path');
 const fs = require('fs');

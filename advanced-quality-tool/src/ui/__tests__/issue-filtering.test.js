@@ -4,7 +4,6 @@
 
 'use strict';
 
-const { describe, test, expect, beforeEach } = require('@jest/globals');
 const { JSDOM } = require('jsdom');
 const fs = require('fs');
 const path = require('path');

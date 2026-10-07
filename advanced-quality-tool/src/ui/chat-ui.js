@@ -1110,6 +1110,9 @@
         if (response.ok) {
           addAssistantMessage('⏸️ Agent paused');
           showAgentDetails(agentPanelState.selectedAgent.id);
+        } else {
+          const body = await response.json().catch(() => ({}));
+          addAssistantMessage(`❌ Could not pause agent: ${body.error || response.statusText}`);
         }
       } catch (error) {
         console.error('Failed to pause agent:', error);
@@ -1127,6 +1130,9 @@
         if (response.ok) {
           addAssistantMessage('▶️ Agent resumed');
           showAgentDetails(agentPanelState.selectedAgent.id);
+        } else {
+          const body = await response.json().catch(() => ({}));
+          addAssistantMessage(`❌ Could not resume agent: ${body.error || response.statusText}`);
         }
       } catch (error) {
         console.error('Failed to resume agent:', error);

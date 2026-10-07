@@ -24,7 +24,7 @@ function ok(label, cond) { assert.ok(cond, label); console.log('✓', label); pa
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aqt-aigen-'));
 
 // ── Search adapters (T003–T005) ────────────────────────────────────────────────
-(async () => {
+async function runSuite() {
   const issue = { rule: 'semi', message: 'Missing semicolon', category: 'STYLE' };
 
   const docs = await new DocSearcher({ rootDir: tmp }).search(issue);
@@ -128,4 +128,11 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aqt-aigen-'));
   // cleanup
   try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
   console.log(`\nAll ${passed} AI-generator tests passed.`);
-})().catch((err) => { console.error('\n✗ TEST FAILED:', err.message); process.exit(1); });
+}
+
+// Register with the shared test runner when loaded by it; otherwise run standalone.
+if (typeof global.test === 'function') {
+  global.test('AI issue generator network-free suite (Phase 6)', runSuite);
+} else {
+  runSuite().catch((err) => { console.error('\n✗ TEST FAILED:', err.message); process.exit(1); });
+}

@@ -21,7 +21,8 @@ const WorkItemStatus = {
   COMPLETED: 'completed',
   FAILED: 'failed',
   CANCELLED: 'cancelled',
-  BLOCKED: 'blocked'
+  BLOCKED: 'blocked',
+  PAUSED: 'paused'
 };
 
 /**

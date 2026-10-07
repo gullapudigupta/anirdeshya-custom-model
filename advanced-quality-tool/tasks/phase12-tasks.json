@@ -2,7 +2,7 @@
   "phase": "phase12",
   "name": "Level 2 Supervised Autonomous Code-Generation Agent",
   "priority": "CRITICAL",
-  "estimatedHours": 188,
+  "estimatedHours": 138,
   "status": "PLANNED",
   "completionPercentage": "0%",
   "statusSummary": {
@@ -20,7 +20,27 @@
       "No reporting scaffold output or simulated verification as a successful implementation",
       "No execution of commands or tools outside configured workspace and policy limits"
     ],
-    "prerequisiteAssessment": "Builds on the existing WorkOrchestrator, AgentPlanner, ToolRegistry, CodeGenerator, verification-repair loop, API, CLI, and MCP integrations; replace current stubbed execution and verification paths with tested behavior."
+    "prerequisiteAssessment": "Builds on the existing WorkOrchestrator, AgentPlanner, ToolRegistry, CodeGenerator, verification-repair loop, API, CLI, and MCP integrations; replace current stubbed execution and verification paths with tested behavior.",
+    "existingModulesToReuse": {
+      "src/agent/contracts.js": "Untracked partial implementation of P12-T001 (task/plan/completion validation); not yet wired or tested",
+      "src/agent/workspace-context.js": "Untracked partial implementation of P12-T004 (bounded, hashed, workspace-contained context); not yet wired or tested",
+      "src/agent/diff-review-system.js": "Atomic writes, backups, and stale-source detection for P12-T006",
+      "src/agent/permissions.js": "PermissionManager approval modes, protected paths, and dangerous-command rules for P12-T007",
+      "src/agent/verification-repair-loop.js": "Verification result states and repair loop for P12-T008 and P12-T009",
+      "src/agent/privacy-cost-controls.js": "BudgetManager and PrivacyManager for cost caps and redaction in P12-T002, P12-T009, and P12-T010",
+      "src/agent/provider-model-selector.js": "Provider and model selection for P12-T002",
+      "src/agent/streaming-conversation.js": "CancellationController and SessionPersistence for P12-T002 and P12-T010",
+      "src/agent/acceptance-workflow.js": "Acceptance-criteria verification for P12-T001 and P12-T012",
+      "src/agent/requirement-traceability.js": "Requirement-to-change traceability for P12-T010 and P12-T012"
+    },
+    "crossCheckedOn": "2026-10-07",
+    "estimateRevision": {
+      "revisedOn": "2026-10-07",
+      "previousEstimatedHours": 188,
+      "revisedEstimatedHours": 138,
+      "reason": "Reduced by 50 hours to account for reusing existing agent modules (contracts.js, workspace-context.js, diff-review-system.js, permissions.js, verification-repair-loop.js, privacy-cost-controls.js, provider-model-selector.js, streaming-conversation.js). Savings are limited because most of these modules have no tests yet; P12-T003 is unchanged because its added tool-hardening scope offsets reuse savings."
+    },
+    "crossCheckNote": "WorkOrchestrator currently uses none of the reuse modules above; its _checkPermissions, _executeStep, and _verifyWork are independent simplified or stubbed paths. ToolRegistry exposes execute_command (arbitrary shell via exec), has no hash-guarded edit tool, and get_diagnostics is a stub."
   },
   "tasks": [
     {
@@ -28,20 +48,24 @@
       "name": "Define Level 2 task and execution contracts",
       "status": "PENDING",
       "priority": "CRITICAL",
-      "estimatedHours": 12,
+      "estimatedHours": 6,
       "value": 100,
       "dependencies": [],
       "deliverables": [
         "Define versioned task input, acceptance-criteria, plan, patch, verification, approval, and final-result schemas",
         "Define terminal statuses that distinguish completed, incomplete, blocked, denied, and failed work",
         "Specify fail-closed behavior for missing context, invalid plans, unavailable checks, and malformed model output",
-        "Document the Level 2 boundary: scoped implementation with human review, not autonomous merge or deployment"
+        "Document the Level 2 boundary: scoped implementation with human review, not autonomous merge or deployment",
+        "Use one verification status vocabulary across contracts.js and verification-repair-loop.js"
       ],
       "acceptanceCriteria": [
         "Schemas reject missing task descriptions and invalid acceptance criteria",
         "Result states cannot mark unverified or scaffold-only output as completed",
-        "Contract fixtures cover valid, invalid, blocked, and failed cases"
+        "Contract fixtures cover valid, invalid, blocked, and failed cases",
+        "A real passing VerificationRepairLoop result satisfies validateCompletion"
       ],
+      "reuses": ["src/agent/contracts.js", "src/agent/acceptance-workflow.js"],
+      "notes": "Partially started: src/agent/contracts.js exists (untracked, created by another session) but is not wired or tested. validateCompletion requires check status 'passed' while VerificationRepairLoop emits 'pass', so no real result can currently complete.",
       "tags": ["agent", "level-2", "contracts", "safety"]
     },
     {
@@ -49,7 +73,7 @@
       "name": "Implement real model-backed agent step execution",
       "status": "PENDING",
       "priority": "CRITICAL",
-      "estimatedHours": 20,
+      "estimatedHours": 15,
       "value": 100,
       "dependencies": ["P12-T001"],
       "deliverables": [
@@ -63,6 +87,7 @@
         "No model provider is invoked unless explicitly configured",
         "Execution failures never produce success-shaped step results"
       ],
+      "reuses": ["src/agent/provider-model-selector.js", "src/agent/privacy-cost-controls.js", "src/agent/streaming-conversation.js"],
       "tags": ["agent", "execution", "model", "level-2"]
     },
     {
@@ -77,21 +102,27 @@
         "Inject ToolRegistry into the execution context and expose only registered tools",
         "Make tool schemas and outputs available to the model executor",
         "Record tool name, validated arguments, result status, duration, and bounded output in the work log",
-        "Enforce per-task tool-call and output budgets"
+        "Enforce per-task tool-call and output budgets",
+        "Do not expose execute_command to the model; replace it with an allowlisted check runner that takes check IDs, not shell text",
+        "Add a hash-guarded edit tool that rejects edits when the file changed since it was read",
+        "Replace the get_diagnostics stub with real linter diagnostics, or mark the tool unavailable"
       ],
       "acceptanceCriteria": [
         "Agent execution can perform read/search/edit/check operations only through registered tools",
         "Unknown tools, invalid arguments, budget exhaustion, and tool failures are explicit",
-        "Tool execution logs are correlated with task and plan-step IDs"
+        "Tool execution logs are correlated with task and plan-step IDs",
+        "No agent-reachable tool executes arbitrary model-supplied shell text",
+        "get_diagnostics never reports zero issues when diagnostics were not actually collected"
       ],
-      "tags": ["agent", "tools", "tool-registry", "level-2"]
+      "reuses": ["src/agent/tool-registry.js", "src/agent/permissions.js"],
+      "tags": ["agent", "tools", "tool-registry", "security", "level-2"]
     },
     {
       "id": "P12-T004",
       "name": "Build bounded repository context for coding tasks",
       "status": "PENDING",
       "priority": "HIGH",
-      "estimatedHours": 16,
+      "estimatedHours": 8,
       "value": 90,
       "dependencies": ["P12-T001"],
       "deliverables": [
@@ -105,6 +136,8 @@
         "Absolute paths outside the workspace are rejected",
         "Context provenance is available in the task result"
       ],
+      "reuses": ["src/agent/workspace-context.js", "src/agent/scope-analyzer.js"],
+      "notes": "Partially started: src/agent/workspace-context.js exists (untracked, created by another session) with workspace containment, symlink checks, byte limits, and SHA-256 hashes, but it is not wired or tested. Token budgets and search-based discovery are still missing.",
       "tags": ["agent", "context", "workspace", "level-2"]
     },
     {
@@ -112,7 +145,7 @@
       "name": "Generate and validate actionable execution plans",
       "status": "PENDING",
       "priority": "HIGH",
-      "estimatedHours": 12,
+      "estimatedHours": 9,
       "value": 90,
       "dependencies": ["P12-T004"],
       "deliverables": [
@@ -133,11 +166,12 @@
       "name": "Generate and apply reviewable workspace patches",
       "status": "PENDING",
       "priority": "CRITICAL",
-      "estimatedHours": 20,
+      "estimatedHours": 14,
       "value": 100,
-      "dependencies": ["P12-T002", "P12-T003", "P12-T004"],
+      "dependencies": ["P12-T002", "P12-T003", "P12-T004", "P12-T005", "P12-T007"],
       "deliverables": [
         "Replace CodeGenerator scaffold patches with model-generated structured create, modify, and delete operations",
+        "Apply patches through DiffReviewSystem rather than a new write path, extending it with content-hash expectations",
         "Validate patch paths, content hashes, expected original content, and changed-file limits before applying",
         "Produce a unified diff and per-file summary before approval or application",
         "Reject empty, scaffold-only, malformed, conflicting, or stale patches"
@@ -146,8 +180,10 @@
         "Patch application is workspace-contained and rejects traversal and symlink escape attempts",
         "A stale source file causes a conflict result without overwriting user edits",
         "No patch is reported as implemented until the intended content is actually present",
-        "Patch generation and application have isolated temporary-workspace tests"
+        "Patch generation and application have isolated temporary-workspace tests",
+        "No patch is applied unless it belongs to an approved plan and passes the approval gate"
       ],
+      "reuses": ["src/agent/code-generator.js", "src/agent/diff-review-system.js"],
       "tags": ["agent", "code-generation", "patches", "level-2"]
     },
     {
@@ -155,10 +191,11 @@
       "name": "Enforce action-level permissions and approval gates",
       "status": "PENDING",
       "priority": "CRITICAL",
-      "estimatedHours": 16,
+      "estimatedHours": 11,
       "value": 100,
       "dependencies": ["P12-T005"],
       "deliverables": [
+        "Replace WorkOrchestrator._checkPermissions with PermissionManager enforcement",
         "Apply permission policy to each tool call and patch operation, not only to the initial plan",
         "Require explicit approval for destructive edits, dependency changes, broad scope, and configured high-risk actions",
         "Bind approval to the plan and patch digest and invalidate it if either changes",
@@ -169,6 +206,7 @@
         "Any change to an approved plan or patch requires renewed approval",
         "Policy decisions are auditable and tested against adversarial requests"
       ],
+      "reuses": ["src/agent/permissions.js"],
       "tags": ["agent", "permissions", "approval", "level-2"]
     },
     {
@@ -176,14 +214,14 @@
       "name": "Run real verification checks and report evidence",
       "status": "PENDING",
       "priority": "CRITICAL",
-      "estimatedHours": 20,
+      "estimatedHours": 16,
       "value": 100,
       "dependencies": ["P12-T006"],
       "deliverables": [
         "Replace WorkOrchestrator._verifyWork stub with real configured test, lint, type-check, and build command execution",
         "Run commands with bounded timeout, output size, environment, and workspace scope",
         "Capture command, exit code, duration, and sanitized bounded output for each check",
-        "Distinguish passed, failed, skipped, unavailable, and timed-out checks"
+        "Distinguish passed, failed, skipped, unavailable, errored, and timed-out checks, extending VerificationRepairLoop states with a timeout state"
       ],
       "acceptanceCriteria": [
         "A failed required check prevents task completion",
@@ -191,6 +229,7 @@
         "No check executes an implicit shell command supplied by model text",
         "Verification evidence is included in the final work result"
       ],
+      "reuses": ["src/agent/verification-repair-loop.js"],
       "tags": ["agent", "verification", "tests", "level-2"]
     },
     {
@@ -198,9 +237,9 @@
       "name": "Add bounded verification-driven repair loop",
       "status": "PENDING",
       "priority": "HIGH",
-      "estimatedHours": 16,
+      "estimatedHours": 10,
       "value": 90,
-      "dependencies": ["P12-T008"],
+      "dependencies": ["P12-T007", "P12-T008"],
       "deliverables": [
         "Connect the existing verification-repair loop to agent patches and check failures",
         "Feed only relevant, bounded diagnostics back to the executor",
@@ -212,6 +251,7 @@
         "A repair cannot bypass the original permissions or approval digest",
         "Tests cover fixed-on-retry, persistent failure, regression, cancellation, and limit exhaustion"
       ],
+      "reuses": ["src/agent/verification-repair-loop.js", "src/agent/privacy-cost-controls.js"],
       "tags": ["agent", "repair-loop", "verification", "level-2"]
     },
     {
@@ -219,9 +259,9 @@
       "name": "Persist agent runs, checkpoints, and audit events",
       "status": "PENDING",
       "priority": "HIGH",
-      "estimatedHours": 12,
+      "estimatedHours": 9,
       "value": 85,
-      "dependencies": ["P12-T002"],
+      "dependencies": ["P12-T002", "P12-T006", "P12-T007", "P12-T008"],
       "deliverables": [
         "Persist task contract, plan, approval, tool events, patch digests, verification evidence, and final status",
         "Resume only from validated checkpoints and re-check workspace hashes before continuation",
@@ -233,6 +273,7 @@
         "Tampered, incompatible, or stale checkpoints fail with an explicit recovery state",
         "Persistence tests verify redaction and deterministic resume behavior"
       ],
+      "reuses": ["src/agent/streaming-conversation.js", "src/agent/privacy-cost-controls.js", "src/agent/requirement-traceability.js"],
       "tags": ["agent", "persistence", "audit", "level-2"]
     },
     {
@@ -240,7 +281,7 @@
       "name": "Expose supervised code-generation workflow consistently",
       "status": "PENDING",
       "priority": "HIGH",
-      "estimatedHours": 12,
+      "estimatedHours": 10,
       "value": 85,
       "dependencies": ["P12-T003", "P12-T006", "P12-T007", "P12-T008", "P12-T010"],
       "deliverables": [
@@ -261,7 +302,7 @@
       "name": "Prove Level 2 behavior with end-to-end acceptance suite",
       "status": "PENDING",
       "priority": "CRITICAL",
-      "estimatedHours": 16,
+      "estimatedHours": 14,
       "value": 100,
       "dependencies": ["P12-T005", "P12-T006", "P12-T007", "P12-T008", "P12-T009", "P12-T010", "P12-T011"],
       "deliverables": [
@@ -276,6 +317,7 @@
         "Every blocked or failed case proves unsafe changes were not left behind",
         "Phase 12 exit requires all critical acceptance cases passing"
       ],
+      "reuses": ["src/agent/acceptance-workflow.js", "src/agent/requirement-traceability.js"],
       "tags": ["agent", "end-to-end", "acceptance", "level-2"]
     }
   ],

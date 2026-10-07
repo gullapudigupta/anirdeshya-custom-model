@@ -681,6 +681,43 @@ paths:
         '404':
           description: Work item not found
 
+  /api/agent/{id}/pause:
+    post:
+      tags: [Agent]
+      summary: Pause agent work
+      description: Pauses queued or working items. Running work pauses at the next plan-step boundary.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Work paused
+        '404':
+          description: Active work item not found
+        '409':
+          description: Work is not in a pausable state
+
+  /api/agent/{id}/resume:
+    post:
+      tags: [Agent]
+      summary: Resume paused agent work
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Work resumed
+        '404':
+          description: Active work item not found
+        '409':
+          description: Work is not paused
+
   /api/agent/{id}/logs:
     get:
       tags: [Agent]
@@ -883,6 +920,23 @@ paths:
                     $ref: '#/components/schemas/PipelineExecution'
         '404':
           description: Execution not found
+    delete:
+      tags: [Pipelines]
+      summary: Cancel a running pipeline execution
+      description: Requests cancellation; the run stops before its next stage.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cancellation requested
+        '404':
+          description: Active execution not found
+        '409':
+          description: Execution has already finished or has not started
 
   /api/pipelines/executions/{id}/replay:
     post:

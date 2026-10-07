@@ -16,10 +16,11 @@ const { results, runTests, setCurrentFile } = require('./harness');
 
 function findTests(dir) {
   const found = [];
+  if (!fs.existsSync(dir)) return found;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name === 'node_modules') continue;
+      if (entry.name === 'node_modules' || entry.name === 'fixtures') continue;
       found.push(...findTests(full));
     } else if (entry.name.endsWith('.test.js')) {
       found.push(full);
@@ -29,10 +30,13 @@ function findTests(dir) {
 }
 
 const testDir = __dirname;
-const files = findTests(testDir).sort();
+const projectRoot = path.resolve(__dirname, '..');
+// Suites live in test/, tests/, and src/**/__tests__; run all of them.
+const testRoots = [testDir, path.join(projectRoot, 'tests'), path.join(projectRoot, 'src')];
+const files = [...new Set(testRoots.flatMap(findTests))].sort();
 
 if (files.length === 0) {
-  console.log('No test files (*.test.js) found under', testDir);
+  console.log('No test files (*.test.js) found under', testRoots.join(', '));
   process.exit(0);
 }
 
@@ -40,7 +44,7 @@ console.log(`Running ${files.length} test file(s)\n`);
 
 (async () => {
   for (const file of files) {
-    console.log(path.relative(testDir, file));
+    console.log(path.relative(projectRoot, file));
     try {
       setCurrentFile(file);
       require(file);
