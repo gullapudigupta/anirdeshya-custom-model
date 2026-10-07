@@ -31,6 +31,7 @@ class WorkspaceContext {
     this.maxFileBytes = options.maxFileBytes ?? 128 * 1024;
     this.maxTotalBytes = options.maxTotalBytes ?? 512 * 1024;
     this.maxTokens = options.maxTokens ?? 8000;
+    this.countTokens = options.countTokens || (content => Math.ceil(content.length / 4));
     this.maxSearchFiles = options.maxSearchFiles ?? 1000;
     this.maxSearchBytes = options.maxSearchBytes ?? 5 * 1024 * 1024;
     this.maxSearchResults = options.maxSearchResults ?? 20;
@@ -141,12 +142,17 @@ class WorkspaceContext {
     const hash = crypto.createHash('sha256').update(content).digest('hex');
     const availableBytes = Math.max(0, this.maxTotalBytes - context.totalBytes);
     const availableTokens = Math.max(0, this.maxTokens - context.totalTokens);
-    const byteLimit = Math.min(this.maxFileBytes, availableBytes);
-    let includedContent = content.slice(0, Math.min(content.length, byteLimit, availableTokens * 4));
-    while (Buffer.byteLength(includedContent, 'utf8') > byteLimit ||
-        Math.ceil(includedContent.length / 4) > availableTokens) {
-      includedContent = includedContent.slice(0, -1);
+    const originalTokens = this.countTokens(content, relativePath);
+    if (!Number.isFinite(originalTokens) || originalTokens < 0) {
+      throw new Error(`Token counter returned an invalid count for ${relativePath}`);
     }
+    if (originalTokens > availableTokens) {
+      context.truncated.push({ path: relativePath, reason: 'context token limit exceeded' });
+      return;
+    }
+    const byteLimit = Math.min(this.maxFileBytes, availableBytes);
+    let includedContent = content.slice(0, Math.min(content.length, byteLimit));
+    while (Buffer.byteLength(includedContent, 'utf8') > byteLimit) includedContent = includedContent.slice(0, -1);
     const truncated = includedContent.length < content.length;
 
     if (truncated) {
@@ -158,7 +164,7 @@ class WorkspaceContext {
 
     if (includedContent.length === 0 && content.length > 0) return;
     const bytes = Buffer.byteLength(includedContent, 'utf8');
-    const tokens = Math.ceil(includedContent.length / 4);
+    const tokens = this.countTokens(includedContent, relativePath);
     const language = this._detectLanguage(relativePath);
     const file = {
       path: (path.isAbsolute(relativePath) ? path.relative(this.workspace, relativePath) : relativePath)

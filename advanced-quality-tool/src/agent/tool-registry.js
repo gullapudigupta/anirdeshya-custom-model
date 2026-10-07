@@ -123,6 +123,11 @@ class ToolRegistry {
       // Execute tool
       const rawData = await tool.handler({ ...args, workspace: this.workspace }, context);
       const data = this._boundOutput(rawData);
+      if (toolName === 'get_diagnostics' && data && data.available === false) {
+        const unavailable = this._result(false, data, `Diagnostics are not configured: ${data.reason || 'no linter is available'}`, Date.now() - startTime, 'DIAGNOSTICS_UNAVAILABLE');
+        this._logExecution(toolName, args, unavailable, context, argsValidated);
+        return unavailable;
+      }
       const outputBytes = Buffer.byteLength(JSON.stringify(data), 'utf8');
       budget.outputBytes += outputBytes;
       if (budget.outputBytes > this.limits.maxOutputPerTask) {
@@ -299,7 +304,7 @@ class ToolRegistry {
           }
           if (currentHash !== args.expectedHash) {
             const error = new Error(
-              `File '${args.path}' changed since it was last read (expected ${args.expectedHash}, found ${currentHash}); re-read before editing`
+              `Stale source: file '${args.path}' changed since it was last read (expected ${args.expectedHash}, found ${currentHash}); re-read before editing`
             );
             error.code = 'STALE_FILE';
             throw error;

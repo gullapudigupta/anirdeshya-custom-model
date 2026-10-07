@@ -13,12 +13,16 @@
 'use strict';
 
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const { WorkItem, WorkItemStatus } = require('./work-item');
 const { AgentPlanner } = require('./planner');
 const { PipelineExecutor } = require('../pipelines/pipeline-executor');
 const { ToolRegistry } = require('./tool-registry');
 const { WorkspaceContext } = require('./workspace-context');
 const { PermissionManager } = require('./permissions');
+const { DiffReviewSystem, hashContent } = require('./diff-review-system');
+const { CONTRACT_VERSION, validatePatch } = require('./contracts');
 
 const DEFAULT_TOOL_BUDGET = Object.freeze({
   maxCalls: 25,
@@ -35,10 +39,15 @@ class WorkOrchestrator {
     this.pipelineExecutor = options.pipelineExecutor || new PipelineExecutor();
     this.stepExecutor = options.stepExecutor || options.executor || null;
     this.checkRunner = options.checkRunner || null;
+    this.diffReviewSystem = options.diffReviewSystem || new DiffReviewSystem({
+      workspace: this.workspace,
+      backupDir: path.join(this.workspace, '.aqt-backups')
+    });
+    this.maxFiles = options.maxFiles || 50;
     this.provider = options.provider || null;
     this.model = options.model || null;
     this.providerConfig = options.providerConfig || null;
-    this.stepTimeoutMs = options.stepTimeoutMs === undefined ? 120000 : options.stepTimeoutMs;
+    this.stepTimeoutMs = options.stepTimeoutMs ?? options.executorTimeoutMs ?? 120000;
     if (!Number.isFinite(this.stepTimeoutMs) || this.stepTimeoutMs <= 0) {
       throw new Error('stepTimeoutMs must be a positive finite number');
     }
@@ -315,7 +324,9 @@ class WorkOrchestrator {
 
         if (this.workspaceContext) {
           const suppliedContext = item.context && typeof item.context === 'object' ? item.context : {};
-          const requestedFiles = Array.isArray(suppliedContext.files) ? suppliedContext.files : [];
+          const requestedFiles = Array.isArray(suppliedContext.files) && suppliedContext.files.length
+            ? suppliedContext.files
+            : item.files;
           item.context = Object.assign(suppliedContext, {
             ...this.workspaceContext.collect(requestedFiles, { query: item.description }),
             workspace: this.workspace
@@ -436,6 +447,9 @@ class WorkOrchestrator {
         this._progress({ type: 'work-executing', item: item.getSummary() });
 
         const output = await this._executeSteps(item, executablePlan, controller);
+        if (output.patches.length) {
+          output.appliedPatches = await this._applyPatches(item, executablePlan, output.patches, controller.signal);
+        }
         item.setOutput(output);
 
         if (item.status === WorkItemStatus.CANCELLED) {
@@ -458,6 +472,11 @@ class WorkOrchestrator {
         if (controller.signal.aborted) throw cancellationError(controller.signal);
 
         if (!verificationResults.passed) {
+          const unavailableRequiredCheck = Object.values(verificationResults.checks || {})
+            .some(check => check.required && check.status === 'unavailable');
+          if (unavailableRequiredCheck) {
+            throw new Error('Verification failed: required check is unavailable');
+          }
           // Retry if available
           if (item.incrementRetry()) {
             this._progress({ type: 'work-retry', item: item.getSummary() });
@@ -476,6 +495,7 @@ class WorkOrchestrator {
           itemId: item.id,
           status: 'completed',
           output,
+          verification: verificationResults,
           contextProvenance: this._contextProvenance(item)
         });
         this._progress({ type: 'work-complete', item: item.getSummary() });
@@ -497,6 +517,13 @@ class WorkOrchestrator {
           this._progress({ type: 'work-cancelled', item: item.getSummary() });
           return;
         }
+        if (failure.denied) {
+          item.updateStatus(WorkItemStatus.DENIED, { error: failure.message });
+          results.denied = (results.denied || 0) + 1;
+          results.items.push({ itemId: item.id, status: 'denied', error: failure.message, code: failure.code || 'DENIED' });
+          this._progress({ type: 'work-denied', item: item.getSummary(), error: failure.message });
+          return;
+        }
         item.setError(failure);
         item.updateStatus(WorkItemStatus.FAILED, { error: failure.message });
         results.failed++;
@@ -505,6 +532,7 @@ class WorkOrchestrator {
           status: 'failed',
           error: failure.message,
           code: failure.code || 'EXECUTION_ERROR',
+          verification: item.verificationResults,
           provider: failure.provider || this.provider,
           model: failure.model || this.model,
           contextProvenance: this._contextProvenance(item)
@@ -525,7 +553,7 @@ class WorkOrchestrator {
   }
 
   async _executeSteps(item, plan, controller) {
-    const output = { completedSteps: [], results: {} };
+    const output = { completedSteps: [], results: {}, patches: [] };
 
     for (const step of plan.steps) {
       await this._waitWhilePaused(item);
@@ -545,7 +573,8 @@ class WorkOrchestrator {
       const stepResult = await this._executeStep(item, step, plan, controller);
 
       output.completedSteps.push(step.id);
-      output.results[step.id] = stepResult;
+      output.results[step.id] = stepResult.output;
+      if (Array.isArray(stepResult.patches)) output.patches.push(...stepResult.patches);
 
       this._progress({
         type: 'step-complete',
@@ -564,7 +593,7 @@ class WorkOrchestrator {
       const code = this.provider ? 'PROVIDER_EXECUTOR_NOT_CONFIGURED' : 'EXECUTOR_NOT_CONFIGURED';
       throw createExecutionError(code, this.provider
         ? `No executor is configured for provider '${this.provider}'`
-        : 'No step executor is configured');
+        : 'No agent executor is configured');
     }
 
     const execute = typeof executor === 'function'
@@ -585,7 +614,13 @@ class WorkOrchestrator {
     const execution = Promise.resolve().then(() => execute.call(executor, {
       step,
       plan,
-      task: item.taskContract,
+      task: item.taskContract || {
+        schemaVersion: CONTRACT_VERSION,
+        id: item.taskId || item.id,
+        description: item.description,
+        acceptanceCriteria: item.acceptanceCriteria,
+        files: item.files
+      },
       context: item.context || { workspace: this.workspace, files: step.files || [] },
       signal,
       itemId: item.id,
@@ -602,7 +637,7 @@ class WorkOrchestrator {
     let timedOut = false;
     const timeoutError = createExecutionError(
       'STEP_TIMEOUT',
-      `Step '${step.id}' exceeded the ${this.stepTimeoutMs}ms execution timeout`
+      `Agent executor timed out after ${this.stepTimeoutMs}ms`
     );
     const timeoutPromise = new Promise((resolve, reject) => {
       timeout = setTimeout(() => {
@@ -651,14 +686,25 @@ class WorkOrchestrator {
     if (!result || typeof result !== 'object' || Array.isArray(result) ||
         (Object.getPrototypeOf(result) !== Object.prototype && Object.getPrototypeOf(result) !== null) ||
         result.success !== true || String(result.stepId) !== String(step.id) ||
-        !Object.prototype.hasOwnProperty.call(result, 'output')) {
-      throw createExecutionError(
-        'MALFORMED_OUTPUT',
-        `Executor returned malformed output for step '${step.id}'`
-      );
+        (!Object.prototype.hasOwnProperty.call(result, 'output') && !Array.isArray(result.patches))) {
+      throw createExecutionError('MALFORMED_OUTPUT', `Executor returned malformed output for step '${step.id}'`);
     }
+    if (result.patches !== undefined) {
+      if (!Array.isArray(result.patches) || result.patches.length === 0) {
+        throw createExecutionError('MALFORMED_PATCH', 'Invalid patch: executor must return a non-empty patch array');
+      }
+      for (const patch of result.patches) {
+        const validation = validatePatch(patch);
+        if (!validation.valid) {
+          throw createExecutionError('MALFORMED_PATCH', `Invalid patch: ${validation.issues.join(', ')}`);
+        }
+      }
+    }
+    const output = Object.prototype.hasOwnProperty.call(result, 'output')
+      ? result.output
+      : { patchCount: result.patches.length };
     try {
-      const serializedOutput = JSON.stringify(result.output);
+      const serializedOutput = JSON.stringify(output);
       if (serializedOutput === undefined) throw new Error('Output is not JSON serializable');
     } catch (error) {
       throw createExecutionError(
@@ -666,7 +712,7 @@ class WorkOrchestrator {
         `Executor output for step '${step.id}' is not serializable`
       );
     }
-    return { ...result, stepId: step.id };
+    return { ...result, output, stepId: step.id };
   }
 
   /**
@@ -678,6 +724,90 @@ class WorkOrchestrator {
    * @param {Object} step
    * @returns {{ call: Function, schemas: Array<Object> }|null}
    */
+  async _applyPatches(item, plan, patches, signal) {
+    if (!Array.isArray(patches) || !patches.length) return [];
+    if (patches.length > this.maxFiles) throw new Error(`Patch file limit exceeded (${patches.length} > ${this.maxFiles})`);
+    const planDigest = digestPlan(plan);
+    const patchDigest = crypto.createHash('sha256')
+      .update(JSON.stringify({ planDigest, patches }))
+      .digest('hex');
+    const contextFiles = new Map((item.context?.files || []).map(file => [file.path, file]));
+    const review = new DiffReviewSystem({ workspace: this.workspace, maxChangedFiles: this.maxFiles });
+    const operations = [];
+    const seen = new Set();
+
+    for (const patch of patches) {
+      const validation = validatePatch(patch);
+      if (!validation.valid) throw new Error(`Invalid patch: ${validation.issues.join(', ')}`);
+      const relativePath = patch.path.replace(/\\/g, '/');
+      if (seen.has(relativePath)) throw new Error(`Invalid patch: duplicate operation for ${relativePath}`);
+      seen.add(relativePath);
+      if (!(plan.affectedFiles || []).includes(relativePath)) {
+        throw new Error(`Invalid patch: path is outside the approved plan: ${relativePath}`);
+      }
+      const type = patch.operation;
+      const operation = {
+        type: type === 'delete' ? 'delete_file' : 'edit_file',
+        digest: digestAction(planDigest, type, patch),
+        params: { path: relativePath, dependencyChange: isDependencyPath(relativePath), workId: item.id }
+      };
+      const permission = await this.permissionManager.checkPermission(operation, { deferApproval: true });
+      this._recordPermissionDecision(item, operation, permission);
+      if (!permission.allowed) {
+        throw Object.assign(new Error(`Permission denied: ${permission.reason}`), { code: 'PERMISSION_DENIED', denied: true });
+      }
+      const originalFile = contextFiles.get(relativePath);
+      const originalContent = type === 'create' ? null : originalFile?.content;
+      if (type !== 'create' && typeof originalContent !== 'string') {
+        throw new Error(`Invalid patch: source file was not present in bounded context: ${relativePath}`);
+      }
+      if (type !== 'create' && hashContent(originalContent) !== patch.expectedHash) {
+        throw new Error(`Invalid patch: expected hash does not match gathered source for ${relativePath}`);
+      }
+      const absolutePath = path.resolve(this.workspace, relativePath);
+      if (type !== 'create') {
+        if (!fs.existsSync(absolutePath) || hashContent(fs.readFileSync(absolutePath, 'utf8')) !== patch.expectedHash) {
+          throw Object.assign(new Error(`Stale source detected for ${relativePath}`), { code: 'PATCH_CONFLICT' });
+        }
+      } else if (fs.existsSync(absolutePath)) {
+        throw Object.assign(new Error(`Stale source detected: create target already exists for ${relativePath}`), { code: 'PATCH_CONFLICT' });
+      }
+      const diff = review.addPatch({
+        type,
+        filePath: relativePath,
+        originalContent,
+        modifiedContent: type === 'delete' ? '' : patch.content,
+        expectedHash: patch.expectedHash
+      }, { planDigest, patchDigest });
+      operations.push({ operation, diff, relativePath });
+    }
+
+    const currentDigest = () => crypto.createHash('sha256')
+      .update(JSON.stringify({ planDigest: digestPlan(item.plan), patches }))
+      .digest('hex');
+    const approval = await this._requestApproval(item, plan, {
+      kind: 'patch', planDigest, actionDigest: patchDigest, patchDigest,
+      diffs: operations.map(({ diff, relativePath }) => ({ filePath: relativePath, unifiedDiff: diff.toUnifiedDiff() }))
+    }, signal, currentDigest);
+    if (!approval.approved) {
+      for (const { operation } of operations) this.permissionManager.recordApproval(operation, {
+        approved: false, planDigest, patchDigest, outcome: approval.outcome || 'denied', reason: approval.reason
+      });
+      throw Object.assign(new Error(approval.reason || 'Patch approval denied'), { code: 'PATCH_DENIED', denied: true });
+    }
+
+    const applied = [];
+    for (let index = 0; index < operations.length; index++) {
+      const { operation, diff, relativePath } = operations[index];
+      const result = await review.applyDiff(index, { approval: { approved: true, planDigest, patchDigest } });
+      if (!result.success) throw Object.assign(new Error(`Patch apply failed for ${relativePath}: ${result.error}`), { code: result.code });
+      this.permissionManager.recordApproval(operation, { approved: true, planDigest, patchDigest, outcome: 'approved' });
+      if (!item.changedFiles.includes(relativePath)) item.changedFiles.push(relativePath);
+      applied.push({ path: relativePath, type: diff.type, unifiedDiff: diff.toUnifiedDiff() });
+    }
+    return applied;
+  }
+
   _createToolContext(item, step, plan, controller) {
     const registry = this.toolRegistry;
     if (!registry) return null;
@@ -924,15 +1054,19 @@ class WorkOrchestrator {
   }
 
   async _verifyWork(item, plan) {
-    const results = { passed: true, checks: {} };
-    for (const check of plan.expectedChecks || []) {
-      if (this.checkRunner) {
-        const id = check.checkId || check.type;
-        const result = await this.checkRunner.run(id, { item, plan, workspace: this.workspace });
-        results.checks[id] = result;
-        if (check.required && result.status !== 'passed' && result.passed !== true) results.passed = false;
-      } else {
-        results.checks[check.checkId || check.type] = { passed: true, required: check.required };
+    const results = { schemaVersion: CONTRACT_VERSION, passed: true, checks: {}, requiredPassed: true };
+    const checks = Array.isArray(plan.expectedChecks) ? plan.expectedChecks : [];
+    if (checks.length === 0) return results;
+    for (const check of checks) {
+      const id = check.checkId || check.type;
+      const result = (this.checkRunner
+        ? await this.checkRunner.run(id, { item, plan, workspace: this.workspace })
+        : null) || { id, status: 'unavailable', required: check.required === true, error: 'No check runner is configured' };
+      results.checks[id] = { ...result, required: check.required === true };
+      const passed = result.status === 'passed' || result.passed === true;
+      if (check.required && !passed) {
+        results.passed = false;
+        results.requiredPassed = false;
       }
     }
     return results;

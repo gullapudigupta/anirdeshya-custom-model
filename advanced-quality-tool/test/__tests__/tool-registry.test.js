@@ -222,11 +222,11 @@ describe('ToolRegistry get_diagnostics', () => {
   test('reports unavailable instead of zero issues when no linters are configured', async () => {
     const registry = new ToolRegistry({ workspace: TEST_DIR });
     const result = await registry.execute('get_diagnostics', { files: [] });
-    assert.strictEqual(result.success, true);
+    assert.strictEqual(result.success, false);
     assert.strictEqual(result.data.available, false);
     assert.strictEqual(result.data.diagnostics, null);
     assert.strictEqual(result.data.summary, null);
-    assert.ok(result.data.reason);
+    assert.match(result.error, /not configured/i);
   });
 
   test('collects real diagnostics from an available linter instead of a stub result', async () => {

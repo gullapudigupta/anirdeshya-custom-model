@@ -138,6 +138,7 @@ describe('Phase 12 execution planning (P12-T005)', () => {
           provenance: [{ path: 'src/feature.js', hash: 'abc' }]
         })
       },
+      checkRunner: { run: async id => ({ id, status: 'passed' }) },
       toolRegistry: null,
       onApprovalRequired: async (item, approvedPlan) => {
         approvalPlan = approvedPlan;

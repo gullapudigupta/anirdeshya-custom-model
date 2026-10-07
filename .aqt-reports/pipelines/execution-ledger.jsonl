@@ -1,0 +1,8 @@
+{"type":"run-start","runId":"run-1791368086827-86b7530e","pipelineId":"workspace-quality-analysis","taskId":null,"workspace":"C:\\sarah laptop\\first app\\mobileapp\\anirdeshya-cutom-model","input":{},"context":{},"timestamp":"2026-10-07T10:14:46.827Z","status":"running"}
+{"type":"stage-start","runId":"run-1791368086827-86b7530e","stageName":"resolve-workspace","input":{},"timestamp":"2026-10-07T10:14:46.828Z"}
+{"type":"stage-end","runId":"run-1791368086827-86b7530e","stageName":"resolve-workspace","result":{"success":true,"output":{},"duration":53},"timestamp":"2026-10-07T10:14:46.881Z","duration":53}
+{"type":"stage-start","runId":"run-1791368086827-86b7530e","stageName":"detect-tools","input":{},"timestamp":"2026-10-07T10:14:46.887Z"}
+{"type":"stage-end","runId":"run-1791368086827-86b7530e","stageName":"detect-tools","result":{"success":true,"output":{},"duration":46},"timestamp":"2026-10-07T10:14:46.932Z","duration":46}
+{"type":"stage-start","runId":"run-1791368086827-86b7530e","stageName":"select-files","input":{},"timestamp":"2026-10-07T10:14:46.934Z"}
+{"type":"stage-end","runId":"run-1791368086827-86b7530e","stageName":"select-files","result":{"success":true,"output":{},"duration":48},"timestamp":"2026-10-07T10:14:46.982Z","duration":48}
+{"type":"run-cancel","runId":"run-1791368086827-86b7530e","reason":"cancelled by user","partialOutput":{"stageResults":{"resolve-workspace":{"success":true,"output":{},"duration":53},"detect-tools":{"success":true,"output":{},"duration":46},"select-files":{"success":true,"output":{},"duration":48}}},"timestamp":"2026-10-07T10:14:46.983Z","status":"cancelled"}
