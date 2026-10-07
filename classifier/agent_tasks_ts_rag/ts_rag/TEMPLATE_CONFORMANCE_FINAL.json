@@ -1,0 +1,155 @@
+{
+  "profile": "final",
+  "generated": "2026-10-07T11:50:46.630Z",
+  "templates": [
+    "tools/task-template-final.json"
+  ],
+  "files": [
+    {
+      "file": "typescript-rag/tasks_chunk_1.json",
+      "kind": "tasks",
+      "tasks": 12,
+      "errors": 0,
+      "warnings": 12,
+      "fileIssues": [],
+      "taskIssues": [
+        {
+          "id": "RAG-1",
+          "issues": [
+            {
+              "level": "warn",
+              "rule": "id-format",
+              "message": "id \"RAG-1\" is not P{phase}-T{n} (phase10 uses its own prefix, so a spec prefix is tolerated)"
+            }
+          ]
+        },
+        {
+          "id": "RAG-2",
+          "issues": [
+            {
+              "level": "warn",
+              "rule": "id-format",
+              "message": "id \"RAG-2\" is not P{phase}-T{n} (phase10 uses its own prefix, so a spec prefix is tolerated)"
+            }
+          ]
+        },
+        {
+          "id": "RAG-3",
+          "issues": [
+            {
+              "level": "warn",
+              "rule": "id-format",
+              "message": "id \"RAG-3\" is not P{phase}-T{n} (phase10 uses its own prefix, so a spec prefix is tolerated)"
+            }
+          ]
+        },
+        {
+          "id": "RAG-4",
+          "issues": [
+            {
+              "level": "warn",
+              "rule": "id-format",
+              "message": "id \"RAG-4\" is not P{phase}-T{n} (phase10 uses its own prefix, so a spec prefix is tolerated)"
+            }
+          ]
+        },
+        {
+          "id": "RAG-5",
+          "issues": [
+            {
+              "level": "warn",
+              "rule": "id-format",
+              "message": "id \"RAG-5\" is not P{phase}-T{n} (phase10 uses its own prefix, so a spec prefix is tolerated)"
+            }
+          ]
+        },
+        {
+          "id": "RAG-6",
+          "issues": [
+            {
+              "level": "warn",
+              "rule": "id-format",
+              "message": "id \"RAG-6\" is not P{phase}-T{n} (phase10 uses its own prefix, so a spec prefix is tolerated)"
+            }
+          ]
+        },
+        {
+          "id": "RAG-7",
+          "issues": [
+            {
+              "level": "warn",
+              "rule": "id-format",
+              "message": "id \"RAG-7\" is not P{phase}-T{n} (phase10 uses its own prefix, so a spec prefix is tolerated)"
+            }
+          ]
+        },
+        {
+          "id": "RAG-8",
+          "issues": [
+            {
+              "level": "warn",
+              "rule": "id-format",
+              "message": "id \"RAG-8\" is not P{phase}-T{n} (phase10 uses its own prefix, so a spec prefix is tolerated)"
+            }
+          ]
+        },
+        {
+          "id": "RAG-9",
+          "issues": [
+            {
+              "level": "warn",
+              "rule": "id-format",
+              "message": "id \"RAG-9\" is not P{phase}-T{n} (phase10 uses its own prefix, so a spec prefix is tolerated)"
+            }
+          ]
+        },
+        {
+          "id": "RAG-10",
+          "issues": [
+            {
+              "level": "warn",
+              "rule": "id-format",
+              "message": "id \"RAG-10\" is not P{phase}-T{n} (phase10 uses its own prefix, so a spec prefix is tolerated)"
+            }
+          ]
+        },
+        {
+          "id": "RAG-11",
+          "issues": [
+            {
+              "level": "warn",
+              "rule": "id-format",
+              "message": "id \"RAG-11\" is not P{phase}-T{n} (phase10 uses its own prefix, so a spec prefix is tolerated)"
+            }
+          ]
+        },
+        {
+          "id": "RAG-12",
+          "issues": [
+            {
+              "level": "warn",
+              "rule": "id-format",
+              "message": "id \"RAG-12\" is not P{phase}-T{n} (phase10 uses its own prefix, so a spec prefix is tolerated)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "typescript-rag/tasks_master.json",
+      "kind": "master",
+      "tasks": 0,
+      "errors": 0,
+      "warnings": 0,
+      "fileIssues": [],
+      "taskIssues": []
+    }
+  ],
+  "totals": {
+    "files": 2,
+    "tasks": 12,
+    "errors": 0,
+    "warnings": 12,
+    "conformingTasks": 12
+  }
+}

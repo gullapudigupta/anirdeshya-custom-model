@@ -33,5 +33,4 @@ The public API is exported from [src/index.ts](src/index.ts). Use `AnalysisOrche
 
 Extend `intentRules`, `domains`, `entityTerms`, and `constraintRules` in [src/classifier.ts](src/classifier.ts) to support product-specific language. Replace the example registry in [src/index.ts](src/index.ts) with real application or MCP tool handlers.
 
-For the steps needed to move from the current rule baseline toward broad English coverage, see [knowledge store/broad-english-classification-roadmap.md](knowledge%20store/broad-english-classification-roadmap.md).
-
+For the steps needed to move from the current rule baseline toward broad English coverage, see the [broad-English classification roadmap](../agent_tasks_ts_rag/knowledge%20store/Broad%20English%20Classification%20Roadmap.md).

@@ -1,0 +1,105 @@
+﻿{
+  "source": "GitHub Copilot models-and-pricing (docs.github.com); IDs verified against Copilot CLI 1.0.81 --model",
+  "note": "Prices are USD per 1M tokens (input/output). Model ids are native Copilot CLI ids. Strategy: claude-sonnet-5.5 for critical work requiring reasoning, gpt-5.6-luna for followup/scaffolding.",
+  "grades": {
+    "A": "frontier",
+    "A-": "strong frontier-class",
+    "B+": "strong, cost-efficient",
+    "B": "budget"
+  },
+  "models": [
+    { "id": "js-script", "displayName": "Plain JS/TS script (no model)", "vendor": "local", "grade": "n/a", "inputPerM": 0, "outputPerM": 0, "estimated": false },
+    { "id": "gpt-6-luna", "displayName": "GPT-6 Luna", "vendor": "OpenAI", "grade": "B+", "inputPerM": 0.1, "outputPerM": 0.5, "estimated": false },
+    { "id": "gpt-5.6-luna", "displayName": "GPT-5.6 Luna", "vendor": "OpenAI", "grade": "B+", "inputPerM": 0.2, "outputPerM": 1.2, "estimated": false },
+    { "id": "mai-code-1.1-flash", "displayName": "MAI-Code-1.1-Flash", "vendor": "Microsoft", "grade": "B+", "inputPerM": 0.2, "outputPerM": 1.20, "estimated": false },
+    { "id": "gpt-5-mini", "displayName": "GPT-5 mini", "vendor": "OpenAI", "grade": "B", "inputPerM": 0.25, "outputPerM": 2, "estimated": false },
+    { "id": "gpt-5.4-mini", "displayName": "GPT-5.4 mini", "vendor": "OpenAI", "grade": "B+", "inputPerM": 0.75, "outputPerM": 4.5, "estimated": false },
+    { "id": "gemini-3.8-flash", "displayName": "Gemini 3.8 Flash", "vendor": "Google", "grade": "B+", "inputPerM": 0.75, "outputPerM": 3.75, "estimated": false },
+    { "id": "claude-haiku-4.5", "displayName": "Claude Haiku 4.5", "vendor": "Anthropic", "grade": "B", "inputPerM": 1, "outputPerM": 5, "estimated": false },
+    { "id": "gpt-5.3-codex", "displayName": "GPT-5.3-Codex", "vendor": "OpenAI", "grade": "A", "inputPerM": 1.75, "outputPerM": 14, "estimated": false },
+    { "id": "claude-sonnet-5", "displayName": "Claude Sonnet 5", "vendor": "Anthropic", "grade": "A", "inputPerM": 2, "outputPerM": 10, "estimated": false },
+    { "id": "claude-sonnet-5.5", "displayName": "Claude Sonnet 5.5", "vendor": "Anthropic", "grade": "A", "inputPerM": 2, "outputPerM": 10, "estimated": false },
+    { "id": "gpt-5.6-terra", "displayName": "GPT-5.6 Terra", "vendor": "OpenAI", "grade": "A", "inputPerM": 2, "outputPerM": 12, "estimated": false },
+    { "id": "grok-4.5", "displayName": "Grok 4.5", "vendor": "xAI", "grade": "A-", "inputPerM": 2, "outputPerM": 6, "estimated": false },
+    { "id": "gpt-5.4", "displayName": "GPT-5.4", "vendor": "OpenAI", "grade": "A", "inputPerM": 2.5, "outputPerM": 15, "estimated": false }
+  ],
+  "equalGradeGroups": {
+    "A-flagship": ["claude-sonnet-5.5", "gpt-5.6-terra", "gpt-5.4", "claude-sonnet-5"],
+    "A-value": ["claude-sonnet-5", "grok-4.5", "gpt-5.3-codex"],
+    "B+": ["gpt-6-luna", "gpt-5.6-luna", "mai-code-1.1-flash", "gpt-5.4-mini", "gemini-3.8-flash"],
+    "B": ["gpt-5-mini", "claude-haiku-4.5"]
+  },
+  "categories": {
+    "scripted": {
+      "band": "scaffold",
+      "costTier": "free",
+      "firstChoice": "js-script",
+      "equalGradeAlternatives": ["gpt-5.6-luna", "claude-haiku-4.5"],
+      "why": "Mechanical file/folder/config creation; fall back to cheap Luna or Haiku."
+    },
+    "scaffold": {
+      "band": "scaffold",
+      "costTier": "low",
+      "firstChoice": "gpt-6-luna",
+      "equalGradeAlternatives": ["gpt-5.6-luna", "mai-code-1.1-flash"],
+      "why": "Boilerplate: lightweight Luna at $0.10/$0.50."
+    },
+    "critical-security-core": {
+      "band": "critical-logic",
+      "costTier": "premium",
+      "firstChoice": "claude-sonnet-5.5",
+      "equalGradeAlternatives": ["gpt-5.3-codex", "gpt-5.6-terra"],
+      "why": "Core security (permissions, MFA, secrets): best reasoning, no trade-offs."
+    },
+    "critical-security": {
+      "band": "critical-logic",
+      "costTier": "premium",
+      "firstChoice": "claude-sonnet-5.5",
+      "equalGradeAlternatives": ["gpt-5.6-terra", "gpt-5.3-codex"],
+      "why": "Security-adjacent logic: Sonnet 5.5 for rigorous reasoning."
+    },
+    "critical-money": {
+      "band": "critical-logic",
+      "costTier": "premium",
+      "firstChoice": "claude-sonnet-5.5",
+      "equalGradeAlternatives": ["gpt-5.6-terra", "gpt-5.3-codex"],
+      "why": "Ledger/wallet/idempotency: trustworthy reasoning at $2/$10."
+    },
+    "critical-architecture": {
+      "band": "critical-logic",
+      "costTier": "premium",
+      "firstChoice": "claude-sonnet-5.5",
+      "equalGradeAlternatives": ["gpt-5.6-terra", "gpt-5.4"],
+      "why": "Foundational design: Sonnet 5.5 for multi-step system thinking."
+    },
+    "logic-reasoning": {
+      "band": "critical-logic",
+      "costTier": "mid",
+      "firstChoice": "claude-sonnet-5.5",
+      "equalGradeAlternatives": ["gpt-5.6-luna", "gpt-5.3-codex"],
+      "why": "Multi-step reasoning: Sonnet 5.5 $2/$10, fallback Luna."
+    },
+    "followup-backend": {
+      "band": "followup",
+      "costTier": "low",
+      "firstChoice": "gpt-5.6-luna",
+      "equalGradeAlternatives": ["gpt-5.4-mini", "claude-haiku-4.5"],
+      "why": "Backend plumbing after critical logic: Luna $0.20/$1.20."
+    },
+    "followup-ui": {
+      "band": "followup",
+      "costTier": "low",
+      "firstChoice": "gpt-5.6-luna",
+      "equalGradeAlternatives": ["gpt-5.4-mini", "gemini-3.8-flash"],
+      "why": "UI/screens: Luna or Gemini Flash."
+    },
+    "followup-docs-tests": {
+      "band": "followup",
+      "costTier": "low",
+      "firstChoice": "gpt-5.6-luna",
+      "equalGradeAlternatives": ["gpt-6-luna", "claude-haiku-4.5"],
+      "why": "Docs/tests: Luna $0.20/$1.20."
+    }
+  },
+  "escalation": "If a task fails twice or confidence < 0.7, move to the next model in recommendedModel, then to the next category's first choice."
+}

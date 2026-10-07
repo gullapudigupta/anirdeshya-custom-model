@@ -16,9 +16,9 @@ It cannot yet create a **trained language model** or a **complete coding agent**
 
 The existing folders provide useful specifications:
 
-- `src/` contains the current rule classifier, schema, router, and fallback.
-- `knowledge store/` contains the broad-English roadmap, design, and implementation tasks.
-- `next-steps/` describes codebase analysis and code generation after classification.
+- `../native-classifier/src/` contains the current rule classifier, schema, router, and fallback.
+- `../knowledge store/` contains the broad-English roadmap, design, and implementation tasks.
+- `../next-steps/` describes codebase analysis and code generation after classification.
 
 Most components described in those documents are designs, not implemented runtime modules. The project currently has no versioned utterance dataset, trainer, model artifact, inference adapter, repository analyzer, implementation planner, code generator, or iterative execution engine.
 
@@ -497,5 +497,4 @@ A full coding system is ready only when:
 - repair attempts are bounded
 - evaluations meet release thresholds
 - releases and model artifacts can be rolled back
-
 

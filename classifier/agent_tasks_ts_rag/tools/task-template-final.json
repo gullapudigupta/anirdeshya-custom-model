@@ -1,0 +1,695 @@
+{
+  "$schema": "./task-schema.json",
+  "version": "2.0.0",
+  "description": "Final task template = task-template.json + phase10-documentation.json file header + model assignment, cost ordering, execution result, JEV recommendation, script automation and user clarifications.",
+  "usage": "Copy this file to start a spec task file. Run `node tools/cli.js validate --profile final` to check conformance.",
+  "metadata": {
+    "created": "2026-10-04",
+    "inheritsFrom": [
+      "advanced-quality-tool/tasks/task-template.json",
+      "advanced-quality-tool/tasks/phase10-documentation.json"
+    ],
+    "modelCatalog": "tools/model-catalog.json (derived from docs/llm-model-comparison.md)",
+    "legacyModelPricing": {
+      "deepseek-v4-flash": {
+        "input": 0.14,
+        "output": 0.28,
+        "perMTokens": 0.98
+      },
+      "gpt-4o-mini": {
+        "input": 0.15,
+        "output": 0.6,
+        "perMTokens": 1.95
+      },
+      "claude-haiku-4": {
+        "input": 1,
+        "output": 5,
+        "perMTokens": 16
+      },
+      "o1-mini": {
+        "input": 3,
+        "output": 12,
+        "perMTokens": 39
+      },
+      "gpt-4.1": {
+        "input": 2,
+        "output": 8,
+        "perMTokens": 26
+      },
+      "deepseek-r1": {
+        "input": 8,
+        "output": 32,
+        "perMTokens": 104
+      },
+      "claude-opus-5": {
+        "input": 4,
+        "output": 20,
+        "perMTokens": 64
+      }
+    }
+  },
+  "fileHeaderTemplate": {
+    "description": "Header of every task file (from phase10-documentation.json). Chunked specs keep spec/chunkId/taskRange/folder; master files list chunks and carry executionPlan.",
+    "example": {
+      "name": "Spec name",
+      "description": "What this file covers",
+      "priority": "MEDIUM",
+      "status": "PENDING",
+      "completionPercentage": "0%",
+      "createdOn": "2026-10-04",
+      "updatedOn": "2026-10-04",
+      "tasks": [
+        "(task objects)"
+      ],
+      "summary": {
+        "total": 0,
+        "completed": 0,
+        "pending": 0,
+        "totalEstimatedHours": 0,
+        "averageValue": 0
+      },
+      "executionPlan": {
+        "strategy": "scaffold -> critical-logic -> followup, dependency-safe",
+        "generated": "2026-10-04",
+        "batches": 0,
+        "order": [
+          {
+            "order": 1,
+            "batch": 1,
+            "id": "SPEC-1",
+            "band": "scaffold",
+            "model": "qwen-3",
+            "file": "tasks.json"
+          }
+        ]
+      }
+    }
+  },
+  "exampleTaskCompleted": {
+    "id": "SPEC-1",
+    "name": "Create ledger collection with server-only permissions",
+    "status": "COMPLETED",
+    "completedDate": "2026-10-04",
+    "artifacts": [
+      "functions/ledger/schema.json"
+    ],
+    "priority": "CRITICAL",
+    "estimatedHours": 12,
+    "value": 95,
+    "recommendedModel": [
+      "gpt-5",
+      "claude-opus",
+      "claude-sonnet"
+    ],
+    "modelRationale": "Why this model, equal-grade fallbacks, and when to escalate.",
+    "dependencies": [],
+    "deliverables": [
+      "Concrete, checkable deliverable"
+    ],
+    "tags": [
+      "ledger",
+      "security"
+    ],
+    "userClarifications": [],
+    "modelAssignment": {
+      "source": "docs/llm-model-comparison.md",
+      "category": "critical-money",
+      "grade": "A",
+      "costTier": "premium",
+      "firstChoice": "gpt-5",
+      "equalGradeAlternatives": [
+        "claude-opus",
+        "claude-sonnet"
+      ],
+      "previous": {
+        "recommendedModel": [
+          "gpt-4.1"
+        ],
+        "modelRationale": "(original text, kept for audit)"
+      }
+    },
+    "executionPlan": {
+      "order": 1,
+      "batch": 1,
+      "band": "critical-logic",
+      "scriptable": false,
+      "estimatedCostUsd": 4.5
+    },
+    "executionResult": {
+      "model": "gpt-5",
+      "provider": "OpenAI",
+      "confidenceScore": 0.9,
+      "executionNotes": "Free-form notes about the run, retries, escalations.",
+      "usedFirstChoice": true,
+      "executedAt": "2026-10-04T07:00:00.000Z"
+    },
+    "jevRecommendation": {
+      "model": "gpt-5",
+      "confidence": 0.8,
+      "reason": "One-sentence reason from the JEV system.",
+      "gatewayModel": "anthropic/claude-sonnet-4",
+      "queriedAt": "2026-10-04T07:00:00.000Z",
+      "agreesWithFirstChoice": true
+    },
+    "automation": {
+      "script": "scaffold",
+      "files": [
+        {
+          "path": "relative/path.md",
+          "template": "md",
+          "title": "Title"
+        }
+      ]
+    }
+  },
+  "exampleTaskPending": {
+    "id": "SPEC-2",
+    "name": "Pending task: new properties start as null",
+    "status": "PENDING",
+    "priority": "CRITICAL",
+    "estimatedHours": 12,
+    "value": 95,
+    "recommendedModel": [
+      "gpt-5",
+      "claude-opus",
+      "claude-sonnet"
+    ],
+    "modelRationale": "Why this model, equal-grade fallbacks, and when to escalate.",
+    "dependencies": [],
+    "deliverables": [
+      "Concrete, checkable deliverable"
+    ],
+    "tags": [
+      "ledger",
+      "security"
+    ],
+    "userClarifications": [],
+    "modelAssignment": {
+      "source": "docs/llm-model-comparison.md",
+      "category": "critical-money",
+      "grade": "A",
+      "costTier": "premium",
+      "firstChoice": "gpt-5",
+      "equalGradeAlternatives": [
+        "claude-opus",
+        "claude-sonnet"
+      ],
+      "previous": {
+        "recommendedModel": [
+          "gpt-4.1"
+        ],
+        "modelRationale": "(original text, kept for audit)"
+      }
+    },
+    "executionPlan": {
+      "order": 1,
+      "batch": 1,
+      "band": "critical-logic",
+      "scriptable": false,
+      "estimatedCostUsd": 4.5
+    },
+    "executionResult": null,
+    "jevRecommendation": null
+  },
+  "newProperties": {
+    "modelAssignment": "Task 2: first-choice model picked from equal-grade groups in the model catalog; `previous` keeps the original recommendation.",
+    "executionPlan": "Task 4: order (1-based within the spec folder), batch (consecutive tasks sharing a band), band (scaffold | critical-logic | followup), scriptable, estimatedCostUsd.",
+    "executionResult": "Task 3: null until completed; then {model, provider, confidenceScore 0-1, executionNotes, usedFirstChoice, executedAt}. Write it with `node tools/cli.js complete`.",
+    "jevRecommendation": "Task 5: null until queried; then the JEV system answer {model, confidence, reason, gatewayModel, queriedAt, agreesWithFirstChoice}. Write it with `node tools/cli.js jev`.",
+    "automation": "Task 6 (optional): {script:\"scaffold\", files:[{path,template,...}]}; executed by `node tools/cli.js scaffold` with zero model tokens.",
+    "userClarifications": "Optional array of {question, answer, status} entries captured with `node tools/cli.js clarify`; status is confirmed, recorded_decision or awaiting_user_input."
+  },
+  "orderingRules": {
+    "bands": [
+      "scaffold",
+      "critical-logic",
+      "followup"
+    ],
+    "principle": "Cheap/scripted creation first, then high-end models for critical logic, then low-cost models for the remaining work; dependencies always win over band.",
+    "batching": "Stay in the current band while any task in it is ready, then move to the next band.",
+    "crossSpecOrder": "EXECUTION_ORDER.md"
+  },
+  "modelCatalogSummary": {
+    "equalGradeGroups": {
+      "A-flagship": [
+        "claude-sonnet-5.5",
+        "gpt-5.6-terra",
+        "gpt-5.4",
+        "claude-sonnet-5"
+      ],
+      "A-value": [
+        "claude-sonnet-5",
+        "grok-4.5",
+        "gpt-5.3-codex"
+      ],
+      "B+": [
+        "gpt-6-luna",
+        "gpt-5.6-luna",
+        "mai-code-1.1-flash",
+        "gpt-5.4-mini",
+        "gemini-3.8-flash"
+      ],
+      "B": [
+        "gpt-5-mini",
+        "claude-haiku-4.5"
+      ]
+    },
+    "categories": {
+      "scripted": {
+        "band": "scaffold",
+        "costTier": "free",
+        "firstChoice": "js-script",
+        "equalGradeAlternatives": [
+          "gpt-5.6-luna",
+          "claude-haiku-4.5"
+        ]
+      },
+      "scaffold": {
+        "band": "scaffold",
+        "costTier": "low",
+        "firstChoice": "gpt-6-luna",
+        "equalGradeAlternatives": [
+          "gpt-5.6-luna",
+          "mai-code-1.1-flash"
+        ]
+      },
+      "critical-security-core": {
+        "band": "critical-logic",
+        "costTier": "premium",
+        "firstChoice": "claude-sonnet-5.5",
+        "equalGradeAlternatives": [
+          "gpt-5.3-codex",
+          "gpt-5.6-terra"
+        ]
+      },
+      "critical-security": {
+        "band": "critical-logic",
+        "costTier": "premium",
+        "firstChoice": "claude-sonnet-5.5",
+        "equalGradeAlternatives": [
+          "gpt-5.6-terra",
+          "gpt-5.3-codex"
+        ]
+      },
+      "critical-money": {
+        "band": "critical-logic",
+        "costTier": "premium",
+        "firstChoice": "claude-sonnet-5.5",
+        "equalGradeAlternatives": [
+          "gpt-5.6-terra",
+          "gpt-5.3-codex"
+        ]
+      },
+      "critical-architecture": {
+        "band": "critical-logic",
+        "costTier": "premium",
+        "firstChoice": "claude-sonnet-5.5",
+        "equalGradeAlternatives": [
+          "gpt-5.6-terra",
+          "gpt-5.4"
+        ]
+      },
+      "logic-reasoning": {
+        "band": "critical-logic",
+        "costTier": "mid",
+        "firstChoice": "claude-sonnet-5.5",
+        "equalGradeAlternatives": [
+          "gpt-5.6-luna",
+          "gpt-5.3-codex"
+        ]
+      },
+      "followup-backend": {
+        "band": "followup",
+        "costTier": "low",
+        "firstChoice": "gpt-5.6-luna",
+        "equalGradeAlternatives": [
+          "gpt-5.4-mini",
+          "claude-haiku-4.5"
+        ]
+      },
+      "followup-ui": {
+        "band": "followup",
+        "costTier": "low",
+        "firstChoice": "gpt-5.6-luna",
+        "equalGradeAlternatives": [
+          "gpt-5.4-mini",
+          "gemini-3.8-flash"
+        ]
+      },
+      "followup-docs-tests": {
+        "band": "followup",
+        "costTier": "low",
+        "firstChoice": "gpt-5.6-luna",
+        "equalGradeAlternatives": [
+          "gpt-6-luna",
+          "claude-haiku-4.5"
+        ]
+      }
+    },
+    "escalation": "If a task fails twice or confidence < 0.7, move to the next model in recommendedModel, then to the next category's first choice."
+  },
+  "taskCreationGuide": {
+    "requiredFields": [
+      {
+        "field": "id",
+        "type": "string",
+        "format": "P{phase}-T{number}",
+        "example": "P9-T041",
+        "description": "Unique task identifier"
+      },
+      {
+        "field": "name",
+        "type": "string",
+        "example": "New Task Name",
+        "description": "Human-readable task name"
+      },
+      {
+        "field": "status",
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "IN_PROGRESS",
+          "COMPLETED",
+          "BLOCKED",
+          "CANCELLED"
+        ],
+        "default": "PENDING",
+        "description": "Current task status"
+      },
+      {
+        "field": "priority",
+        "type": "string",
+        "enum": [
+          "CRITICAL",
+          "HIGH",
+          "MEDIUM",
+          "LOW"
+        ],
+        "default": "MEDIUM",
+        "description": "Task priority level"
+      },
+      {
+        "field": "estimatedHours",
+        "type": "number",
+        "minimum": 1,
+        "example": 16,
+        "description": "Estimated hours to complete"
+      },
+      {
+        "field": "value",
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 85,
+        "description": "Business value score (0-100)"
+      },
+      {
+        "field": "recommendedModel",
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 1,
+        "maxItems": 3,
+        "example": [
+          "deepseek-v4-flash",
+          "gpt-4o-mini",
+          "claude-haiku-4"
+        ],
+        "description": "Array of recommended models in priority order (lowest cost first)"
+      },
+      {
+        "field": "modelRationale",
+        "type": "string",
+        "example": "Explain why these models and when to escalate",
+        "description": "Explanation of model selection and escalation triggers"
+      },
+      {
+        "field": "dependencies",
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "example": [
+          "P9-T001",
+          "P9-T002"
+        ],
+        "description": "Array of task IDs that must be completed first"
+      },
+      {
+        "field": "deliverables",
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 1,
+        "example": [
+          "Deliverable 1",
+          "Deliverable 2"
+        ],
+        "description": "List of expected deliverables"
+      },
+      {
+        "field": "tags",
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "example": [
+          "documentation",
+          "inventory"
+        ],
+        "description": "Categorization tags"
+      },
+      {
+        "field": "modelAssignment",
+        "type": "object",
+        "description": "First choice + equal-grade alternatives from the model catalog"
+      },
+      {
+        "field": "executionPlan",
+        "type": "object",
+        "description": "order, batch, band, scriptable, estimatedCostUsd"
+      },
+      {
+        "field": "executionResult",
+        "type": "object|null",
+        "description": "null until COMPLETED, then model/confidence/notes"
+      },
+      {
+        "field": "jevRecommendation",
+        "type": "object|null",
+        "description": "null until the JEV system is queried"
+      }
+    ],
+    "optionalFields": [
+      {
+        "field": "pipelineId",
+        "type": "string",
+        "example": "pipeline-ledger",
+        "description": "Identifier for pipeline-based tasks"
+      },
+      {
+        "field": "pipelineStages",
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "example": [
+          "register",
+          "start",
+          "complete"
+        ],
+        "description": "Stages in pipeline execution"
+      },
+      {
+        "field": "executionRecord",
+        "type": "object",
+        "properties": {
+          "required": {
+            "type": "boolean"
+          },
+          "store": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string"
+          },
+          "pipeline": {
+            "type": "string"
+          }
+        },
+        "description": "Execution record configuration"
+      },
+      {
+        "field": "completedDate",
+        "type": "string",
+        "format": "date",
+        "example": "2026-09-30",
+        "description": "Date task was completed"
+      },
+      {
+        "field": "artifacts",
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "example": [
+          "src/core/services.js"
+        ],
+        "description": "Files or artifacts produced by this task"
+      },
+      {
+        "field": "blocker",
+        "type": "string",
+        "description": "Description of what is blocking this task"
+      },
+      {
+        "field": "notes",
+        "type": "string",
+        "description": "Additional notes or context"
+      },
+      {
+        "field": "automation",
+        "type": "object",
+        "description": "Script-only execution spec (see newProperties.automation)"
+      },
+      {
+        "field": "userClarifications",
+        "type": "array",
+        "description": "Questions and answers captured through `node tools/cli.js clarify`; statuses are confirmed, recorded_decision or awaiting_user_input"
+      }
+    ],
+    "recommendedModelRule": "1-3 catalog ids, first choice first; remaining entries are equal-grade alternatives (not escalations)."
+  },
+  "costEstimationGuide": {
+    "formula": "estimatedTokens = estimatedHours * 100000; cost = tokens/1e6 * (0.7*input + 0.3*output)",
+    "modelCosts": {
+      "js-script": {
+        "per1MInput": 0,
+        "per1MOutput": 0,
+        "grade": "n/a",
+        "estimated": false
+      },
+      "gpt-6-luna": {
+        "per1MInput": 0.1,
+        "per1MOutput": 0.5,
+        "grade": "B+",
+        "estimated": false
+      },
+      "gpt-5.6-luna": {
+        "per1MInput": 0.2,
+        "per1MOutput": 1.2,
+        "grade": "B+",
+        "estimated": false
+      },
+      "mai-code-1.1-flash": {
+        "per1MInput": 0.2,
+        "per1MOutput": 1.2,
+        "grade": "B+",
+        "estimated": false
+      },
+      "gpt-5-mini": {
+        "per1MInput": 0.25,
+        "per1MOutput": 2,
+        "grade": "B",
+        "estimated": false
+      },
+      "gpt-5.4-mini": {
+        "per1MInput": 0.75,
+        "per1MOutput": 4.5,
+        "grade": "B+",
+        "estimated": false
+      },
+      "gemini-3.8-flash": {
+        "per1MInput": 0.75,
+        "per1MOutput": 3.75,
+        "grade": "B+",
+        "estimated": false
+      },
+      "claude-haiku-4.5": {
+        "per1MInput": 1,
+        "per1MOutput": 5,
+        "grade": "B",
+        "estimated": false
+      },
+      "gpt-5.3-codex": {
+        "per1MInput": 1.75,
+        "per1MOutput": 14,
+        "grade": "A",
+        "estimated": false
+      },
+      "claude-sonnet-5": {
+        "per1MInput": 2,
+        "per1MOutput": 10,
+        "grade": "A",
+        "estimated": false
+      },
+      "claude-sonnet-5.5": {
+        "per1MInput": 2,
+        "per1MOutput": 10,
+        "grade": "A",
+        "estimated": false
+      },
+      "gpt-5.6-terra": {
+        "per1MInput": 2,
+        "per1MOutput": 12,
+        "grade": "A",
+        "estimated": false
+      },
+      "grok-4.5": {
+        "per1MInput": 2,
+        "per1MOutput": 6,
+        "grade": "A-",
+        "estimated": false
+      },
+      "gpt-5.4": {
+        "per1MInput": 2.5,
+        "per1MOutput": 15,
+        "grade": "A",
+        "estimated": false
+      }
+    }
+  },
+  "quickReference": {
+    "chooseModelPattern": {
+      "simple_implementation": "Pattern 1: ['deepseek-v4-flash', 'gpt-4o-mini', 'claude-haiku-4']",
+      "requires_reasoning": "Pattern 2: ['gpt-4o-mini', 'gpt-4.1', 'deepseek-r1']",
+      "security_sensitive": "Pattern 3: ['o1-mini', 'gpt-4.1', 'claude-opus-5']",
+      "critical_complex": "Pattern 4: ['gpt-4o-mini', 'o1-mini', 'gpt-4.1']"
+    },
+    "priorityGuidelines": {
+      "CRITICAL": "Must complete; affects multiple other tasks; no alternatives",
+      "HIGH": "Important feature; significant value; some workarounds",
+      "MEDIUM": "Nice to have; adds value; can be deferred",
+      "LOW": "Enhancement; minor impact; can be skipped"
+    },
+    "statusTransitions": {
+      "PENDING": [
+        "IN_PROGRESS",
+        "BLOCKED",
+        "CANCELLED"
+      ],
+      "IN_PROGRESS": [
+        "COMPLETED",
+        "BLOCKED",
+        "CANCELLED"
+      ],
+      "BLOCKED": [
+        "PENDING",
+        "CANCELLED"
+      ],
+      "COMPLETED": [],
+      "CANCELLED": [
+        "PENDING"
+      ]
+    }
+  },
+  "headerSummaryRule": {
+    "total": 21,
+    "completed": 21,
+    "pending": 0,
+    "totalEstimatedHours": 77,
+    "averageValue": 77
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "chunks": [
+    {
+      "taskRange": "RAG-1 to RAG-12",
+      "chunkId": "typescript-rag-chunk-1",
+      "file": "tasks_chunk_1.json",
+      "taskCount": 12
+    }
+  ],
+  "totalTasks": 12,
+  "spec": "typescript-rag",
+  "description": "Implement a source-grounded RAG index and retrieval system for JavaScript and TypeScript repositories, including Angular, Node.js, and React projects.",
+  "folder": "typescript-rag",
+  "order": 1,
+  "dependsOnSpec": [],
+  "executionPlan": {
+    "strategy": "foundation -> source discovery and parsing -> indexing and retrieval -> API and verification, dependency-safe",
+    "generated": "2026-10-07",
+    "batches": 9,
+    "order": [
+      { "order": 1, "batch": 1, "id": "RAG-1", "band": "scaffold", "model": "gpt-5.3-codex", "file": "tasks_chunk_1.json" },
+      { "order": 2, "batch": 2, "id": "RAG-2", "band": "critical-logic", "model": "gpt-5.3-codex", "file": "tasks_chunk_1.json" },
+      { "order": 3, "batch": 2, "id": "RAG-3", "band": "critical-logic", "model": "gpt-5.3-codex", "file": "tasks_chunk_1.json" },
+      { "order": 4, "batch": 2, "id": "RAG-6", "band": "critical-logic", "model": "claude-sonnet-5.5", "file": "tasks_chunk_1.json" },
+      { "order": 5, "batch": 2, "id": "RAG-7", "band": "critical-logic", "model": "gpt-5.3-codex", "file": "tasks_chunk_1.json" },
+      { "order": 6, "batch": 3, "id": "RAG-4", "band": "critical-logic", "model": "gpt-5.3-codex", "file": "tasks_chunk_1.json" },
+      { "order": 7, "batch": 4, "id": "RAG-5", "band": "critical-logic", "model": "gpt-5.3-codex", "file": "tasks_chunk_1.json" },
+      { "order": 8, "batch": 5, "id": "RAG-8", "band": "critical-logic", "model": "gpt-5.3-codex", "file": "tasks_chunk_1.json" },
+      { "order": 9, "batch": 6, "id": "RAG-9", "band": "critical-logic", "model": "gpt-5.3-codex", "file": "tasks_chunk_1.json" },
+      { "order": 10, "batch": 7, "id": "RAG-10", "band": "followup", "model": "gpt-5.3-codex", "file": "tasks_chunk_1.json" },
+      { "order": 11, "batch": 8, "id": "RAG-11", "band": "critical-logic", "model": "claude-sonnet-5.5", "file": "tasks_chunk_1.json" },
+      { "order": 12, "batch": 9, "id": "RAG-12", "band": "followup", "model": "gpt-5.3-codex", "file": "tasks_chunk_1.json" }
+    ]
+  }
+}
