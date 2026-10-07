@@ -52,6 +52,7 @@ class PythonAnalyzer {
       conventions: 0,
       refactorings: 0
     };
+    this.toolErrors = [];
   }
 
   /**
@@ -59,6 +60,7 @@ class PythonAnalyzer {
    */
   async analyzeFile(filePath) {
     this.stats.filesAnalyzed++;
+    this.toolErrors = [];
 
     try {
       const issues = [];
@@ -99,21 +101,31 @@ class PythonAnalyzer {
         else if (severity === 'refactor') this.stats.refactorings++;
       });
 
-      return {
+      const result = {
         filePath,
         issues,
         count: issues.length,
         language: 'python'
       };
+      if (this.toolErrors.length > 0) result.error = this.toolErrors.join('; ');
+      return result;
 
     } catch (error) {
       this.log(`Error analyzing ${filePath}: ${error.message}`);
       return {
         filePath,
         error: error.message,
-        issues: []
+        issues: [],
+        count: 0,
+        language: 'python'
       };
     }
+  }
+
+  recordToolError(tool, error) {
+    const message = `${tool} command failed: ${error.message || error}`;
+    this.toolErrors.push(message);
+    this.log(message);
   }
 
   /**
@@ -131,6 +143,7 @@ class PythonAnalyzer {
         return results.map(result => this.parsePylintIssue(result, filePath));
       } catch (parseError) {
         this.log(`Failed to parse Pylint output: ${parseError.message}`);
+        this.recordToolError('pylint', parseError);
         return [];
       }
 
@@ -142,11 +155,12 @@ class PythonAnalyzer {
           return results.map(result => this.parsePylintIssue(result, filePath));
         } catch (parseError) {
           this.log(`Pylint failed: ${error.message}`);
+          this.recordToolError('pylint', parseError);
           return [];
         }
       }
 
-      this.log(`Pylint command failed: ${error.message}`);
+      this.recordToolError('pylint', error);
       return [];
     }
   }
@@ -213,7 +227,7 @@ class PythonAnalyzer {
         return this.parseFlake8Text(error.stdout, filePath);
       }
 
-      this.log(`Flake8 command failed: ${error.message}`);
+      this.recordToolError('flake8', error);
       return [];
     }
   }
@@ -308,7 +322,7 @@ class PythonAnalyzer {
         }];
       }
 
-      this.log(`Black command failed: ${error.message}`);
+      this.recordToolError('black', error);
       return [];
     }
   }
@@ -328,7 +342,7 @@ class PythonAnalyzer {
         return this.parseMypyOutput(error.stdout, filePath);
       }
 
-      this.log(`Mypy command failed: ${error.message}`);
+      this.recordToolError('mypy', error);
       return [];
     }
   }
@@ -374,6 +388,7 @@ class PythonAnalyzer {
         return (results.results || []).map(result => this.parseBanditIssue(result, filePath));
       } catch (parseError) {
         this.log(`Failed to parse Bandit output: ${parseError.message}`);
+        this.recordToolError('bandit', parseError);
         return [];
       }
 
@@ -384,11 +399,12 @@ class PythonAnalyzer {
           return (results.results || []).map(result => this.parseBanditIssue(result, filePath));
         } catch (parseError) {
           this.log(`Bandit failed: ${error.message}`);
+          this.recordToolError('bandit', parseError);
           return [];
         }
       }
 
-      this.log(`Bandit command failed: ${error.message}`);
+      this.recordToolError('bandit', error);
       return [];
     }
   }

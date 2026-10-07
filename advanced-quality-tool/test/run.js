@@ -12,7 +12,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { results } = require('./harness');
+const { results, runTests, setCurrentFile } = require('./harness');
 
 function findTests(dir) {
   const found = [];
@@ -42,8 +42,7 @@ console.log(`Running ${files.length} test file(s)\n`);
   for (const file of files) {
     console.log(path.relative(testDir, file));
     try {
-      // Test files call describe/test synchronously; the harness awaits each
-      // test as it runs. require() triggers execution.
+      setCurrentFile(file);
       require(file);
     } catch (err) {
       results.failed++;
@@ -53,8 +52,7 @@ console.log(`Running ${files.length} test file(s)\n`);
     console.log('');
   }
 
-  // Give any trailing async tests a tick to settle.
-  await new Promise((r) => setImmediate(r));
+  await runTests();
 
   console.log('----------------------------------------');
   console.log(`Passed: ${results.passed}  Failed: ${results.failed}`);

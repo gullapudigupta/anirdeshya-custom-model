@@ -835,7 +835,8 @@ paths:
   /api/pipelines/executions/{id}/replay:
     post:
       tags: [Pipelines]
-      summary: Replay a pipeline execution
+      summary: Preview replay data for a pipeline execution
+      description: Returns the original run input and metadata; it does not start a new execution.
       parameters:
         - name: id
           in: path
@@ -864,6 +865,12 @@ paths:
                   data:
                     type: object
                     properties:
+                      replayed:
+                        type: boolean
+                        example: false
+                      mode:
+                        type: string
+                        example: preview
                       originalRunId:
                         type: string
                       pipelineId:

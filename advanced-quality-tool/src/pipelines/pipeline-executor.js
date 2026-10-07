@@ -64,6 +64,7 @@ class PipelineExecutor {
     try {
       // Execute stages in order
       const stageResults = {};
+      const stageOutputs = {};
       let lastOutput = input;
 
       for (const stageName of pipeline.stages) {
@@ -97,7 +98,7 @@ class PipelineExecutor {
             pipelineId,
             stageName,
             input: lastOutput,
-            previousResults: stageResults,
+            previousResults: stageOutputs,
             ledger: this.ledger,
             workspace,
             taskId,
@@ -106,6 +107,7 @@ class PipelineExecutor {
 
           const stageOutput = await handler(stageContext);
           const duration = Date.now() - stageStart;
+          stageOutputs[stageName] = stageOutput;
 
           this.ledger.stageEnd(runId, stageName, { 
             success: true, 

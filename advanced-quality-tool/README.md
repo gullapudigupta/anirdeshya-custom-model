@@ -17,6 +17,7 @@ A comprehensive, AI-powered code quality analysis and auto-fix platform with mul
 
 ## Table of Contents
 
+- [Language Support](docs/LANGUAGE-SUPPORT.md)
 - [Features](#features)
 - [Quick Start](#quick-start)
 - [AI Features](#ai-features)
@@ -31,6 +32,8 @@ A comprehensive, AI-powered code quality analysis and auto-fix platform with mul
 - [Configuration](#configuration)
 - [Security](#security)
 - [Documentation](#documentation)
+- [Release Readiness](docs/RELEASE-READINESS.md)
+- [UAT Test Plan](docs/UAT-TEST-PLAN.md)
 - [Development](#development)
 - [Contributing](#contributing)
 - [License](#license)

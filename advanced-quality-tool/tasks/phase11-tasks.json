@@ -1032,7 +1032,7 @@
         "Prepare announcement"
       ],
       "tags": ["release", "beta", "preparation"],
-      "notes": "Blocked: beta distribution requires release credentials and an authorized release decision."
+      "notes": "Repository preparation includes .github/workflows/advanced-quality-tool-ci.yml and docs/RELEASE-READINESS.md. Still blocked on successful hosted matrix runs, release credentials, and an authorized beta decision."
     },
     {
       "id": "P11-T044",
@@ -1055,7 +1055,7 @@
         "Verify fixes with testers"
       ],
       "tags": ["testing", "uat", "feedback"],
-      "notes": "Blocked: user acceptance testing requires recruited external testers and coordination."
+      "notes": "The draft test plan is in docs/UAT-TEST-PLAN.md. Still blocked on beta access, recruited external testers, feedback collection, and tester sign-off."
     },
     {
       "id": "P11-T045",

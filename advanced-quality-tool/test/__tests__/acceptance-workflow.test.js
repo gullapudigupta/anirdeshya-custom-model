@@ -4,6 +4,8 @@
 
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
 const { AcceptanceWorkflow, WorkflowState, CriteriaStatus } = require('../../src/agent/acceptance-workflow');
 const { ExecutionLedger } = require('../../src/pipelines/execution-ledger');
 

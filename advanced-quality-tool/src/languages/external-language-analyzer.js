@@ -15,9 +15,16 @@ class ExternalLanguageAnalyzer {
   async analyzeFile(filePath) {
     this.stats.filesAnalyzed++;
     const issues = [];
+    const errors = [];
     for (const [toolName, tool] of Object.entries(this.tools)) {
       if (this.options[toolName] === false) continue;
-      issues.push(...await this.runTool(toolName, tool, filePath));
+      try {
+        issues.push(...await this.runTool(toolName, tool, filePath));
+      } catch (error) {
+        const message = `${toolName}: ${error.message}`;
+        errors.push(message);
+        this.log(message);
+      }
     }
     issues.forEach(issue => {
       this.stats.issuesFound++;
@@ -26,7 +33,9 @@ class ExternalLanguageAnalyzer {
       else if (severity === 'WARNING') this.stats.warnings++;
       else this.stats.info++;
     });
-    return { filePath, issues, count: issues.length, language: this.language };
+    const result = { filePath, issues, count: issues.length, language: this.language };
+    if (errors.length > 0) result.error = errors.join('; ');
+    return result;
   }
 
   async runTool(toolName, tool, filePath) {
@@ -37,9 +46,11 @@ class ExternalLanguageAnalyzer {
       return this.parseOutput(toolName, result.stdout || '', filePath, tool.parser);
     } catch (error) {
       const output = `${error.stdout || ''}\n${error.stderr || ''}`;
-      if (output.trim()) return this.parseOutput(toolName, output, filePath, tool.parser);
-      this.log(`${toolName} is unavailable: ${error.message}`);
-      return [];
+      if (output.trim()) {
+        const issues = this.parseOutput(toolName, output, filePath, tool.parser);
+        if (issues.length > 0) return issues;
+      }
+      throw new Error(`Unable to run ${toolName} (${command}): ${error.message}`, { cause: error });
     }
   }
 
@@ -52,19 +63,47 @@ class ExternalLanguageAnalyzer {
   }
 
   parseJson(output, filePath, toolName) {
+    let value;
     try {
-      const value = JSON.parse(output);
-      const entries = Array.isArray(value) ? value : (value.issues || value.results || []);
-      return entries.map(issue => this.issue(toolName, issue.filePath || issue.path || filePath, {
-        line: issue.line || issue.line_number,
-        column: issue.column || issue.column_number,
-        ruleId: issue.code || issue.rule || issue.ruleId || issue.test_id,
+      value = JSON.parse(output);
+    } catch {
+      const entries = output.split(/\r?\n/).filter(Boolean).flatMap(line => {
+        try {
+          return [JSON.parse(line)];
+        } catch {
+          return [];
+        }
+      });
+      if (entries.length === 0) return this.parseText(output, filePath, toolName);
+      value = entries;
+    }
+
+    const entries = Array.isArray(value)
+      ? value
+      : value && Array.isArray(value.issues)
+        ? value.issues
+        : value && Array.isArray(value.results)
+          ? value.results
+          : value && value.reason === 'compiler-message'
+            ? [value]
+            : [];
+    return entries.flatMap(entry => {
+      if (!entry || typeof entry !== 'object') return [];
+      const issue = entry.reason === 'compiler-message' && entry.message && typeof entry.message === 'object'
+        ? entry.message
+        : entry;
+      const spans = Array.isArray(issue.spans) ? issue.spans : [];
+      const span = spans.find(candidate => candidate.is_primary) || spans[0] || {};
+      const code = issue.code && typeof issue.code === 'object' ? issue.code.code : issue.code;
+      const normalized = this.issue(toolName, issue.filePath || issue.path || span.file_name || filePath, {
+        line: issue.line || issue.line_number || span.line_start,
+        column: issue.column || issue.column_number || span.column_start,
+        ruleId: code || issue.rule || issue.ruleId || issue.test_id,
         message: issue.message || issue.text || issue.issue_text,
         severity: issue.severity || issue.level || issue.type
-      }));
-    } catch {
-      return this.parseText(output, filePath, toolName);
-    }
+      });
+      return normalized.message ? [normalized] : [];
+    });
   }
 
   parseRubocop(output, filePath) {
@@ -85,12 +124,21 @@ class ExternalLanguageAnalyzer {
   parsePhpcs(output, filePath) {
     try {
       const value = JSON.parse(output);
-      return Object.entries(value.files || {}).flatMap(([source, file]) => [
-        ...(file.messages || []), ...(file.errors || []), ...(file.warnings || [])
-      ].map(issue => this.issue('phpcs', source || filePath, {
-        line: issue.line, column: issue.column, ruleId: issue.source,
-        message: issue.message, severity: issue.type
-      })));
+      return Object.entries(value.files || {}).flatMap(([source, file]) => {
+        const messages = Array.isArray(file.messages)
+          ? file.messages
+          : [
+            ...(Array.isArray(file.errors) ? file.errors : []),
+            ...(Array.isArray(file.warnings) ? file.warnings : [])
+          ];
+        return messages.map(issue => this.issue('phpcs', source || filePath, {
+          line: issue.line,
+          column: issue.column,
+          ruleId: issue.source,
+          message: issue.message,
+          severity: issue.type
+        }));
+      });
     } catch {
       return this.parseText(output, filePath, 'phpcs');
     }

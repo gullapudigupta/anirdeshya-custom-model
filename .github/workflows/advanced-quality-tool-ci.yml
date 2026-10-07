@@ -1,0 +1,41 @@
+name: Advanced Quality Tool CI
+
+on:
+  push:
+    paths:
+      - "advanced-quality-tool/**"
+      - ".github/workflows/advanced-quality-tool-ci.yml"
+  pull_request:
+    paths:
+      - "advanced-quality-tool/**"
+      - ".github/workflows/advanced-quality-tool-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Node ${{ matrix.node }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [20, 22, 24]
+    defaults:
+      run:
+        working-directory: advanced-quality-tool
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: advanced-quality-tool/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run tests
+        run: npm test

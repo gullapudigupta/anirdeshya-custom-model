@@ -28,6 +28,12 @@ model, and budget preferences are separate from credentials.
 code, applies a confidence threshold, and retains the existing backup behavior.
 Use `--dry-run` to preview changes.
 
+Generated TypeScript is checked with the TypeScript compiler, using the nearest
+`tsconfig.json` when present. Type or configuration errors fail validation;
+generated code is not reported as passing when compiler validation fails.
+`CodeGenerator` outputs marked as scaffolds are proposals only and do not count
+as completed implementations.
+
 ## Custom prompt templates
 
 Create a UTF-8 text template using documented placeholders and store it through

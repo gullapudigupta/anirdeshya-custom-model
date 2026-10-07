@@ -14,6 +14,7 @@ const { getRegistry } = require('./pipeline-registry');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const net = require('net');
 
 /**
  * Security finding severity
@@ -139,6 +140,52 @@ class SecurityScanPipeline {
         description: 'Maximum 5 high-severity dependency vulnerabilities'
       }
     ];
+  }
+
+  isUrlAllowed(value) {
+    let url;
+    try {
+      url = new URL(value);
+    } catch {
+      return { allowed: false, reason: 'Invalid URL' };
+    }
+
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      return { allowed: false, reason: 'Unsupported URL protocol' };
+    }
+    if (url.username || url.password) {
+      return { allowed: false, reason: 'URLs containing credentials are not allowed' };
+    }
+
+    const hostname = url.hostname.toLowerCase().replace(/\.$/, '').replace(/^\[|\]$/g, '');
+    if (!hostname || hostname === 'localhost' || hostname.endsWith('.localhost') ||
+        hostname === '0.0.0.0' || hostname === '::' || hostname === '::1' ||
+        hostname.startsWith('fc') || hostname.startsWith('fd') ||
+        /^fe[89ab]/.test(hostname)) {
+      return { allowed: false, reason: 'Local and private network destinations are not allowed' };
+    }
+
+    if (net.isIP(hostname) === 4) {
+      const [a, b] = hostname.split('.').map(Number);
+      const privateAddress = a === 0 || a === 10 || a === 127 ||
+        (a === 169 && b === 254) ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168);
+      if (privateAddress) {
+        return { allowed: false, reason: 'Local and private network destinations are not allowed' };
+      }
+    } else if (net.isIP(hostname) === 6 && hostname.startsWith('::ffff:')) {
+      const mappedIPv4 = hostname.slice('::ffff:'.length);
+      if (net.isIP(mappedIPv4) === 4) {
+        const [a, b] = mappedIPv4.split('.').map(Number);
+        if (a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) ||
+            (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) {
+          return { allowed: false, reason: 'Local and private network destinations are not allowed' };
+        }
+      }
+    }
+
+    return { allowed: true };
   }
 
   // ─── Stage Handlers ───────────────────────────────────────────────────────────

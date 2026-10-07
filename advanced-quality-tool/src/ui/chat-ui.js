@@ -727,13 +727,17 @@
     
     async function loadPipelineHistory() {
       try {
-        const response = await fetch('http://localhost:3000/api/pipelines/executions');
+        const response = await fetch('http://localhost:3000/api/pipelines/executions?limit=50');
         const data = await response.json();
+        if (!response.ok) throw new Error(data.message || data.error || `Request failed (${response.status})`);
         
-        pipelineState.executions = data.executions || [];
+        pipelineState.executions = data.executions || data.data || [];
         renderPipelineHistory();
+        return true;
       } catch (error) {
         console.error('Failed to load pipeline history:', error);
+        addAssistantMessage(`Failed to load pipeline history: ${escapeHtml(error.message)}`);
+        return false;
       }
     }
     
@@ -748,18 +752,24 @@
         return;
       }
       
-      history.innerHTML = recent.map(exec => `
-        <div class="history-item" data-exec-id="${exec.id}">
+      history.innerHTML = recent.map(exec => {
+        const id = exec.id || exec.runId;
+        const pipeline = exec.pipeline || exec.pipelineName || exec.pipelineId || 'Unknown pipeline';
+        const status = String(exec.status || 'unknown').toLowerCase();
+        const started = exec.startTime || exec.started;
+        return `
+        <div class="history-item" data-exec-id="${escapeHtml(id || '')}">
           <div class="history-info">
-            <span class="history-icon">${exec.status === 'completed' ? '✅' : exec.status === 'failed' ? '❌' : '⏳'}</span>
+            <span class="history-icon">${status === 'completed' ? '✅' : status === 'failed' ? '❌' : '⏳'}</span>
             <div>
-              <div class="history-name">${escapeHtml(exec.pipeline)}</div>
-              <div class="history-time">${formatTimeAgo(exec.startTime)}</div>
+              <div class="history-name">${escapeHtml(pipeline)}</div>
+              <div class="history-time">${started ? formatTimeAgo(started) : 'Unknown time'}</div>
             </div>
           </div>
-          <span class="history-status ${exec.status}">${escapeHtml(exec.status)}</span>
+          <span class="history-status ${escapeHtml(status)}">${escapeHtml(status)}</span>
         </div>
-      `).join('');
+      `;
+      }).join('');
       
       // Add click handlers
       history.querySelectorAll('.history-item').forEach(item => {
@@ -770,13 +780,16 @@
     async function showExecutionDetails(execId) {
       try {
         const response = await fetch(`http://localhost:3000/api/pipelines/executions/${execId}`);
-        const data = await response.json();
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.message || payload.error || `Request failed (${response.status})`);
+        const data = payload.data || payload;
         
         const details = document.getElementById('pipelineExecDetails');
         if (!details) return;
         
-        document.getElementById('execId').textContent = data.id;
-        document.getElementById('execStart').textContent = new Date(data.startTime).toLocaleString();
+        document.getElementById('execId').textContent = data.id || data.runId || execId;
+        const started = data.startTime || data.started;
+        document.getElementById('execStart').textContent = started ? new Date(started).toLocaleString() : '-';
         document.getElementById('execDuration').textContent = data.duration ? formatDuration(data.duration) : '-';
         document.getElementById('execStatus').textContent = data.status;
         document.getElementById('execIssuesFound').textContent = data.issuesFound || 0;
@@ -785,6 +798,7 @@
         details.style.display = 'block';
       } catch (error) {
         console.error('Failed to load execution details:', error);
+        addAssistantMessage(`Failed to load execution details: ${escapeHtml(error.message)}`);
       }
     }
     
@@ -792,20 +806,78 @@
       document.getElementById('pipelineExecDetails').style.display = 'none';
     }
     
-    function showPipelineHistory() {
-      addAssistantMessage('📋 Full pipeline history view coming soon. Check the recent executions in the Pipeline panel.');
+    async function showPipelineHistory() {
+      if (!await loadPipelineHistory()) return;
+      if (pipelineState.executions.length === 0) {
+        addAssistantMessage('No pipeline executions have been recorded yet.');
+        return;
+      }
+
+      const items = pipelineState.executions.map(exec => {
+        const pipeline = exec.pipeline || exec.pipelineName || exec.pipelineId || 'Unknown pipeline';
+        const status = String(exec.status || 'unknown').toLowerCase();
+        const started = exec.startTime || exec.started;
+        const timestamp = started ? formatTimeAgo(started) : 'Unknown time';
+        return `<li><strong>${escapeHtml(pipeline)}</strong> — ${escapeHtml(status)} — ${escapeHtml(timestamp)}</li>`;
+      }).join('');
+      addAssistantMessage(`<strong>Pipeline execution history</strong><ul>${items}</ul>`);
     }
     
     async function replayExecution() {
       const execId = document.getElementById('execId').textContent;
-      addAssistantMessage(`🔄 Replaying execution ${execId}...`);
-      // Implementation would call the replay API
+      try {
+        const response = await fetch(`http://localhost:3000/api/pipelines/executions/${encodeURIComponent(execId)}/replay`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.message || payload.error || `Request failed (${response.status})`);
+        const preview = payload.data || payload;
+        addAssistantMessage(
+          `Replay preview for ${escapeHtml(preview.pipelineId || execId)}: ` +
+          `${escapeHtml(preview.message || 'Execution details loaded.')} ` +
+          'No new execution was started; use the CLI or SDK for a full replay.'
+        );
+      } catch (error) {
+        console.error('Failed to preview pipeline replay:', error);
+        addAssistantMessage(`Failed to preview pipeline replay: ${escapeHtml(error.message)}`);
+      }
     }
     
-    function exportExecutionReport() {
+    async function exportExecutionReport() {
       const execId = document.getElementById('execId').textContent;
-      addAssistantMessage(`📥 Exporting report for execution ${execId}...`);
-      // Implementation would download the report
+      try {
+        const response = await fetch(`http://localhost:3000/api/pipelines/executions/${encodeURIComponent(execId)}`);
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.message || payload.error || `Request failed (${response.status})`);
+        const data = payload.data || payload;
+        const report = {
+          generatedAt: new Date().toISOString(),
+          execution: {
+            id: data.id || data.runId || execId,
+            pipeline: data.pipeline || data.pipelineName || data.pipelineId,
+            status: data.status,
+            started: data.started || data.startTime,
+            completed: data.completed,
+            duration: data.duration,
+            error: data.error || null
+          }
+        };
+        const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+        const downloadUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = `aqt-pipeline-${execId.replace(/[^\w.-]/g, '_')}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+        addAssistantMessage(`Downloaded the execution summary for ${escapeHtml(execId)}.`);
+      } catch (error) {
+        console.error('Failed to export pipeline report:', error);
+        addAssistantMessage(`Failed to export pipeline report: ${escapeHtml(error.message)}`);
+      }
     }
     
     // ============================================================================
@@ -843,12 +915,16 @@
       try {
         const response = await fetch('http://localhost:3000/api/agent');
         const data = await response.json();
+        if (!response.ok) throw new Error(data.message || data.error || `Request failed (${response.status})`);
         
-        agentPanelState.agents = data.agents || [];
+        agentPanelState.agents = data.agents || data.data || [];
         renderActiveAgents();
         updateAgentStats();
+        return true;
       } catch (error) {
         console.error('Failed to load agents:', error);
+        addAssistantMessage(`Failed to load agent history: ${escapeHtml(error.message)}`);
+        return false;
       }
     }
     
@@ -1115,8 +1191,22 @@
       document.getElementById('agentDetails').style.display = 'none';
     }
     
-    function showAgentHistory() {
-      addAssistantMessage('📋 Full agent history view coming soon. Check the recent agents in the Agent panel.');
+    async function showAgentHistory() {
+      if (!await loadActiveAgents()) return;
+      if (agentPanelState.agents.length === 0) {
+        addAssistantMessage('No agent work has been recorded yet.');
+        return;
+      }
+
+      const items = agentPanelState.agents.map(agent => {
+        const id = agent.id || 'Unknown agent';
+        const status = String(agent.status || 'unknown').toLowerCase();
+        const started = agent.started || agent.createdAt;
+        const timestamp = started ? formatTimeAgo(started) : 'Unknown time';
+        return `<li><strong>${escapeHtml(id)}</strong> — ${escapeHtml(status)} — ` +
+          `${escapeHtml(agent.description || 'No description')} — ${escapeHtml(timestamp)}</li>`;
+      }).join('');
+      addAssistantMessage(`<strong>Agent work history</strong><ul>${items}</ul>`);
     }
     
     function expandAgentLogs() {

@@ -9,8 +9,8 @@
  *   - dotnet-format (whitespace/style verification)
  *
  * Design notes:
- *   - Shells out to external tools; when a tool is missing, degrades to an
- *     empty result rather than throwing, so the rest of the pipeline runs.
+ *   - Shells out to external tools; when a tool is missing or its diagnostics
+ *     cannot be parsed, the result includes an error instead of appearing clean.
  *   - Roslyn/StyleCop/Sonar all deliver diagnostics through the compiler, so
  *     the primary path parses `dotnet build` output. We support both the
  *     structured MSBuild JSON logger output and the plain `file(line,col):
@@ -119,9 +119,11 @@ class CSharpAnalyzer {
     try {
       const projectPath = this.findNearestProject(filePath);
       let issues = [];
+      const errors = [];
 
       if (projectPath) {
         const projectResult = await this.analyzeProject(projectPath);
+        if (projectResult.error) errors.push(`dotnet: ${projectResult.error}`);
         const target = path.resolve(filePath);
         issues = (projectResult.issues || []).filter(
           (i) => !i.filePath || path.resolve(i.filePath) === target
@@ -136,12 +138,14 @@ class CSharpAnalyzer {
 
       this.tallyStats(issues);
 
-      return {
+      const result = {
         filePath,
         issues,
         count: issues.length,
         language: 'csharp'
       };
+      if (errors.length > 0) result.error = errors.join('; ');
+      return result;
     } catch (error) {
       this.log(`Error analyzing ${filePath}: ${error.message}`);
       return { filePath, error: error.message, issues: [], count: 0, language: 'csharp' };
@@ -177,6 +181,14 @@ class CSharpAnalyzer {
       const combined = `${(error && error.stdout) || ''}\n${(error && error.stderr) || ''}`;
       if (combined.trim()) {
         const issues = this.parseBuildOutput(combined);
+        if (issues.length === 0) {
+          return {
+            projectPath,
+            error: `dotnet build failed without recognized diagnostics: ${error.message}`,
+            issues,
+            count: 0
+          };
+        }
         return { projectPath, issues, count: issues.length };
       }
       this.log(`dotnet build failed: ${error.message}`);

@@ -15,6 +15,9 @@ const results = { passed: 0, failed: 0, failures: [] };
 const suiteStack = [];
 const beforeEachStack = [];
 const afterEachStack = [];
+const fileHooks = new Map();
+const tests = [];
+let currentFile = null;
 
 function currentName(name) {
   return [...suiteStack, name].join(' › ');
@@ -36,18 +39,22 @@ function describe(name, fn) {
 function beforeEach(fn) {
   const top = beforeEachStack[beforeEachStack.length - 1];
   if (top) top.push(fn);
+  else if (currentFile) fileHooks.get(currentFile).beforeEach.push(fn);
 }
 
 function afterEach(fn) {
   const top = afterEachStack[afterEachStack.length - 1];
   if (top) top.push(fn);
+  else if (currentFile) fileHooks.get(currentFile).afterEach.push(fn);
 }
 
-async function runHooks(stack) {
-  for (const level of stack) {
-    for (const hook of level) {
-      await hook();
-    }
+function setCurrentFile(file) {
+  currentFile = file;
+  suiteStack.length = 0;
+  beforeEachStack.length = 0;
+  afterEachStack.length = 0;
+  if (!fileHooks.has(file)) {
+    fileHooks.set(file, { beforeEach: [], afterEach: [] });
   }
 }
 
@@ -76,20 +83,47 @@ function runWithOptionalDone(fn) {
   });
 }
 
-async function test(name, fn) {
+function test(name, fn) {
   const label = currentName(name);
-  try {
-    await runHooks(beforeEachStack);
-    await runWithOptionalDone(fn);
-    await runHooks(afterEachStack);
-    results.passed++;
-    console.log(`  \u2713 ${label}`);
-  } catch (err) {
-    results.failed++;
-    results.failures.push({ label, message: err && err.message });
-    console.log(`  \u2717 ${label}`);
-    console.log(`      ${err && err.message}`);
+  const hooks = currentFile ? fileHooks.get(currentFile) : { beforeEach: [], afterEach: [] };
+  tests.push({
+    label,
+    fn,
+    beforeEach: [...hooks.beforeEach, ...beforeEachStack.flatMap((level) => level)],
+    afterEach: [
+      ...afterEachStack.slice().reverse().flatMap((level) => level.slice().reverse()),
+      ...hooks.afterEach.slice().reverse()
+    ]
+  });
+}
+
+async function runTests() {
+  for (const registeredTest of tests) {
+    let failure;
+    try {
+      for (const hook of registeredTest.beforeEach) await hook();
+      await runWithOptionalDone(registeredTest.fn);
+    } catch (error) {
+      failure = error;
+    }
+    for (const hook of registeredTest.afterEach) {
+      try {
+        await hook();
+      } catch (error) {
+        failure ||= error;
+      }
+    }
+    if (failure) {
+      results.failed++;
+      results.failures.push({ label: registeredTest.label, message: failure && failure.message });
+      console.log(`  \u2717 ${registeredTest.label}`);
+      console.log(`      ${failure && failure.message}`);
+    } else {
+      results.passed++;
+      console.log(`  \u2713 ${registeredTest.label}`);
+    }
   }
+  return results;
 }
 
 function fmt(v) {
@@ -159,8 +193,40 @@ function makeExpect(actual, negated = false) {
     },
     toBeLessThanOrEqual(n) {
       assert(actual <= n, `expected ${fmt(actual)} ${negated ? 'not ' : ''}to be <= ${n}`);
+    },
+    toThrow(expected) {
+      let thrown;
+      try {
+        actual();
+      } catch (error) {
+        thrown = error;
+      }
+      let pass = Boolean(thrown);
+      if (pass && expected instanceof RegExp) pass = expected.test(thrown.message);
+      else if (pass && typeof expected === 'string') pass = thrown.message.includes(expected);
+      else if (pass && typeof expected === 'function') pass = thrown instanceof expected;
+      assert(pass, `expected function ${negated ? 'not ' : ''}to throw${expected ? ` ${fmt(expected)}` : ''}`);
     }
   };
+  Object.defineProperty(api, 'rejects', {
+    get() {
+      return {
+        async toThrow(expected) {
+          let thrown;
+          try {
+            await actual;
+          } catch (error) {
+            thrown = error;
+          }
+          let pass = Boolean(thrown);
+          if (pass && expected instanceof RegExp) pass = expected.test(thrown.message);
+          else if (pass && typeof expected === 'string') pass = thrown.message.includes(expected);
+          else if (pass && typeof expected === 'function') pass = thrown instanceof expected;
+          assert(pass, `expected promise ${negated ? 'not ' : ''}to reject${expected ? ` with ${fmt(expected)}` : ''}`);
+        }
+      };
+    }
+  });
   return api;
 }
 
@@ -210,4 +276,4 @@ global.beforeEach = beforeEach;
 global.afterEach = afterEach;
 global.expect = expect;
 
-module.exports = { results };
+module.exports = { results, runTests, setCurrentFile };

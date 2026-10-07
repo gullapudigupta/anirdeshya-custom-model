@@ -8,7 +8,7 @@
     "purpose": "Top-level index for the advanced-quality-tool only. Work is split into per-phase task files, with bugs and change requests tracked separately under maintenance/.",
     "createdBy": "Kiro",
     "createdOn": "2026-09-07",
-    "updatedOn": "2026-09-30",
+    "updatedOn": "2026-10-07",
     "sourceOfTruth": "Per-phase task files in this folder. The legacy monolithic TASKS.json (in the tool root) mirrors the same tasks and should be treated as read-only history.",
     "notes": "When adding/renaming a planned task: place it in the correct phaseN-tasks.json, then update the matching module entry below and the rollup. For bugs and change requests (CRs/tweaks), inspect maintenanceFiles below, identify the exact related phase task, and record its task ID and phase file. meta.json holds scoring/roadmap/research metadata and is not a task list."
   },
@@ -23,6 +23,7 @@
     "phase7": "./phase7-tasks.json",
     "phase8": "./phase8-tasks.json",
     "phase9": "./phase9-tasks.json",
+    "phase10": "./phase10-documentation.json",
     "phase11": "./phase11-tasks.json",
     "meta": "./meta.json",
     "bugs": "./maintenance/bugs.json",
@@ -47,7 +48,7 @@
       "name": "Core Foundation & Auto-Fix Engine",
       "priority": "HIGH",
       "status": "COMPLETED",
-      "estimatedHours": 160,
+      "estimatedHours": 216,
       "taskCount": 17,
       "statusSummary": { "completed": 17, "in_progress": 0, "pending": 0 },
       "reconciledOn": "2026-09-28",
@@ -86,7 +87,7 @@
       "name": "Advanced Features & Enhancements (from online research)",
       "priority": "LOW",
       "status": "COMPLETED",
-      "estimatedHours": 200,
+      "estimatedHours": 480,
       "taskCount": 25,
       "statusSummary": { "completed": 25, "pending": 0 },
       "reconciledOn": "2026-09-30",
@@ -99,7 +100,7 @@
       "name": "Additional Language Support",
       "priority": "LOW",
       "status": "COMPLETED",
-      "estimatedHours": 120,
+      "estimatedHours": 124,
       "taskCount": 6,
       "statusSummary": { "completed": 5, "archived": 1, "pending": 0 },
       "reconciledOn": "2026-09-28",
@@ -150,23 +151,36 @@
       "file": "./phase9-tasks.json",
       "name": "Coding Agent Workbench and Documentation",
       "priority": "HIGH",
-      "status": "PENDING",
+      "status": "COMPLETED",
       "estimatedHours": 778,
       "taskCount": 40,
-      "statusSummary": { "completed": 0, "in_progress": 0, "pending": 40 },
-      "reconciliationNote": "Preserves the six documentation normalization tasks and adds thirteen coding-agent workbench tasks covering workspace/linter configuration, task import, model selection, planning, tools, permissions, review, verification, and acceptance."
+      "statusSummary": { "completed": 40, "in_progress": 0, "pending": 0 },
+      "reconciledOn": "2026-10-07",
+      "reconciliationNote": "All 40 Phase 9 task records are marked completed in phase9-tasks.json."
+    },
+    {
+      "phase": "phase10",
+      "file": "./phase10-documentation.json",
+      "name": "Source Directory README Documentation",
+      "priority": "MEDIUM",
+      "status": "COMPLETED",
+      "estimatedHours": 79,
+      "taskCount": 21,
+      "statusSummary": { "completed": 21, "in_progress": 0, "pending": 0 },
+      "reconciledOn": "2026-10-07",
+      "reconciliationNote": "All 21 task records are marked completed in phase10-documentation.json."
     },
     {
       "phase": "phase11",
       "file": "./phase11-tasks.json",
-      "name": "Phase 11 Feature Completion",
+      "name": "Feature Exposure & Gap Resolution",
       "priority": "HIGH",
       "status": "IN_PROGRESS",
-      "estimatedHours": 0,
+      "estimatedHours": 562,
       "taskCount": 78,
       "statusSummary": { "completed": 72, "in_progress": 0, "pending": 6 },
       "reconciledOn": "2026-10-07",
-      "reconciliationNote": "Repository-contained Phase 11 tasks are implemented and verified. P11-T042–P11-T047 remain pending because tutorials, release authorization, external UAT, hosted monitoring, and community-service setup require operator access or decisions. See phase11-tasks.json for the source-of-truth status.",
+      "reconciliationNote": "Task records show 72 completed and six pending. Release, UAT, hosting, and community tasks require operator access or decisions; test stabilization and task-data reconciliation are tracked separately.",
       "completedIds": ["P11-T001", "P11-T002", "P11-T003", "P11-T004", "P11-T005", "P11-T006", "P11-T007", "P11-T008", "P11-T009", "P11-T010", "P11-T011", "P11-T012", "P11-T013", "P11-T014", "P11-T015", "P11-T016", "P11-T017", "P11-T018", "P11-T019", "P11-T020", "P11-T021", "P11-T022", "P11-T023", "P11-T024", "P11-T025", "P11-T026", "P11-T027", "P11-T028", "P11-T029", "P11-T030", "P11-T031", "P11-T032", "P11-T033", "P11-T034", "P11-T035", "P11-T036", "P11-T037", "P11-T038", "P11-T039", "P11-T040", "P11-T041", "P11-T048", "P11-T049", "P11-T050", "P11-T051", "P11-T052", "P11-T053", "P11-T054", "P11-T055", "P11-T056", "P11-T057", "P11-T058", "P11-T059", "P11-T060", "P11-T061", "P11-T062", "P11-T063", "P11-T064", "P11-T065", "P11-T066", "P11-T067", "P11-T068", "P11-T069", "P11-T070", "P11-T071", "P11-T072", "P11-T073", "P11-T074", "P11-T075", "P11-T076", "P11-T077", "P11-T078"]
     }
   ],
@@ -218,16 +232,17 @@
     "IN_PROGRESS": "Currently being worked on"
   },
   "rollup": {
-    "totalPhases": 9,
-    "totalTasks": 136,
+    "totalPhases": 11,
+    "totalTasks": 235,
     "byStatus": {
-      "completed": 86,
+      "completed": 228,
       "archived": 1,
       "in_progress": 0,
-      "pending": 49
+      "pending": 6
     },
-    "totalEstimatedHours": 2078,
-    "completionPercentage": "63%",
-    "note": "Legacy aggregate snapshot from phases 1–9; it predates the phase11 entry and has not been recalculated because existing phase task files contain invalid JSON. Use each individual phase task file as the source of truth."
+    "totalEstimatedHours": 3059,
+    "completionPercentage": "97.4%",
+    "calculatedOn": "2026-10-07",
+    "note": "Computed from task records in all phase files; archived tasks are included in totalTasks but excluded from the completion percentage denominator."
   }
 }

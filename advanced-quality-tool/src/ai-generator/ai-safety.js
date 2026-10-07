@@ -17,6 +17,8 @@
 'use strict';
 
 const crypto = require('crypto');
+const path = require('path');
+const ts = require('typescript');
 
 // Malicious code patterns to detect
 const MALICIOUS_PATTERNS = [
@@ -196,10 +198,11 @@ class AISafetyValidator {
 
       // 6. Type safety check (if TypeScript)
       if (context.language === 'typescript' && this.config.strictMode) {
-        const typeCheck = await this.validateTypeScript(code);
+        const typeCheck = await this.validateTypeScript(code, context);
         if (!typeCheck.valid) {
-          result.warnings.push({
-            severity: 'warning',
+          result.passed = false;
+          result.issues.push({
+            severity: 'error',
             category: 'types',
             message: 'TypeScript validation failed',
             details: typeCheck.errors
@@ -400,12 +403,62 @@ class AISafetyValidator {
   /**
    * Validate TypeScript code (if TypeScript is available)
    */
-  async validateTypeScript(code) {
-    // This would require TypeScript compiler API
-    // For now, return a placeholder
+  async validateTypeScript(code, context = {}) {
+    const fileName = path.resolve(
+      context.filePath || path.join(process.cwd(), '__aqt_generated_validation__.ts')
+    );
+    let options = {
+      strict: true,
+      noEmit: true,
+      skipLibCheck: true,
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.CommonJS,
+      moduleResolution: ts.ModuleResolutionKind.Node10
+    };
+    const configPath = ts.findConfigFile(path.dirname(fileName), ts.sys.fileExists);
+    if (configPath) {
+      const config = ts.readConfigFile(configPath, ts.sys.readFile);
+      if (config.error) {
+        return {
+          valid: false,
+          errors: [ts.flattenDiagnosticMessageText(config.error.messageText, '\n')]
+        };
+      }
+      const parsedConfig = ts.parseJsonConfigFileContent(
+        config.config,
+        ts.sys,
+        path.dirname(configPath),
+        { noEmit: true, skipLibCheck: true },
+        configPath
+      );
+      options = { ...options, ...parsedConfig.options, noEmit: true, skipLibCheck: true };
+    }
+    const host = ts.createCompilerHost(options);
+    const sourceFile = ts.createSourceFile(fileName, code, options.target, true);
+    const originalFileExists = host.fileExists.bind(host);
+    const originalReadFile = host.readFile.bind(host);
+    const originalGetSourceFile = host.getSourceFile.bind(host);
+
+    host.fileExists = (candidate) =>
+      path.resolve(candidate) === fileName || originalFileExists(candidate);
+    host.readFile = (candidate) =>
+      path.resolve(candidate) === fileName ? code : originalReadFile(candidate);
+    host.getSourceFile = (candidate, languageVersion, onError, shouldCreateNewSourceFile) =>
+      path.resolve(candidate) === fileName
+        ? sourceFile
+        : originalGetSourceFile(candidate, languageVersion, onError, shouldCreateNewSourceFile);
+
+    const program = ts.createProgram([fileName], options, host);
+    const errors = ts.getPreEmitDiagnostics(program).map((diagnostic) => {
+      const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
+      if (!diagnostic.file || diagnostic.start === undefined) return message;
+      const position = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
+      return `${position.line + 1}:${position.character + 1} TS${diagnostic.code}: ${message}`;
+    });
+
     return {
-      valid: true,
-      errors: []
+      valid: errors.length === 0,
+      errors
     };
   }
 

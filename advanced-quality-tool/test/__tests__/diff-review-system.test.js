@@ -6,10 +6,11 @@
 const { DiffReviewSystem, FileDiff, BackupManager } = require('../../src/agent/diff-review-system');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 // Test fixtures
-const TEST_DIR = path.join(__dirname, '..', 'fixtures', 'diff-review-test');
-const BACKUP_DIR = path.join(TEST_DIR, '.backups');
+let TEST_DIR;
+let BACKUP_DIR;
 
 // Sample file contents
 const originalContent = `function hello() {
@@ -88,11 +89,8 @@ describe('BackupManager', () => {
   let backupManager;
 
   beforeEach(() => {
-    // Clean up test directory
-    if (fs.existsSync(TEST_DIR)) {
-      fs.rmSync(TEST_DIR, { recursive: true });
-    }
-    fs.mkdirSync(TEST_DIR, { recursive: true });
+    TEST_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'aqt-diff-review-'));
+    BACKUP_DIR = path.join(TEST_DIR, '.backups');
     
     backupManager = new BackupManager(BACKUP_DIR);
   });
@@ -161,11 +159,8 @@ describe('DiffReviewSystem', () => {
   let testFile;
 
   beforeEach(() => {
-    // Clean up test directory
-    if (fs.existsSync(TEST_DIR)) {
-      fs.rmSync(TEST_DIR, { recursive: true });
-    }
-    fs.mkdirSync(TEST_DIR, { recursive: true });
+    TEST_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'aqt-diff-review-'));
+    BACKUP_DIR = path.join(TEST_DIR, '.backups');
     
     system = new DiffReviewSystem({ backupDir: BACKUP_DIR });
     testFile = path.join(TEST_DIR, 'test.js');

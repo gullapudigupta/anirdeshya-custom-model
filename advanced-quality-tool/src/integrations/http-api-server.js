@@ -1876,6 +1876,8 @@ class HttpApiServer {
           originalRunId: id,
           pipelineId: summary.pipelineId,
           originalStatus: summary.status,
+          replayed: false,
+          mode: 'preview',
           originalInput: startEvent.input,
           originalContext: startEvent.context,
           message: 'Use the CLI or SDK for full replay with custom handlers'

@@ -160,8 +160,11 @@ class FileDiff {
    */
   toUnifiedDiff() {
     const lines = [];
-    lines.push(`--- a/${this.filePath}`);
-    lines.push(`+++ b/${this.filePath}`);
+    const displayPath = path.normalize(this.filePath)
+      .replace(/\\/g, '/')
+      .replace(/^\/+/, '');
+    lines.push(`--- a/${displayPath}`);
+    lines.push(`+++ b/${displayPath}`);
     
     for (const hunk of this.hunks) {
       const oldStart = hunk.lines.find(l => l.originalLine)?.originalLine || 1;
@@ -341,13 +344,7 @@ class DiffReviewSystem {
    */
   validateBeforeApply(diff) {
     // Check if file exists
-    if (!fs.existsSync(diff.filePath)) {
-      // New file - check parent directory exists
-      const parentDir = path.dirname(diff.filePath);
-      if (!fs.existsSync(parentDir)) {
-        return { valid: false, reason: 'Parent directory does not exist' };
-      }
-    } else {
+    if (fs.existsSync(diff.filePath)) {
       // Existing file - check for stale source
       const currentContent = fs.readFileSync(diff.filePath, 'utf8');
       if (currentContent !== diff.originalContent) {
@@ -400,7 +397,7 @@ class DiffReviewSystem {
       // Write new content atomically
       const tempPath = `${diff.filePath}.tmp`;
       fs.writeFileSync(tempPath, diff.modifiedContent, 'utf8');
-      fs.renameSync(tempPath, diff.filePath);
+      await this._renameWithRetry(tempPath, diff.filePath);
       
       diff.status = 'applied';
       this.status.pending--;
@@ -414,6 +411,19 @@ class DiffReviewSystem {
       this.status.failed++;
       
       return { success: false, error: error.message };
+    }
+  }
+
+  async _renameWithRetry(source, destination, attempts = 4) {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await fs.promises.rename(source, destination);
+        return;
+      } catch (error) {
+        const retryable = ['EBUSY', 'EACCES', 'EPERM'].includes(error.code);
+        if (!retryable || attempt >= attempts - 1) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 20 * (2 ** attempt)));
+      }
     }
   }
 

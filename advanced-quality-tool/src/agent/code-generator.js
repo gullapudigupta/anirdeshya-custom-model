@@ -53,7 +53,13 @@ class CodeGenerator {
       // 4. Build traceability information
       result.traceability = this._buildTraceability(task, result.plan, result.patches, result.context);
 
-      result.success = true;
+      result.scaffold = result.patches.some(patch => patch.scaffold);
+      result.success = result.patches.length > 0 && !result.scaffold;
+      if (!result.patches.length) {
+        result.error = 'No implementation patches were generated.';
+      } else if (result.scaffold) {
+        result.error = 'Only scaffolding was generated; no implementation is available to verify.';
+      }
     } catch (error) {
       result.error = error.message;
     }
@@ -78,11 +84,19 @@ class CodeGenerator {
     if (!generationResult.patches || generationResult.patches.length === 0) {
       issues.push({ severity: 'error', message: 'No patches generated' });
     }
+    if (generationResult.scaffold) {
+      issues.push({ severity: 'error', message: 'Scaffold output is not a completed implementation' });
+    }
 
     // Validate each patch
     for (const patch of generationResult.patches || []) {
       if (!patch.filePath) {
         issues.push({ severity: 'error', message: 'Patch missing file path' });
+      }
+      if (patch.scaffold || patch.changes?.some(change =>
+        /Generated implementation stub|TODO:\s*Implement functionality/i.test(change.newContent || '')
+      )) {
+        issues.push({ severity: 'error', message: `Patch for ${patch.filePath || '(unknown file)'} contains scaffold only` });
       }
       if (!patch.changes || patch.changes.length === 0) {
         issues.push({ severity: 'warning', message: `No changes in patch for ${patch.filePath}` });
@@ -348,7 +362,8 @@ class CodeGenerator {
           }
         ],
         taskId: task.id,
-        requiresReview: true
+        requiresReview: true,
+        scaffold: true
       });
     }
 
@@ -364,7 +379,8 @@ class CodeGenerator {
           }
         ],
         taskId: task.id,
-        requiresReview: true
+        requiresReview: true,
+        scaffold: true
       });
     }
 

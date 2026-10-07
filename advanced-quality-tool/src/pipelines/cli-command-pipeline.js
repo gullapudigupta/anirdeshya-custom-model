@@ -82,7 +82,11 @@ class CLICommandPipeline {
       stageHandlers
     });
 
-    return result;
+    return {
+      ...result,
+      run: result.output,
+      output: result.stageResults?.['format-output']?.output?.output || ''
+    };
   }
 
   /**
@@ -510,6 +514,7 @@ Examples:
     }
     
     const data = result.data || {};
+    if (typeof data === 'string') return data;
     
     lines.push(`✓ Command: ${result.command}`);
     

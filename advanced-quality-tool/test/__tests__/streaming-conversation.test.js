@@ -13,9 +13,10 @@ const {
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
-const TEST_DIR = path.join(__dirname, '..', 'fixtures', 'streaming-test');
-const STORAGE_DIR = path.join(TEST_DIR, '.sessions');
+let TEST_DIR;
+let STORAGE_DIR;
 
 describe('ConversationEvent', () => {
   test('should create event with id and timestamp', () => {
@@ -140,10 +141,8 @@ describe('StreamingConversationManager', () => {
   let manager;
 
   beforeEach(() => {
-    // Clean up test directory
-    if (fs.existsSync(TEST_DIR)) {
-      fs.rmSync(TEST_DIR, { recursive: true });
-    }
+    TEST_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'aqt-streaming-test-'));
+    STORAGE_DIR = path.join(TEST_DIR, '.sessions');
     
     manager = new StreamingConversationManager({
       storageDir: STORAGE_DIR,
