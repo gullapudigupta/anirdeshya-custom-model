@@ -51,9 +51,13 @@ class WorkItem {
     this.assignedAgent = params.assignedAgent || null;
     this.assignedModel = params.assignedModel || null;
     this.toolPolicy = params.toolPolicy || 'default';
+    this.taskContract = params.taskContract || null;
+    this.context = params.context || null;
     
     // Execution
     this.plan = null;
+    this.planVersion = null;
+    this.approval = null;
     this.affectedFiles = [];
     this.expectedChecks = [];
     this.risks = [];
@@ -65,8 +69,8 @@ class WorkItem {
     this.error = null;
     this.changedFiles = [];
     this.verificationResults = {};
-    this.approval = null;
-    this.contextHashes = {};
+    this.toolCalls = [];
+    this._toolBudgetUsed = { calls: 0, outputBytes: 0 };
     
     // Timing
     this.createdAt = new Date().toISOString();
@@ -113,6 +117,8 @@ class WorkItem {
    */
   setPlan(plan) {
     this.plan = plan;
+    this.planVersion = plan.planVersion;
+    this.approval = null;
     this.affectedFiles = plan.affectedFiles || [];
     this.expectedChecks = plan.expectedChecks || [];
     this.risks = plan.risks || [];
@@ -202,6 +208,23 @@ class WorkItem {
   }
 
   /**
+   * Record a tool call made during execution, correlated with this work item,
+   * its task, and the plan step that issued it.
+   * @param {Object} entry
+   */
+  recordToolCall(entry) {
+    this.toolCalls.push(entry);
+    this.events.push({
+      type: 'tool-call',
+      timestamp: entry.timestamp || new Date().toISOString(),
+      tool: entry.tool,
+      stepId: entry.stepId,
+      success: entry.success,
+      code: entry.code || null
+    });
+  }
+
+  /**
    * Increment retry counter
    * @returns {boolean} true if more retries available
    */
@@ -284,7 +307,11 @@ class WorkItem {
       assignedAgent: this.assignedAgent,
       assignedModel: this.assignedModel,
       toolPolicy: this.toolPolicy,
+      taskContract: this.taskContract,
+      context: this.context,
       plan: this.plan,
+      planVersion: this.planVersion,
+      approval: this.approval,
       affectedFiles: this.affectedFiles,
       expectedChecks: this.expectedChecks,
       risks: this.risks,
@@ -294,8 +321,7 @@ class WorkItem {
       error: this.error,
       changedFiles: this.changedFiles,
       verificationResults: this.verificationResults,
-      approval: this.approval,
-      contextHashes: this.contextHashes,
+      toolCalls: this.toolCalls,
       createdAt: this.createdAt,
       startedAt: this.startedAt,
       completedAt: this.completedAt,

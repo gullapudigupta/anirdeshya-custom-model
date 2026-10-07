@@ -11,27 +11,34 @@
 
 const path = require('path');
 const fs = require('fs');
-const { WorkspaceContext } = require('./workspace-context');
-const { CONTRACT_VERSION, validatePlan, validatePatch } = require('./contracts');
+const crypto = require('crypto');
+const { DiffReviewSystem, hashContent } = require('./diff-review-system');
 const { PermissionManager } = require('./permissions');
+const { WorkspaceContext } = require('./workspace-context');
+const { CONTRACT_VERSION, validatePlan } = require('./contracts');
 
 /**
  * Code Generation Workflow
  */
 class CodeGenerator {
   constructor(options = {}) {
-    this.workspace = options.workspace || process.cwd();
+    this.workspace = path.resolve(options.workspace || process.cwd());
     this.contextProvider = options.contextProvider || null;
+    this.workspaceContext = options.workspaceContext || new WorkspaceContext({ workspace: this.workspace, ...(options.contextOptions || {}) });
     this.modelExecutor = options.modelExecutor || null;
     this.guidanceLoader = options.guidanceLoader || null;
-    this.workspaceContext = options.workspaceContext || new WorkspaceContext({
+    this.maxChangedFiles = options.maxChangedFiles === undefined ? 20 : options.maxChangedFiles;
+    if (!Number.isSafeInteger(this.maxChangedFiles) || this.maxChangedFiles <= 0) {
+      throw new Error('maxChangedFiles must be a positive safe integer');
+    }
+    this.permissionManager = options.permissionManager || new PermissionManager({
       workspace: this.workspace,
-      maxFiles: options.maxFiles || 40,
-      maxFileBytes: options.maxFileBytes || 128 * 1024,
-      maxTotalBytes: options.maxTotalBytes || 512 * 1024,
-      maxTokens: options.maxTokens || 32000
+      ...(options.permissionOptions || {}),
+      maxFilesPerTask: Math.min(
+        options.permissionOptions?.maxFilesPerTask || this.maxChangedFiles,
+        this.maxChangedFiles
+      )
     });
-    this.permissionManager = options.permissionManager || new PermissionManager({ workspace: this.workspace });
   }
 
   /**
@@ -56,7 +63,7 @@ class CodeGenerator {
       result.context = await this._buildContext(task, options);
 
       // 2. Generate implementation plan
-      result.plan = await this._generatePlan(task, result.context, options);
+      result.plan = options.plan || await this._generatePlan(task, result.context, options);
 
       // 3. Generate patches from plan
       result.patches = await this._generatePatches(task, result.plan, result.context, options);
@@ -65,14 +72,20 @@ class CodeGenerator {
       result.traceability = this._buildTraceability(task, result.plan, result.patches, result.context);
 
       result.scaffold = result.patches.some(patch => patch.scaffold);
-      result.success = result.patches.length > 0 && !result.scaffold;
+      const validation = this.validate(result);
+      result.success = result.patches.length > 0 && validation.valid;
       if (!result.patches.length) {
         result.error = 'No implementation patches were generated.';
       } else if (result.scaffold) {
         result.error = 'Only scaffolding was generated; no implementation is available to verify.';
+      } else if (!validation.valid) {
+        result.error = validation.issues.filter(issue => issue.severity === 'error')
+          .map(issue => issue.message).join('; ');
       }
     } catch (error) {
-      result.error = error.message;
+      result.error = result.patches.length === 0
+        ? `No implementation patches were generated: ${error.message}`
+        : error.message;
     }
 
     return result;
@@ -85,9 +98,12 @@ class CodeGenerator {
    */
   validate(generationResult) {
     const issues = [];
+    if (!generationResult || typeof generationResult !== 'object' || Array.isArray(generationResult)) {
+      return { valid: false, issues: [{ severity: 'error', message: 'Generation result must be an object' }] };
+    }
 
     // Check plan exists
-    if (!generationResult.plan) {
+    if (!generationResult || !generationResult.plan) {
       issues.push({ severity: 'error', message: 'No implementation plan generated' });
     }
 
@@ -100,22 +116,39 @@ class CodeGenerator {
     }
 
     // Validate each patch
-    for (const patch of generationResult.patches || []) {
-      const patchValidation = validatePatch(patch);
-      if (!patchValidation.valid) {
-        issues.push({ severity: 'error', message: patchValidation.issues.join(', ') });
+    const patches = generationResult && Array.isArray(generationResult.patches)
+      ? generationResult.patches
+      : [];
+    for (const patch of patches) {
+      if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+        issues.push({ severity: 'error', message: 'Patch entry must be an object' });
+        continue;
       }
-      if (patch.scaffold || patch.changes?.some(change =>
-        /Generated implementation stub|TODO:\s*Implement functionality/i.test(change.newContent || '')
-      )) {
-        issues.push({ severity: 'error', message: `Patch for ${patch.path || '(unknown file)'} contains scaffold only` });
+      if (!patch.filePath || !['create', 'modify', 'delete'].includes(patch.type)) {
+        issues.push({ severity: 'error', message: 'Patch has a missing path or unsupported operation' });
       }
-      if (patch.operation !== 'delete' && typeof patch.content !== 'string') {
-        issues.push({ severity: 'error', message: `Patch for ${patch.path || '(unknown file)'} has no replacement content` });
+      if (patch.scaffold || /Generated implementation stub|TODO:\s*Implement functionality/i
+        .test(patch.modifiedContent || '')) {
+        issues.push({ severity: 'error', message: `Patch for ${patch.filePath || '(unknown file)'} contains scaffold only` });
       }
-      if (patch.operation === 'modify' && !/^[a-f0-9]{64}$/i.test(patch.expectedHash || '')) {
-        issues.push({ severity: 'error', message: `Patch for ${patch.path} has no valid expected content hash` });
+      if (typeof patch.originalContent !== 'string' && patch.originalContent !== null) {
+        issues.push({ severity: 'error', message: `Patch for ${patch.filePath || '(unknown file)'} has malformed original content` });
       }
+      if (typeof patch.modifiedContent !== 'string' ||
+          (patch.type === 'create' && patch.originalContent !== null) ||
+          (patch.type !== 'create' && typeof patch.originalContent !== 'string') ||
+          (patch.type === 'delete' && patch.modifiedContent !== '') ||
+          (patch.type !== 'delete' && !patch.modifiedContent.trim()) ||
+          (patch.type !== 'delete' && patch.originalContent === patch.modifiedContent)) {
+        issues.push({ severity: 'error', message: `Patch for ${patch.filePath || '(unknown file)'} is empty or malformed` });
+      }
+      if (typeof patch.originalContent === 'string' &&
+          patch.expectedHash !== hashContent(patch.originalContent)) {
+        issues.push({ severity: 'error', message: `Patch for ${patch.filePath || '(unknown file)'} has an invalid expected content hash` });
+      }
+    }
+    if (patches.length > this.maxChangedFiles) {
+      issues.push({ severity: 'error', message: `Changed-file limit (${this.maxChangedFiles}) exceeded` });
     }
 
     // Check traceability
@@ -349,44 +382,281 @@ class CodeGenerator {
   }
 
   async _generatePatches(task, plan, context, options) {
-    if (!this.modelExecutor || typeof this.modelExecutor.generatePatches !== 'function') {
-      throw new Error('Model patch executor is not configured; no scaffold or simulated implementation was generated');
+    if (!this.modelExecutor) {
+      throw new Error('Model patch executor is not configured; a configured model executor is required to generate implementation patches');
     }
-    const patches = await this.modelExecutor.generatePatches({ task, plan, context, options });
-    if (!Array.isArray(patches) || patches.length === 0) {
-      throw new Error('Model patch executor returned no implementation patches');
+    const execute = typeof this.modelExecutor === 'function'
+      ? this.modelExecutor
+      : this.modelExecutor.generatePatches || this.modelExecutor.generate || this.modelExecutor.execute;
+    if (typeof execute !== 'function') {
+      throw new Error('Model executor must be a function or expose generatePatches(), generate(), or execute()');
     }
-    const contextByPath = new Map(context.relevantCode.files.map(file => [file.path, file]));
-    for (const patch of patches) {
-      const patchValidation = validatePatch(patch);
-      if (!patchValidation.valid) {
-        throw new Error(`Model patch executor returned an invalid patch: ${patchValidation.issues.join(', ')}`);
+    const generated = await execute.call(this.modelExecutor, {
+      task,
+      plan,
+      context,
+      workspace: this.workspace,
+      limits: { maxChangedFiles: this.maxChangedFiles },
+      outputSchema: {
+        type: 'object',
+        required: ['operations'],
+        operations: ['create', 'modify', 'delete'],
+        operationFields: { type: 'string', filePath: 'string', content: 'string' }
+      },
+      signal: options.signal
+    });
+    if (!generated || typeof generated !== 'object') {
+      throw new Error('Model executor must return a non-empty structured operations array');
+    }
+    const returned = Array.isArray(generated) ? generated : (generated.operations || generated.patches);
+    const operations = Array.isArray(returned) ? returned.map(operation => {
+      if (operation && operation.schemaVersion === CONTRACT_VERSION && operation.path) {
+        return {
+          type: operation.operation,
+          filePath: operation.path,
+          content: operation.content,
+          expectedHash: operation.expectedHash
+        };
       }
-      if (!patch || typeof patch !== 'object' || !['create', 'modify', 'delete'].includes(patch.operation) ||
-          typeof patch.path !== 'string' || !plan.affectedFiles.includes(patch.path)) {
-        throw new Error('Model patch executor returned a malformed or out-of-scope patch');
+      return operation;
+    }) : returned;
+    if (!Array.isArray(operations) || operations.length === 0) {
+      throw new Error('Model executor must return a non-empty structured operations array');
+    }
+    if (operations.length > this.maxChangedFiles) {
+      throw new Error(`Changed-file limit (${this.maxChangedFiles}) exceeded`);
+    }
+
+    const declaredFiles = [
+      ...(plan.affectedFiles || []),
+      ...(plan.modifiedFiles || []),
+      ...(plan.newFiles || [])
+    ];
+    const normalizedFiles = declaredFiles.map(normalizeRelativePath);
+    if (normalizedFiles.some(file => !file)) {
+      throw new Error('Approved plan contains a path outside workspace boundaries');
+    }
+    const allowedFiles = new Set(normalizedFiles);
+    if (allowedFiles.size === 0) {
+      throw new Error('The approved plan does not declare any files that may be changed');
+    }
+
+    const reviewSystem = new DiffReviewSystem({
+      workspace: this.workspace,
+      maxChangedFiles: this.maxChangedFiles
+    });
+    const patches = [];
+    const seen = new Set();
+    for (const operation of operations) {
+      if (!operation || typeof operation !== 'object' || Array.isArray(operation) ||
+          !['create', 'modify', 'delete'].includes(operation.type)) {
+        throw new Error('Model executor returned a malformed patch operation');
       }
-      const normalized = path.resolve(this.workspace, patch.path);
-      const relative = path.relative(this.workspace, normalized);
-      if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
-        throw new Error(`Model patch path escapes the workspace: ${patch.path}`);
+      const operationPath = operation.filePath || operation.path;
+      const relativePath = normalizeRelativePath(operationPath);
+      if (!relativePath || !allowedFiles.has(relativePath)) {
+        throw new Error(`Patch path is not declared in the approved plan: ${operationPath}`);
       }
-      const source = contextByPath.get(patch.path);
-      if (patch.operation === 'modify' &&
-          (!source || patch.expectedHash !== source.hash || typeof patch.content !== 'string')) {
-        throw new Error(`Model patch for ${patch.path} has a stale or missing source hash`);
+      if (seen.has(relativePath)) throw new Error(`Conflicting patch operations for ${relativePath}`);
+      seen.add(relativePath);
+      if ((operation.type === 'delete' && operation.content !== undefined) ||
+          (operation.type !== 'delete' && typeof operation.content !== 'string')) {
+        throw new Error(`Malformed ${operation.type} operation for ${relativePath}`);
       }
-      if (patch.operation === 'create' && (source || patch.expectedHash != null || typeof patch.content !== 'string')) {
-        throw new Error(`Model create patch for ${patch.path} conflicts with the bounded context`);
+      const content = operation.type === 'delete' ? '' : operation.content;
+      if (operation.type !== 'delete' && !content.trim()) {
+        throw new Error(`Empty ${operation.type} patch rejected for ${relativePath}`);
       }
-      if (patch.operation === 'delete' && (!source || patch.expectedHash !== source.hash)) {
-        throw new Error(`Model delete patch for ${patch.path} has a stale or missing source hash`);
+      if (/Generated implementation stub|TODO:\s*Implement functionality/i.test(content)) {
+        throw new Error(`Scaffold-only patch rejected for ${relativePath}`);
       }
-      if (/Generated implementation stub|TODO:\s*Implement functionality/i.test(patch.content || '')) {
-        throw new Error(`Model patch for ${patch.path} contains scaffold-only output`);
+      const absolutePath = reviewSystem.validatePatchPath(relativePath);
+      if (operation.type === 'create' && fs.existsSync(absolutePath)) {
+        throw new Error(`Create target already exists: ${relativePath}`);
       }
+      const originalContent = operation.type === 'create'
+        ? null
+        : readRegularFile(absolutePath, relativePath);
+      if (operation.expectedHash && originalContent !== null &&
+          operation.expectedHash !== hashContent(originalContent)) {
+        throw new Error(`Source file changed since it was read: ${relativePath}`);
+      }
+      const patch = {
+        type: operation.type,
+        operation: operation.type,
+        filePath: relativePath,
+        originalContent,
+        modifiedContent: content,
+        expectedHash: originalContent === null ? null : hashContent(originalContent),
+        reason: typeof operation.reason === 'string' ? operation.reason : '',
+        taskId: task.id,
+        requiresReview: true,
+        changes: [{
+          type: operation.type,
+          oldContent: originalContent || '',
+          newContent: content,
+          reason: typeof operation.reason === 'string' ? operation.reason : ''
+        }]
+      };
+      patches.push(patch);
     }
     return patches;
+  }
+
+  async applyPatches(generationResult, options = {}) {
+    const validation = this.validate(generationResult);
+    if (!generationResult || !generationResult.success || !validation.valid) {
+      return { success: false, code: 'INVALID_PATCH_SET', error: 'Generation result is not a valid implementation patch set', validation };
+    }
+    if (typeof options.approvalGate !== 'function') {
+      return { success: false, code: 'APPROVAL_REQUIRED', error: 'A plan- and patch-bound approval gate is required' };
+    }
+
+    const planDigest = digest(generationResult.plan);
+    const patchDigest = digest(generationResult.patches);
+    const system = options.diffReviewSystem || new DiffReviewSystem({
+      workspace: this.workspace,
+      backupDir: options.backupDir,
+      maxChangedFiles: this.maxChangedFiles
+    });
+    try {
+      for (const patch of generationResult.patches) {
+        system.addPatch(patch, { planDigest, patchDigest });
+      }
+      const review = system.presentForReview();
+      for (const diff of system.diffs) {
+        const preflight = system.validateBeforeApply(diff);
+        if (!preflight.valid) {
+          return {
+            success: false,
+            code: preflight.code || 'PATCH_CONFLICT',
+            error: preflight.reason,
+            review
+          };
+        }
+      }
+      const permissionDecisions = [];
+      for (const patch of generationResult.patches) {
+        const pathCheck = this.permissionManager.validatePath(patch.filePath);
+        if (!pathCheck.valid) {
+          return {
+            success: false,
+            code: 'PERMISSION_DENIED',
+            error: pathCheck.reason,
+            review
+          };
+        }
+        const type = patch.type === 'create' ? 'create_file'
+          : patch.type === 'delete' ? 'delete_file' : 'edit_file';
+        const operation = {
+          type,
+          digest: patch.expectedHash || null,
+          params: {
+            path: patch.filePath,
+            expectedHash: patch.type === 'modify' ? patch.expectedHash : undefined,
+            content: patch.modifiedContent,
+            dependencyChange: /(^|\/)(package(-lock)?\.json|yarn\.lock|pnpm-lock\.yaml|Cargo\.toml|go\.mod)$/
+              .test(patch.filePath)
+          }
+        };
+        const decision = await this.permissionManager.checkPermission(operation, { deferApproval: true });
+        permissionDecisions.push({ path: patch.filePath, type, operation, ...decision });
+        if (!decision.allowed) {
+          return {
+            success: false,
+            code: 'PERMISSION_DENIED',
+            error: decision.reason || `Permission denied for ${patch.filePath}`,
+            review,
+            permissionDecisions
+          };
+        }
+      }
+      let approval;
+      try {
+        approval = await options.approvalGate({
+          plan: generationResult.plan,
+          planDigest,
+          patchDigest,
+          review,
+          permissionDecisions
+        });
+      } catch (error) {
+        for (const decision of permissionDecisions) {
+          this.permissionManager.recordApproval(decision.operation, {
+            approved: false,
+            planDigest,
+            actionDigest: patchDigest,
+            outcome: 'error',
+            reason: `Approval request failed: ${error.message}`
+          });
+        }
+        return {
+          success: false,
+          code: 'APPROVAL_ERROR',
+          error: `Approval request failed: ${error.message}`,
+          review
+        };
+      }
+      const approvalMatches = Boolean(approval && approval.approved === true &&
+        approval.planDigest === planDigest && approval.patchDigest === patchDigest);
+      if (digest(generationResult.plan) !== planDigest ||
+          digest(generationResult.patches) !== patchDigest) {
+        for (const decision of permissionDecisions) {
+          this.permissionManager.recordApproval(decision.operation, {
+            approved: false,
+            planDigest,
+            actionDigest: patchDigest,
+            outcome: 'invalidated',
+            reason: 'Approved plan or patch set changed while approval was pending'
+          });
+        }
+        return {
+          success: false,
+          code: 'APPROVAL_INVALIDATED',
+          error: 'Approved plan or patch set changed while approval was pending',
+          review
+        };
+      }
+      for (const decision of permissionDecisions) {
+        this.permissionManager.recordApproval(decision.operation, {
+          approved: approvalMatches,
+          planDigest,
+          actionDigest: patchDigest,
+          outcome: approvalMatches ? 'approved' : 'denied',
+          reason: approvalMatches ? null : 'Approval was denied or did not match the plan and patch digests'
+        });
+      }
+      if (!approvalMatches) {
+        return {
+          success: false,
+          code: 'APPROVAL_DENIED',
+          error: 'Patch approval was denied or was not bound to the exact plan and patch digests',
+          review
+        };
+      }
+      const application = await system.applyAll({ approval });
+      const success = application.failed === 0 &&
+        application.applied === generationResult.patches.length &&
+        system.diffs.every(diff => diff.type === 'delete'
+          ? !fs.existsSync(diff.filePath)
+          : fs.existsSync(diff.filePath) &&
+            fs.readFileSync(diff.filePath, 'utf8') === diff.modifiedContent);
+      return {
+        success,
+        code: success ? null : 'PATCH_APPLICATION_FAILED',
+        error: success ? null : 'Not all intended patch contents are present after application',
+        review,
+        permissionDecisions,
+        application
+      };
+    } catch (error) {
+      const conflict = /Expected original content does not match|Patch source does not exist|Create target already exists/.test(error.message);
+      return {
+        success: false,
+        code: conflict ? 'PATCH_CONFLICT' : 'PATCH_APPLICATION_FAILED',
+        error: error.message
+      };
+    }
   }
 
   _buildTraceability(task, plan, patches, context) {
@@ -400,10 +670,10 @@ class CodeGenerator {
         phases: [...new Set(plan.steps.map(s => s.phase))]
       },
       codeChanges: {
-        filesModified: patches.filter(p => p.operation === 'modify').length,
-        filesCreated: patches.filter(p => p.operation === 'create').length,
-        filesDeleted: patches.filter(p => p.operation === 'delete').length,
-        totalChanges: patches.length
+        filesModified: patches.filter(p => p.type === 'modify').length,
+        filesCreated: patches.filter(p => p.type === 'create').length,
+        filesDeleted: patches.filter(p => p.type === 'delete').length,
+        totalChanges: patches.reduce((sum, p) => sum + p.changes.length, 0)
       },
       documentation: {
         sourcesUsed: context.documentation.urls,
@@ -495,6 +765,46 @@ class CodeGenerator {
     return risks;
   }
 
+}
+
+function normalizeRelativePath(filePath) {
+  if (typeof filePath !== 'string' || !filePath.trim() || filePath.includes('\0') ||
+      path.isAbsolute(filePath) || /^[a-zA-Z]:/.test(filePath)) return null;
+  const normalized = path.normalize(filePath);
+  const relative = path.relative('.', normalized);
+  if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) return null;
+  return normalized.split(path.sep).join('/');
+}
+
+function readRegularFile(absolutePath, relativePath) {
+  let stat;
+  try {
+    stat = fs.lstatSync(absolutePath);
+  } catch (error) {
+    if (error.code === 'ENOENT') throw new Error(`Patch source does not exist: ${relativePath}`);
+    throw error;
+  }
+  if (!stat.isFile() || stat.isSymbolicLink()) {
+    throw new Error(`Patch source is not a regular file: ${relativePath}`);
+  }
+  return fs.readFileSync(absolutePath, 'utf8');
+}
+
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value && typeof value === 'object') {
+    return Object.keys(value).sort().reduce((result, key) => {
+      result[key] = canonicalize(value[key]);
+      return result;
+    }, {});
+  }
+  return value;
+}
+
+function digest(value) {
+  return crypto.createHash('sha256')
+    .update(JSON.stringify(canonicalize(value)), 'utf8')
+    .digest('hex');
 }
 
 module.exports = {

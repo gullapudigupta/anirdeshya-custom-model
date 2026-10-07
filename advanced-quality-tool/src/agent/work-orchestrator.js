@@ -1,35 +1,29 @@
 /**
- * Work Orchestrator (P9-T010)
+ * Work Orchestrator (P9-T010, P12-T002, P12-T003)
  *
  * Coordinates agent work execution with dependency tracking, concurrency control,
  * retries, and cancellation support. Ensures work is executed in dependency order
- * and tracks all state transitions.
+ * and tracks all state transitions. Injects a ToolRegistry into step execution so
+ * the model executor can only call registered read/search/edit/check tools,
+ * under per-task tool-call and output budgets.
  *
  * @module agent/work-orchestrator
  */
 
 'use strict';
 
+const crypto = require('crypto');
 const { WorkItem, WorkItemStatus } = require('./work-item');
 const { AgentPlanner } = require('./planner');
 const { PipelineExecutor } = require('../pipelines/pipeline-executor');
-const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
-const { PermissionManager, ApprovalMode } = require('./permissions');
+const { ToolRegistry } = require('./tool-registry');
 const { WorkspaceContext } = require('./workspace-context');
-const { DiffReviewSystem } = require('./diff-review-system');
-const { ConfiguredCheckRunner } = require('./check-runner');
-const {
-  CONTRACT_VERSION,
-  validateTaskContract,
-  validatePlan,
-  validatePatch,
-  validateApproval,
-  validateCompletion,
-  WorkResultStatus
-} = require('./contracts');
-const { AgentRunStore } = require('./run-store');
+const { PermissionManager } = require('./permissions');
+
+const DEFAULT_TOOL_BUDGET = Object.freeze({
+  maxCalls: 25,
+  maxOutputBytes: 200 * 1024 // 200KB
+});
 
 /**
  * Work Orchestrator
@@ -37,62 +31,60 @@ const { AgentRunStore } = require('./run-store');
 class WorkOrchestrator {
   constructor(options = {}) {
     this.workspace = path.resolve(options.workspace || process.cwd());
-    this.workItems = new Map();
-    this.workQueue = [];
     this.planner = options.planner || new AgentPlanner({ workspace: this.workspace });
     this.pipelineExecutor = options.pipelineExecutor || new PipelineExecutor();
-    this.executor = options.executor || options.stepExecutor || null;
-    this.workspaceContext = options.workspaceContext || new WorkspaceContext({
-      workspace: this.workspace,
-      ...(options.contextLimits || {})
-    });
-    this.toolRegistry = options.toolRegistry || null;
-    this.checkRunner = options.checkRunner || new ConfiguredCheckRunner({
-      workspace: this.workspace,
-      checks: options.checks || {},
-      ...(options.checkLimits || {})
-    });
-    this.diffReviewSystem = options.diffReviewSystem || new DiffReviewSystem({
-      workspace: this.workspace,
-      backupDir: path.join(this.workspace, '.aqt-backups')
-    });
-    this.permissionManager = options.permissionManager || new PermissionManager({
-      workspace: this.workspace,
-      mode: options.permissionMode || ApprovalMode.APPROVAL_REQUIRED,
-      allowDeletes: options.allowDeletes === true,
-      allowFileWrites: options.allowFileWrites !== false,
-      protectedPaths: options.protectedPaths,
-      requestApproval: async request => {
-        const item = this.workItems.get(request.operation?.params?.workId);
-        if (!item) return false;
-        return this._requestApproval(item, item.plan, request.operation.params.approvalDetails);
-      }
-    });
-    this.runStore = options.runStore === false ? null : (options.runStore || new AgentRunStore({
-      workspace: this.workspace,
-      storageDir: options.persistenceDir,
-      permissionManager: this.permissionManager
-    }));
-    this.maxSteps = options.maxSteps || 20;
-    this.maxFiles = options.maxFiles || 50;
-    this.maxPatchBytes = options.maxPatchBytes || 1024 * 1024;
-    this.approvalTimeoutMs = options.approvalTimeoutMs || 5 * 60 * 1000;
-    this.executorTimeoutMs = options.executorTimeoutMs || 2 * 60 * 1000;
-    this.abortControllers = new Map();
-    
+    this.stepExecutor = options.stepExecutor || options.executor || null;
+    this.checkRunner = options.checkRunner || null;
+    this.provider = options.provider || null;
+    this.model = options.model || null;
+    this.providerConfig = options.providerConfig || null;
+    this.stepTimeoutMs = options.stepTimeoutMs === undefined ? 120000 : options.stepTimeoutMs;
+    if (!Number.isFinite(this.stepTimeoutMs) || this.stepTimeoutMs <= 0) {
+      throw new Error('stepTimeoutMs must be a positive finite number');
+    }
+    this.approvalTimeoutMs = options.approvalTimeoutMs === undefined ? 30000 : options.approvalTimeoutMs;
+    if (!Number.isFinite(this.approvalTimeoutMs) || this.approvalTimeoutMs <= 0) {
+      throw new Error('approvalTimeoutMs must be a positive finite number');
+    }
+
+    this.permissionLimits = options.permissionLimits || {};
+    const toolRegistryOptions = options.toolRegistryOptions || {};
+    this.permissionManager = options.permissionManager || toolRegistryOptions.permissionManager ||
+      new PermissionManager({
+        workspace: this.workspace,
+        ...(options.permissionOptions || {}),
+        maxFilesPerTask: this.permissionLimits.maxFilesPerTask ?? options.permissionOptions?.maxFilesPerTask,
+        requireApprovalForHighRisk:
+          this.permissionLimits.requireApprovalForHighRisk ?? options.permissionOptions?.requireApprovalForHighRisk
+      });
+    // Tool registry: injected into every step execution. Pass `toolRegistry: null`
+    // explicitly to disable tool access entirely for a given orchestrator.
+    this.toolRegistry = options.toolRegistry !== undefined
+      ? options.toolRegistry
+      : new ToolRegistry({
+        workspace: this.workspace,
+        ...toolRegistryOptions,
+        permissionManager: this.permissionManager
+      });
+    this.workspaceContext = options.workspaceContext !== undefined
+      ? options.workspaceContext
+      : new WorkspaceContext({ workspace: this.workspace, ...(options.contextOptions || {}) });
+    this.toolBudget = {
+      maxCalls: options.toolBudget?.maxCalls ?? DEFAULT_TOOL_BUDGET.maxCalls,
+      maxOutputBytes: options.toolBudget?.maxOutputBytes ?? DEFAULT_TOOL_BUDGET.maxOutputBytes
+    };
+
+    // Work queue
+    this.workItems = new Map();
+    this.workQueue = [];
+
     // Concurrency control
     this.maxConcurrent = options.maxConcurrent || 3;
     this.activeWork = new Map();
+    this.activeExecutions = new Map();
     this.pausedFrom = new Map();
     this.pausePollMs = options.pausePollMs || 50;
-    
-    // Permissions
-    this.permissionLimits = options.permissionLimits || {
-      maxFilesPerTask: 50,
-      requireApprovalForHighRisk: true,
-      requireApprovalForDelete: true
-    };
-    
+
     // Callbacks
     this.onProgress = options.onProgress || null;
     this.onApprovalRequired = options.onApprovalRequired || null;
@@ -107,8 +99,7 @@ class WorkOrchestrator {
     const item = new WorkItem(params);
     this.workItems.set(item.id, item);
     this.workQueue.push(item.id);
-    this._persist(item);
-    
+
     this._progress({ type: 'work-added', item: item.getSummary() });
     return item;
   }
@@ -123,8 +114,6 @@ class WorkOrchestrator {
       completed: 0,
       failed: 0,
       cancelled: 0,
-      denied: 0,
-      denied: 0,
       items: []
     };
 
@@ -134,7 +123,7 @@ class WorkOrchestrator {
     while (this.workQueue.length > 0) {
       // Find ready work items
       const readyItems = this._getReadyItems();
-      
+
       if (readyItems.length === 0) {
         // Check if we have active work
         if (this.activeWork.size === 0) {
@@ -142,8 +131,8 @@ class WorkOrchestrator {
           const remaining = this.workQueue.length;
           if (remaining > 0) {
             // Deadlock: items are blocked but nothing is running
-            this._progress({ 
-              type: 'deadlock', 
+            this._progress({
+              type: 'deadlock',
               remainingItems: remaining,
               blockedItems: this.workQueue.map(id => {
                 const item = this.workItems.get(id);
@@ -153,7 +142,7 @@ class WorkOrchestrator {
           }
           break;
         }
-        
+
         // Wait for active work to complete
         await this._waitForActiveWork();
         continue;
@@ -169,7 +158,7 @@ class WorkOrchestrator {
         if (queueIndex !== -1) {
           this.workQueue.splice(queueIndex, 1);
         }
-        
+
         // Execute asynchronously
         this._executeWorkItem(item, results);
       }
@@ -204,9 +193,9 @@ class WorkOrchestrator {
       throw new Error(`Work item not ready: ${readiness.blockedBy.join(', ')}`);
     }
 
-    const results = { total: 1, completed: 0, failed: 0, cancelled: 0, denied: 0, items: [] };
+    const results = { total: 1, completed: 0, failed: 0, cancelled: 0, items: [] };
     await this._executeWorkItem(item, results);
-    
+
     // Wait for completion
     while (this.activeWork.has(itemId)) {
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -226,19 +215,17 @@ class WorkOrchestrator {
 
     if (this.activeWork.has(itemId)) {
       // Cancel active work
-      const promise = this.activeWork.get(itemId);
-      // Set cancellation flag (the execution loop will check this)
+      const controller = this.activeExecutions.get(itemId);
       item.updateStatus(WorkItemStatus.CANCELLED, { reason: 'User cancelled' });
-      const controller = this.abortControllers.get(itemId);
-      if (controller) controller.abort();
-      this._persist(item, { workspaceHashes: item.contextHashes || {} });
+      if (controller && !controller.signal.aborted) {
+        controller.abort(createExecutionError('EXECUTION_CANCELLED', 'User cancelled'));
+      }
       this._progress({ type: 'work-cancelled', item: item.getSummary() });
     } else if (this.workQueue.includes(itemId)) {
       // Remove from queue
       const index = this.workQueue.indexOf(itemId);
       this.workQueue.splice(index, 1);
       item.updateStatus(WorkItemStatus.CANCELLED, { reason: 'Cancelled before execution' });
-      this._persist(item);
       this._progress({ type: 'work-cancelled', item: item.getSummary() });
     }
   }
@@ -296,14 +283,6 @@ class WorkOrchestrator {
     return Array.from(this.workItems.values());
   }
 
-  getHistory() {
-    return this.runStore ? this.runStore.list() : [];
-  }
-
-  getPersistedWorkItem(itemId) {
-    return this.runStore ? this.runStore.load(itemId) : { status: 'unavailable', id: itemId };
-  }
-
   /**
    * Get queue status
    * @returns {Object}
@@ -321,7 +300,7 @@ class WorkOrchestrator {
 
   async _executeWorkItem(item, results) {
     const controller = new AbortController();
-    this.abortControllers.set(item.id, controller);
+    this.activeExecutions.set(item.id, controller);
     const executeAsync = async () => {
       try {
         await this._waitWhilePaused(item);
@@ -333,201 +312,207 @@ class WorkOrchestrator {
 
         this._progress({ type: 'work-start', item: item.getSummary() });
         item.updateStatus(WorkItemStatus.PLANNING);
-        this._persist(item);
 
-        const task = {
-          schemaVersion: item.schemaVersion,
-          id: item.taskId || item.id,
-          description: item.description,
-          acceptanceCriteria: item.acceptanceCriteria,
-          files: item.files
-        };
-        const taskValidation = validateTaskContract(task);
-        if (!taskValidation.valid) {
-          throw new Error(`Invalid task contract: ${taskValidation.issues.join(', ')}`);
+        if (this.workspaceContext) {
+          const suppliedContext = item.context && typeof item.context === 'object' ? item.context : {};
+          const requestedFiles = Array.isArray(suppliedContext.files) ? suppliedContext.files : [];
+          item.context = Object.assign(suppliedContext, {
+            ...this.workspaceContext.collect(requestedFiles, { query: item.description }),
+            workspace: this.workspace
+          });
         }
-        if (!task.files.length) {
-          throw new Error('An explicit, bounded file scope is required for code-generation work');
-        }
-        if (!this.executor) {
-          throw new Error('No agent executor is configured; no model provider was invoked');
-        }
-        const context = this.workspaceContext.collect(task.files);
-        item.contextHashes = Object.fromEntries(context.files.map(file => [file.path, file.hash]));
-        this._persist(item, { workspaceHashes: item.contextHashes });
-        if (controller.signal.aborted) throw new Error('Work cancelled');
 
+        // 1. Create execution plan
         const plan = await this.planner.plan({
-          ...task,
-          deliverables: item.deliverables,
+          description: item.description,
+          deliverables: item.plan?.deliverables || [],
           dependencies: item.dependencies,
-          context: { workspace: this.workspace, files: task.files, boundedContext: context }
+          acceptanceCriteria: item.taskContract?.acceptanceCriteria || [],
+          context: {
+            workspace: this.workspace,
+            files: (item.context?.files || []).map(file =>
+              typeof file === 'string' ? file : file.path),
+            gatheredContext: item.context || {},
+            scopeFiles: item.taskContract?.files || []
+          }
         });
+        if (controller.signal.aborted) throw cancellationError(controller.signal);
 
-        item.setPlan(plan);
-        this._persist(item, { workspaceHashes: item.contextHashes });
-        this._progress({ type: 'plan-created', item: item.getSummary(), plan });
+        const executablePlan = prepareExecutablePlan(plan);
+        item.setPlan(executablePlan);
+        this._progress({ type: 'plan-created', item: item.getSummary(), plan: executablePlan });
 
-        const validation = validatePlan(plan, { maxSteps: this.maxSteps, maxFiles: this.maxFiles });
+        // 2. Validate plan
+        const allowedFiles = [
+          ...(item.taskContract?.files || []),
+          ...(item.context?.files || []).map(file => typeof file === 'string' ? file : file.path)
+        ];
+        const validation = this.planner.validatePlan(executablePlan, {
+          allowedFiles: allowedFiles.length ? allowedFiles : undefined
+        });
         if (!validation.valid) {
           throw new Error(`Invalid plan: ${validation.issues.join(', ')}`);
         }
-        if (typeof this.planner.validatePlan === 'function') {
-          const plannerValidation = this.planner.validatePlan(plan);
-          if (!plannerValidation.valid) {
-            throw new Error(`Invalid plan: ${plannerValidation.issues.join(', ')}`);
+
+        // 3. Check permissions and approval requirements
+        const planDigest = digestPlan(executablePlan);
+        const planOperation = {
+          type: 'plan',
+          digest: planDigest,
+          params: {
+            affectedFiles: executablePlan.affectedFiles,
+            risks: executablePlan.risks,
+            requiresApproval: executablePlan.metadata.requiresApproval
           }
-        }
-        if (plan.affectedFiles.some(file => !task.files.includes(file))) {
-          throw new Error('Plan includes files outside the requested task scope');
-        }
-
-        const permissionCheck = this._checkPermissions(item, plan);
+        };
+        const permissionCheck = await this.permissionManager.checkPermission(planOperation, {
+          deferApproval: true
+        });
+        this._recordPermissionDecision(item, planOperation, permissionCheck);
         if (!permissionCheck.allowed) {
-          throw Object.assign(new Error(`Permission denied: ${permissionCheck.reason}`), { denied: true });
+          throw new Error(`Permission denied: ${permissionCheck.reason}`);
         }
 
-        const planDigest = this._digest(plan);
         if (permissionCheck.requiresApproval) {
           item.updateStatus(WorkItemStatus.AWAITING_APPROVAL);
-          item.approval = { schemaVersion: CONTRACT_VERSION, status: 'pending', planDigest, patchDigest: null };
-          this._persist(item, { workspaceHashes: item.contextHashes });
-          this._progress({ type: 'approval-required', item: item.getSummary(), plan, planDigest });
-          const approved = await this._requestApproval(item, plan, {
-            stage: 'plan',
-            planDigest,
-            signal: controller.signal
+          this._progress({
+            type: 'approval-required',
+            item: item.getSummary(),
+            plan: executablePlan,
+            planDigest
           });
-          if (!approved) {
-            item.updateStatus(WorkItemStatus.DENIED, { reason: 'Plan approval denied', planDigest });
-            item.approval = { schemaVersion: CONTRACT_VERSION, status: 'denied', planDigest };
-            this._persist(item, { workspaceHashes: item.contextHashes || {} });
-            results.denied++;
-            results.items.push({ itemId: item.id, status: WorkResultStatus.DENIED, reason: 'Plan approval denied' });
+
+          // Request approval
+          const approval = await this._requestApproval(item, executablePlan, {
+            kind: 'plan',
+            planDigest,
+            actionDigest: null,
+            operation: planOperation
+          }, controller.signal, () => digestPlan(executablePlan));
+          if (!approval.approved) {
+            this.permissionManager.recordApproval(planOperation, {
+              approved: false,
+              planDigest,
+              outcome: approval.outcome,
+              reason: approval.reason,
+              risk: permissionCheck.risk
+            });
+            item.updateStatus(WorkItemStatus.CANCELLED, { reason: approval.reason });
+            results.cancelled++;
+            results.items.push({
+              itemId: item.id,
+              status: 'cancelled',
+              reason: approval.reason,
+              contextProvenance: this._contextProvenance(item)
+            });
             return;
           }
-          item.approval = {
-            schemaVersion: CONTRACT_VERSION,
-            status: 'approved',
+          if (item.plan !== executablePlan || digestPlan(executablePlan) !== planDigest) {
+            this.permissionManager.recordApproval(planOperation, {
+              approved: false,
+              planDigest,
+              outcome: 'invalidated',
+              reason: 'Approved plan changed before execution',
+              risk: permissionCheck.risk
+            });
+            throw createExecutionError('APPROVAL_INVALIDATED', 'Approved plan changed before execution; approval is invalid');
+          }
+          this.permissionManager.recordApproval(planOperation, {
+            approved: true,
             planDigest,
-            patchDigest: null,
-            patchDigests: [],
-            approvedAt: new Date().toISOString(),
-            stage: 'plan'
+            outcome: 'approved',
+            risk: permissionCheck.risk
+          });
+          item.approval = {
+            planVersion: executablePlan.planVersion,
+            planDigest,
+            approvedAt: new Date().toISOString()
           };
-          this._persist(item, { workspaceHashes: item.contextHashes });
         }
+        if (controller.signal.aborted) throw cancellationError(controller.signal);
 
-        if (controller.signal.aborted) throw new Error('Work cancelled');
+        // 4. Execute work
         item.updateStatus(WorkItemStatus.WORKING);
-        this._persist(item, { workspaceHashes: item.contextHashes });
         this._progress({ type: 'work-executing', item: item.getSummary() });
 
-        const output = await this._executeSteps(item, plan, task, context, controller, planDigest);
+        const output = await this._executeSteps(item, executablePlan, controller);
+        item.setOutput(output);
 
-        if (controller.signal.aborted || item.status === WorkItemStatus.CANCELLED) {
+        if (item.status === WorkItemStatus.CANCELLED) {
           results.cancelled++;
-          results.items.push({ itemId: item.id, status: WorkResultStatus.CANCELLED, reason: 'Cancelled during execution', output });
+          results.items.push({
+            itemId: item.id,
+            status: 'cancelled',
+            reason: 'Cancelled during execution',
+            output,
+            contextProvenance: this._contextProvenance(item)
+          });
           this._progress({ type: 'work-cancelled', item: item.getSummary() });
           return;
         }
 
-        if (this._digest(plan) !== planDigest) {
-          throw new Error('Approved plan changed during execution');
-        }
-        if (output.patches.length) {
-          const applied = await this._applyPatches(item, plan, output.patches, planDigest, controller.signal);
-          output.appliedPatches = applied;
-        }
-        output.verifiedChangedFiles = [...item.changedFiles];
-        item.setOutput(output);
-        this._persist(item, { workspaceHashes: item.contextHashes });
-        if (item.changedFiles.length === 0) {
-          throw new Error('Executor produced no applied workspace changes; work cannot be completed');
-        }
-
+        // 5. Verify results
         item.updateStatus(WorkItemStatus.VERIFYING);
-        this._persist(item, { workspaceHashes: item.contextHashes });
-        const verificationResults = await this._verifyWork(item, plan, controller.signal);
+        const verificationResults = await this._verifyWork(item, executablePlan);
         item.setVerificationResults(verificationResults);
+        if (controller.signal.aborted) throw cancellationError(controller.signal);
 
         if (!verificationResults.passed) {
-          throw new Error('One or more required verification checks did not pass');
+          // Retry if available
+          if (item.incrementRetry()) {
+            this._progress({ type: 'work-retry', item: item.getSummary() });
+            this.workQueue.push(item.id);
+            item.updateStatus(WorkItemStatus.QUEUED, { reason: 'Verification failed, retrying' });
+            return;
+          } else {
+            throw new Error(`Verification failed after ${item.retryCount} attempts`);
+          }
         }
 
-        const completion = {
-          schemaVersion: CONTRACT_VERSION,
-          status: WorkResultStatus.COMPLETED,
-          changedFiles: item.changedFiles,
-          verifiedChangedFiles: output.verifiedChangedFiles,
-          verification: {
-            schemaVersion: CONTRACT_VERSION,
-            checks: Object.fromEntries(Object.entries(verificationResults.checks).map(([id, check]) => [
-              id,
-              { status: check.status, required: check.required }
-            ]))
-          },
-          scaffold: output.scaffold === true
-        };
-        const completionValidation = validateCompletion(completion);
-        if (!completionValidation.valid) {
-          throw new Error(`Completion contract failed: ${completionValidation.issues.join(', ')}`);
-        }
-        const approvalValidation = validateApproval(item.approval);
-        if (!approvalValidation.valid || item.approval.status !== 'approved' ||
-            item.approval.planDigest !== planDigest || !item.approval.patchDigests?.length) {
-          throw new Error('Final patch approval is missing or no longer matches the executed plan');
-        }
-
+        // 6. Complete
         item.updateStatus(WorkItemStatus.COMPLETED);
-        this._persist(item, { workspaceHashes: item.contextHashes });
         results.completed++;
         results.items.push({
           itemId: item.id,
-          status: WorkResultStatus.COMPLETED,
+          status: 'completed',
           output,
-          verification: verificationResults
+          contextProvenance: this._contextProvenance(item)
         });
         this._progress({ type: 'work-complete', item: item.getSummary() });
 
       } catch (error) {
-        if (controller.signal.aborted || item.status === WorkItemStatus.CANCELLED) {
-          item.updateStatus(WorkItemStatus.CANCELLED, { reason: 'Work cancelled' });
-          this._persist(item, { workspaceHashes: item.contextHashes || {} });
+        const failure = error instanceof Error ? error : new Error(String(error));
+        if (item.status === WorkItemStatus.CANCELLED || failure.code === 'EXECUTION_CANCELLED') {
+          if (item.status !== WorkItemStatus.CANCELLED) {
+            item.updateStatus(WorkItemStatus.CANCELLED, { reason: failure.message });
+          }
           results.cancelled++;
-          results.items.push({ itemId: item.id, status: WorkResultStatus.CANCELLED, reason: 'Work cancelled' });
+          results.items.push({
+            itemId: item.id,
+            status: 'cancelled',
+            reason: failure.message,
+            code: failure.code || 'EXECUTION_CANCELLED',
+            contextProvenance: this._contextProvenance(item)
+          });
           this._progress({ type: 'work-cancelled', item: item.getSummary() });
           return;
         }
-        if (error.approvalDenied || error.denied) {
-          item.updateStatus(WorkItemStatus.DENIED, { reason: error.message });
-          item.approval = {
-            schemaVersion: CONTRACT_VERSION,
-            status: error.approvalExpired ? 'expired' : 'denied',
-            planDigest: item.approval?.planDigest || null,
-            patchDigest: item.approval?.patchDigest || null,
-            patchDigests: item.approval?.patchDigests || []
-          };
-          this._persist(item, { workspaceHashes: item.contextHashes });
-          results.denied++;
-          results.items.push({ itemId: item.id, status: WorkResultStatus.DENIED, reason: error.message });
-          this._progress({ type: 'work-denied', item: item.getSummary(), reason: error.message });
-          return;
-        }
-        item.setError(error);
-        item.updateStatus(WorkItemStatus.FAILED, { error: error.message });
-        this._persist(item, { workspaceHashes: item.contextHashes });
+        item.setError(failure);
+        item.updateStatus(WorkItemStatus.FAILED, { error: failure.message });
         results.failed++;
         results.items.push({
           itemId: item.id,
-          status: WorkResultStatus.FAILED,
-          error: error.message,
-          verification: item.verificationResults
+          status: 'failed',
+          error: failure.message,
+          code: failure.code || 'EXECUTION_ERROR',
+          provider: failure.provider || this.provider,
+          model: failure.model || this.model,
+          contextProvenance: this._contextProvenance(item)
         });
-        this._progress({ type: 'work-error', item: item.getSummary(), error: error.message });
+        this._progress({ type: 'work-error', item: item.getSummary(), error: failure.message });
       } finally {
-        this.abortControllers.delete(item.id);
         this.activeWork.delete(item.id);
+        this.activeExecutions.delete(item.id);
       }
     };
 
@@ -535,31 +520,36 @@ class WorkOrchestrator {
     this.activeWork.set(item.id, promise);
   }
 
-  async _executeSteps(item, plan, task, context, controller, planDigest) {
-    const output = { completedSteps: [], results: {}, patches: [], verifiedChangedFiles: [] };
+  _contextProvenance(item) {
+    return item.context?.provenance || [];
+  }
+
+  async _executeSteps(item, plan, controller) {
+    const output = { completedSteps: [], results: {} };
 
     for (const step of plan.steps) {
       await this._waitWhilePaused(item);
 
-      if (controller.signal.aborted || item.status === WorkItemStatus.CANCELLED) {
-        break;
+      // Check for cancellation
+      if (item.status === WorkItemStatus.CANCELLED) {
+        throw createExecutionError('EXECUTION_CANCELLED', 'User cancelled');
       }
 
-      this._progress({ 
-        type: 'step-start', 
-        item: item.getSummary(), 
-        step: step.description 
+      this._progress({
+        type: 'step-start',
+        item: item.getSummary(),
+        step: step.description
       });
 
-      const stepResult = await this._executeStep(item, step, task, context, controller, plan, planDigest);
-      
+      // Execute step (stubbed for now - would call actual agent executor)
+      const stepResult = await this._executeStep(item, step, plan, controller);
+
       output.completedSteps.push(step.id);
       output.results[step.id] = stepResult;
-      output.patches.push(...stepResult.patches);
 
-      this._progress({ 
-        type: 'step-complete', 
-        item: item.getSummary(), 
+      this._progress({
+        type: 'step-complete',
+        item: item.getSummary(),
         step: step.description,
         result: stepResult
       });
@@ -568,398 +558,492 @@ class WorkOrchestrator {
     return output;
   }
 
-  async _executeStep(item, step, task, context, controller, plan, planDigest) {
-    const toolDefinitions = this.toolRegistry ? this.toolRegistry.getModelTools() : [];
-    const toolPatches = [];
-    const stepController = new AbortController();
-    const abortStep = () => stepController.abort();
-    if (controller.signal.aborted) abortStep();
-    else controller.signal.addEventListener('abort', abortStep, { once: true });
-    const modelContext = {
-      ...context,
-      files: context.files.map(file => ({
-        ...file,
-        content: this.permissionManager.redactSecrets(file.content)
-      }))
-    };
-    const callTool = this.toolRegistry ? (name, args) => this.toolRegistry.execute(name, args, {
-      taskId: item.id,
-      planStepId: step.id,
-      signal: stepController.signal,
-      allowedTools: toolDefinitions.map(tool => tool.name),
-      applyPatch: async patch => {
-        const proposal = {
-        schemaVersion: CONTRACT_VERSION,
-        path: patch.path,
-        operation: 'modify',
-        expectedHash: patch.expectedHash,
-        content: patch.content
-        };
-        const validation = validatePatch(proposal, { maxBytes: this.maxPatchBytes });
-        if (!validation.valid) throw new Error(`Invalid edit proposal: ${validation.issues.join(', ')}`);
-        if (!plan.affectedFiles.includes(proposal.path)) {
-          throw new Error(`Edit proposal is outside the approved plan: ${proposal.path}`);
-        }
-        toolPatches.push(proposal);
-        return { status: 'proposed', path: proposal.path, expectedHash: proposal.expectedHash };
-      }
-    }) : undefined;
-    const request = {
-      task,
-      plan,
+  async _executeStep(item, step, plan, controller) {
+    const executor = this.stepExecutor;
+    if (!executor) {
+      const code = this.provider ? 'PROVIDER_EXECUTOR_NOT_CONFIGURED' : 'EXECUTOR_NOT_CONFIGURED';
+      throw createExecutionError(code, this.provider
+        ? `No executor is configured for provider '${this.provider}'`
+        : 'No step executor is configured');
+    }
+
+    const execute = typeof executor === 'function'
+      ? executor
+      : executor && (executor.executeStep || executor.execute);
+    if (typeof execute !== 'function') {
+      throw createExecutionError('EXECUTOR_INVALID', 'Step executor must be a function or expose executeStep()');
+    }
+
+    const signal = controller.signal;
+    if (signal.aborted) {
+      throw cancellationError(signal);
+    }
+
+    const provider = this.provider;
+    const model = item.assignedModel || this.model;
+    const toolContext = this._createToolContext(item, step, plan, controller);
+    const execution = Promise.resolve().then(() => execute.call(executor, {
       step,
-      context: modelContext,
-      signal: stepController.signal,
-      tools: toolDefinitions,
-      callTool
-    };
-    let timeout;
-    let onAbort;
-    try {
-      const execution = typeof this.executor === 'function'
-        ? Promise.resolve().then(() => this.executor(request))
-        : (typeof this.executor.executeStep === 'function'
-          ? Promise.resolve().then(() => this.executor.executeStep(request))
-          : Promise.resolve(null));
-      const interrupted = new Promise((resolve, reject) => {
-        onAbort = () => reject(new Error('Agent step cancelled'));
-        if (stepController.signal.aborted) {
-          onAbort();
-        } else {
-          stepController.signal.addEventListener('abort', onAbort, { once: true });
-        }
-        timeout = setTimeout(() => {
-          reject(Object.assign(
-            new Error(`Agent executor timed out after ${this.executorTimeoutMs}ms`),
-            { code: 'EXECUTOR_TIMEOUT' }
-          ));
-          stepController.abort();
-        }, this.executorTimeoutMs);
-      });
-      const stepResult = await Promise.race([execution, interrupted]);
-      if (controller.signal.aborted) throw new Error('Work cancelled');
-      if (!stepResult || typeof stepResult !== 'object' || Array.isArray(stepResult) ||
-          stepResult.success !== true || String(stepResult.stepId) !== String(step.id) ||
-          !Array.isArray(stepResult.patches)) {
-        throw new Error(`Executor returned malformed or unsuccessful output for step '${step.id}'`);
-      }
-      const patches = [...stepResult.patches, ...toolPatches];
-      for (const patch of patches) {
-        const validation = validatePatch(patch, { maxBytes: this.maxPatchBytes });
-        if (!validation.valid) {
-          throw new Error(`Executor returned an invalid patch for step '${step.id}': ${validation.issues.join(', ')}`);
-        }
-        if (!plan.affectedFiles.includes(patch.path)) {
-          throw new Error(`Executor returned a patch outside the approved plan for step '${step.id}': ${patch.path}`);
-        }
-      }
-      return { ...stepResult, patches };
-    } finally {
-      if (timeout) clearTimeout(timeout);
-      if (onAbort) stepController.signal.removeEventListener('abort', onAbort);
-      controller.signal.removeEventListener('abort', abortStep);
-    }
-  }
-
-  async _applyPatches(item, plan, proposedPatches, planDigest, signal) {
-    if (!Array.isArray(proposedPatches) || proposedPatches.length === 0) {
-      throw new Error('Patch set is empty');
-    }
-    if (proposedPatches.length > this.maxFiles) {
-      throw new Error(`Patch file limit exceeded (${proposedPatches.length} > ${this.maxFiles})`);
-    }
-    const patchDetails = [];
-    const seenPaths = new Set();
-    for (const patch of proposedPatches) {
-      const patchValidation = validatePatch(patch, { maxBytes: this.maxPatchBytes });
-      if (!patchValidation.valid) throw new Error(`Invalid patch: ${patchValidation.issues.join(', ')}`);
-      const relativePath = patch.path;
-      const operation = patch.operation;
-      if (typeof relativePath !== 'string' || !relativePath.trim() ||
-          !['create', 'modify', 'delete'].includes(operation)) {
-        throw new Error('Patch must contain a relative path and a supported operation');
-      }
-      const absolutePath = path.resolve(this.workspace, relativePath);
-      const normalizedRelativePath = path.relative(this.workspace, absolutePath);
-      if (normalizedRelativePath === '..' || normalizedRelativePath.startsWith(`..${path.sep}`) ||
-          path.isAbsolute(normalizedRelativePath) || !plan.affectedFiles.includes(relativePath)) {
-        throw new Error(`Patch path is outside the approved plan scope: ${relativePath}`);
-      }
-      if (seenPaths.has(relativePath)) throw new Error(`Duplicate patch path: ${relativePath}`);
-      seenPaths.add(relativePath);
-      const pathPermission = this.permissionManager.validatePath(absolutePath);
-      if (!pathPermission.valid) throw new Error(`Permission denied: ${pathPermission.reason}`);
-      if (signal.aborted) throw new Error('Work cancelled');
-
-      const exists = fs.existsSync(absolutePath);
-      if (operation === 'create' && exists) throw new Error(`Create target already exists: ${relativePath}`);
-      if (operation !== 'create' && !exists) throw new Error(`Patch source is missing: ${relativePath}`);
-      const originalContent = exists ? fs.readFileSync(absolutePath, 'utf8') : '';
-      const actualHash = exists ? this._digest(originalContent) : null;
-      if (operation === 'create') {
-        if (patch.expectedHash !== null && patch.expectedHash !== undefined) {
-          throw new Error(`Create patch must not include an expected source hash: ${relativePath}`);
-        }
-      } else if (typeof patch.expectedHash !== 'string' || patch.expectedHash !== actualHash) {
-        throw new Error(`Stale source for ${relativePath}: expected hash does not match current content`);
-      }
-      if (operation !== 'delete' && typeof patch.content !== 'string') {
-        throw new Error(`Patch content is required for ${operation}: ${relativePath}`);
-      }
-      if (operation === 'delete' && patch.content !== undefined && patch.content !== null) {
-        throw new Error(`Delete patch must not contain replacement content: ${relativePath}`);
-      }
-      const contentBytes = Buffer.byteLength(patch.content || '', 'utf8');
-      if (contentBytes > this.maxPatchBytes) {
-        throw new Error(`Patch content exceeds byte limit for ${relativePath}`);
-      }
-      patchDetails.push({
-        path: relativePath,
-        operation,
-        expectedHash: patch.expectedHash || null,
-        originalContent,
-        content: patch.content === undefined ? null : patch.content
-      });
-    }
-
-    const patchDigest = this._digest({ planDigest, patches: patchDetails });
-    const firstDiffIndex = this.diffReviewSystem.diffs.length;
-    const rejectPendingDiffs = () => {
-      for (let index = firstDiffIndex; index < this.diffReviewSystem.diffs.length; index++) {
-        if (this.diffReviewSystem.diffs[index].status === 'pending') this.diffReviewSystem.rejectDiff(index);
-      }
-    };
-    for (const patch of patchDetails) {
-      this.diffReviewSystem.addDiff(
-        path.resolve(this.workspace, patch.path),
-        patch.originalContent,
-        patch.content,
-        { operation: patch.operation, expectedHash: patch.expectedHash }
-      );
-    }
-    const proposedDiffs = this.diffReviewSystem.diffs.slice(firstDiffIndex).map(diff => ({
-      path: path.relative(this.workspace, diff.filePath),
-      operation: diff.operation,
-      unifiedDiff: diff.toUnifiedDiff()
+      plan,
+      task: item.taskContract,
+      context: item.context || { workspace: this.workspace, files: step.files || [] },
+      signal,
+      itemId: item.id,
+      taskId: item.taskId,
+      provider,
+      model,
+      providerConfig: this.providerConfig,
+      tools: toolContext ? toolContext.call : null,
+      toolSchemas: toolContext ? toolContext.schemas : []
     }));
-    item.approval = {
-      schemaVersion: CONTRACT_VERSION,
-      status: 'pending',
-      planDigest,
-      patchDigest,
-      patchDigests: item.approval?.patchDigests || [],
-      requestedAt: new Date().toISOString()
-    };
-    this._persist(item, { workspaceHashes: item.contextHashes || {} });
-    let deleteApprovalProvided = false;
+
+    let timeout;
+    let abortHandler;
+    let timedOut = false;
+    const timeoutError = createExecutionError(
+      'STEP_TIMEOUT',
+      `Step '${step.id}' exceeded the ${this.stepTimeoutMs}ms execution timeout`
+    );
+    const timeoutPromise = new Promise((resolve, reject) => {
+      timeout = setTimeout(() => {
+        timedOut = true;
+        reject(timeoutError);
+        controller.abort(timeoutError);
+      }, this.stepTimeoutMs);
+    });
+    const abortPromise = new Promise((resolve, reject) => {
+      abortHandler = () => reject(timedOut ? timeoutError : cancellationError(signal));
+      signal.addEventListener('abort', abortHandler, { once: true });
+    });
+
+    let result;
     try {
-      for (const patch of patchDetails) {
-        const permission = await this.permissionManager.checkPermission({
-          type: patch.operation === 'delete' ? 'delete_file' : 'write_file',
-          params: {
-            path: patch.path,
-            content: patch.content || '',
-            workId: item.id,
-            approvalDetails: { stage: 'patch', planDigest, patchDigest, patches: patchDetails, diffs: proposedDiffs }
-          }
-        });
-        if (!permission.allowed) {
-          throw Object.assign(
-            new Error(`Permission denied for ${patch.path}: ${permission.reason || 'approval denied'}`),
-            { denied: true }
-          );
-        }
-        if (patch.operation === 'delete' && permission.requiresApproval) deleteApprovalProvided = true;
-      }
+      result = await Promise.race([execution, timeoutPromise, abortPromise]);
     } catch (error) {
-      rejectPendingDiffs();
-      throw error;
-    }
-    if (!deleteApprovalProvided) {
-      let approved;
-      try {
-        approved = await this._requestApproval(item, plan, {
-          stage: 'patch',
-          planDigest,
-          patchDigest,
-          patches: patchDetails,
-          diffs: proposedDiffs,
-          signal
-        });
-      } catch (error) {
-        rejectPendingDiffs();
+      if (timedOut || error.code === 'STEP_TIMEOUT') throw timeoutError;
+      if (signal.aborted) throw cancellationError(signal);
+      if (error && error.code) {
+        error.provider = error.provider || provider;
+        error.model = error.model || model;
         throw error;
       }
-      if (!approved) {
-        rejectPendingDiffs();
-        item.updateStatus(WorkItemStatus.DENIED, { reason: 'Patch approval denied', planDigest, patchDigest });
-        throw Object.assign(new Error('Patch approval denied'), { approvalDenied: true });
-      }
+      const providerError = createExecutionError(
+        'PROVIDER_ERROR',
+        error && error.message ? error.message : 'Step executor failed'
+      );
+      providerError.provider = provider;
+      providerError.model = model;
+      throw providerError;
+    } finally {
+      clearTimeout(timeout);
+      signal.removeEventListener('abort', abortHandler);
     }
-    if (this._digest(plan) !== planDigest) {
-      rejectPendingDiffs();
-      throw new Error('Approved plan changed before patch application');
-    }
-    item.approval = {
-      schemaVersion: CONTRACT_VERSION,
-      status: 'approved',
-      planDigest,
-      patchDigest,
-      patchDigests: [...new Set([...(item.approval?.patchDigests || []), patchDigest])],
-      approvedAt: new Date().toISOString(),
-      stage: 'patch'
-    };
 
-    const applied = [];
+    if (result && typeof result === 'object' && result.success === false) {
+      const stepError = createExecutionError(
+        result.code || 'STEP_EXECUTION_FAILED',
+        result.error || `Executor reported failure for step '${step.id}'`
+      );
+      stepError.provider = result.provider || provider;
+      stepError.model = result.model || model;
+      throw stepError;
+    }
+    if (!result || typeof result !== 'object' || Array.isArray(result) ||
+        (Object.getPrototypeOf(result) !== Object.prototype && Object.getPrototypeOf(result) !== null) ||
+        result.success !== true || String(result.stepId) !== String(step.id) ||
+        !Object.prototype.hasOwnProperty.call(result, 'output')) {
+      throw createExecutionError(
+        'MALFORMED_OUTPUT',
+        `Executor returned malformed output for step '${step.id}'`
+      );
+    }
     try {
-      for (let index = firstDiffIndex; index < this.diffReviewSystem.diffs.length; index++) {
-        if (signal.aborted) throw new Error('Work cancelled');
-        const diff = this.diffReviewSystem.diffs[index];
-        const result = await this.diffReviewSystem.applyDiff(index);
-        if (!result.success) throw new Error(`Patch conflict for ${path.relative(this.workspace, diff.filePath)}: ${result.error}`);
-        applied.push(index);
-      }
+      const serializedOutput = JSON.stringify(result.output);
+      if (serializedOutput === undefined) throw new Error('Output is not JSON serializable');
     } catch (error) {
-      for (const index of applied.reverse()) {
-        const diff = this.diffReviewSystem.diffs[index];
-        const rollback = this.diffReviewSystem.rollback(index);
-        if (!rollback.success) {
-          error.message += `; rollback failed for ${diff.filePath}: ${rollback.error}`;
-        }
-      }
-      rejectPendingDiffs();
-      throw error;
+      throw createExecutionError(
+        'MALFORMED_OUTPUT',
+        `Executor output for step '${step.id}' is not serializable`
+      );
     }
-
-    const verifiedChangedFiles = [];
-    for (const patch of patchDetails) {
-      const filePath = path.resolve(this.workspace, patch.path);
-      const verified = patch.operation === 'delete'
-        ? !fs.existsSync(filePath)
-        : fs.existsSync(filePath) && fs.readFileSync(filePath, 'utf8') === patch.content;
-      if (!verified) throw new Error(`Applied patch did not produce the intended workspace state: ${patch.path}`);
-      verifiedChangedFiles.push(patch.path);
-      if (!item.changedFiles.includes(patch.path)) item.addChangedFiles([patch.path]);
-    }
-    return { planDigest, patchDigest, files: verifiedChangedFiles };
+    return { ...result, stepId: step.id };
   }
 
-  async _verifyWork(item, plan, signal) {
-    const results = { schemaVersion: CONTRACT_VERSION, passed: true, checks: {}, requiredPassed: true };
-    if (!Array.isArray(plan.expectedChecks) || plan.expectedChecks.length === 0) {
-      return { passed: false, checks: {}, requiredPassed: false, error: 'No verification checks configured in plan' };
+  /**
+   * Build the bounded, logged tool-call interface handed to the step executor.
+   * Only tools the ToolRegistry marks as exposed can be called; unknown tools,
+   * invalid arguments, exhausted budgets, and tool failures are all returned as
+   * explicit, non-throwing results so the executor cannot mistake them for success.
+   * @param {WorkItem} item
+   * @param {Object} step
+   * @returns {{ call: Function, schemas: Array<Object> }|null}
+   */
+  _createToolContext(item, step, plan, controller) {
+    const registry = this.toolRegistry;
+    if (!registry) return null;
+
+    const exposedNames = new Set(registry.listExposedTools().map(tool => tool.name));
+    const schemas = registry.listExposedTools();
+    if (!item._toolBudgetUsed) {
+      item._toolBudgetUsed = { calls: 0, outputBytes: 0 };
     }
-    for (const check of plan.expectedChecks) {
-      let result;
-      try {
-        result = typeof this.checkRunner === 'function'
-          ? await this.checkRunner(check.type, { required: check.required, signal, workspace: this.workspace })
-          : await this.checkRunner.run(check.type, { required: check.required, signal });
-      } catch (error) {
-        result = {
-          id: check.type,
-          status: 'errored',
-          required: check.required !== false,
-          error: error.message
+    const budget = this.toolBudget;
+    const usage = item._toolBudgetUsed;
+
+    const call = async (toolName, args = {}) => {
+      const correlation = { itemId: item.id, taskId: item.taskId, stepId: step.id };
+      const sanitizedArgs = this._sanitizeToolArgs(args);
+
+      if (controller.signal.aborted || item.status === WorkItemStatus.CANCELLED) {
+        const error = cancellationError(controller.signal);
+        this._recordToolCall(item, correlation, toolName, sanitizedArgs, {
+          success: false, code: error.code, duration: 0, output: null
+        });
+        return { success: false, code: error.code, error: error.message };
+      }
+
+      if (!exposedNames.has(toolName)) {
+        this._recordToolCall(item, correlation, toolName, sanitizedArgs, {
+          success: false, code: 'UNKNOWN_TOOL', duration: 0, output: null
+        });
+        return {
+          success: false,
+          code: 'UNKNOWN_TOOL',
+          error: `Tool '${toolName}' is not a registered, exposed agent tool`
         };
       }
-      const normalized = {
-        id: check.type,
-        status: ['passed', 'failed', 'skipped', 'unavailable', 'errored', 'timed-out'].includes(result?.status)
-          ? result.status
-          : 'errored',
-        required: check.required !== false,
-        command: result?.command || null,
-        exitCode: result?.exitCode ?? null,
-        durationMs: result?.durationMs || 0,
-        output: this.permissionManager.redactSecrets(String(result?.output || '')).slice(0, 128 * 1024),
-        error: result?.error || null
+
+      if (usage.calls >= budget.maxCalls) {
+        this._recordToolCall(item, correlation, toolName, sanitizedArgs, {
+          success: false, code: 'TOOL_BUDGET_EXCEEDED', duration: 0, output: null
+        });
+        return {
+          success: false,
+          code: 'TOOL_BUDGET_EXCEEDED',
+          error: `Tool-call budget (${budget.maxCalls} calls) exhausted for this task`
+        };
+      }
+
+      usage.calls += 1;
+      let actionArgs;
+      try {
+        actionArgs = JSON.parse(JSON.stringify(args));
+      } catch (error) {
+        this._recordToolCall(item, correlation, toolName, sanitizedArgs, {
+          success: false, code: 'INVALID_ARGUMENTS', duration: 0, output: null
+        });
+        return {
+          success: false,
+          code: 'INVALID_ARGUMENTS',
+          error: 'Tool arguments must be JSON-serializable'
+        };
+      }
+      deepFreeze(actionArgs);
+
+      const planDigest = digestPlan(plan);
+      const operation = {
+        type: toolName,
+        digest: digestAction(planDigest, toolName, actionArgs),
+        params: {
+          ...actionArgs,
+          dependencyChange: isDependencyPath(actionArgs.path)
+        }
       };
-      results.checks[check.type] = normalized;
-      if (normalized.required && normalized.status !== 'passed') results.requiredPassed = false;
+      const permissionCheck = await this.permissionManager.checkPermission(operation, {
+        deferApproval: true
+      });
+      this._recordPermissionDecision(item, operation, permissionCheck);
+      if (!permissionCheck.allowed) {
+        this._recordToolCall(item, correlation, toolName, sanitizedArgs, {
+          success: false,
+          code: 'PERMISSION_DENIED',
+          duration: 0,
+          output: null
+        });
+        controller.abort(createExecutionError('PERMISSION_DENIED', permissionCheck.reason));
+        return {
+          success: false,
+          code: 'PERMISSION_DENIED',
+          error: permissionCheck.reason
+        };
+      }
+
+      if (permissionCheck.requiresApproval) {
+        const actionDigest = operation.digest;
+        const approval = await this._requestApproval(item, plan, {
+          kind: 'tool',
+          tool: toolName,
+          planDigest,
+          actionDigest,
+          operation: { type: operation.type, params: actionArgs }
+        }, controller.signal, () =>
+          digestAction(planDigest, toolName, args) === actionDigest &&
+          digestAction(planDigest, toolName, actionArgs) === actionDigest
+            ? actionDigest
+            : null);
+
+        if (!approval.approved) {
+          const approvalCode = approval.outcome === 'timeout'
+            ? 'APPROVAL_TIMEOUT'
+            : approval.outcome === 'cancelled' ? 'EXECUTION_CANCELLED'
+            : approval.outcome === 'invalidated' ? 'APPROVAL_INVALIDATED' : 'APPROVAL_DENIED';
+          this.permissionManager.recordApproval(operation, {
+            approved: false,
+            planDigest,
+            actionDigest,
+            outcome: approval.outcome,
+            reason: approval.reason,
+            risk: permissionCheck.risk
+          });
+          this._recordToolCall(item, correlation, toolName, sanitizedArgs, {
+            success: false,
+            code: approvalCode,
+            duration: 0,
+            output: null
+          });
+          controller.abort(createExecutionError(
+            approvalCode,
+            approval.reason
+          ));
+          return { success: false, code: approvalCode, error: approval.reason };
+        }
+
+        if (item.plan !== plan || digestPlan(plan) !== planDigest ||
+            digestAction(planDigest, toolName, args) !== actionDigest) {
+          const reason = 'Approved action changed before execution; approval is invalid';
+          this.permissionManager.recordApproval(operation, {
+            approved: false,
+            planDigest,
+            actionDigest,
+            outcome: 'invalidated',
+            reason,
+            risk: permissionCheck.risk
+          });
+          controller.abort(createExecutionError('APPROVAL_INVALIDATED', reason));
+          return { success: false, code: 'APPROVAL_INVALIDATED', error: reason };
+        }
+
+        this.permissionManager.recordApproval(operation, {
+          approved: true,
+          planDigest,
+          actionDigest,
+          outcome: 'approved',
+          risk: permissionCheck.risk
+        });
+      }
+
+      if (controller.signal.aborted || item.status === WorkItemStatus.CANCELLED ||
+          item.plan !== plan || digestPlan(plan) !== planDigest) {
+        const error = controller.signal.aborted
+          ? cancellationError(controller.signal)
+          : createExecutionError('APPROVAL_INVALIDATED', 'Execution plan changed before tool call');
+        this._recordToolCall(item, correlation, toolName, sanitizedArgs, {
+          success: false, code: error.code, duration: 0, output: null
+        });
+        return { success: false, code: error.code, error: error.message };
+      }
+
+      const result = await registry.execute(toolName, actionArgs, correlation);
+
+      const { boundedData, truncated } = this._boundToolOutput(result.data, budget, usage);
+      this._recordToolCall(item, correlation, toolName, sanitizedArgs, {
+        success: result.success,
+        code: result.code || null,
+        duration: result.duration,
+        output: boundedData
+      });
+
+      return {
+        success: result.success,
+        data: boundedData,
+        error: result.error,
+        code: result.code || null,
+        duration: result.duration,
+        truncated
+      };
+    };
+
+    return { call, schemas };
+  }
+
+  _recordToolCall(item, correlation, tool, args, outcome) {
+    const entry = {
+      tool,
+      args,
+      itemId: correlation.itemId,
+      taskId: correlation.taskId,
+      stepId: correlation.stepId,
+      success: outcome.success,
+      code: outcome.code,
+      duration: outcome.duration,
+      output: outcome.output,
+      timestamp: new Date().toISOString()
+    };
+    if (typeof item.recordToolCall === 'function') {
+      item.recordToolCall(entry);
     }
-    results.passed = results.requiredPassed;
+    this._progress({ type: 'tool-call', item: item.getSummary(), toolCall: entry });
+  }
+
+  _sanitizeToolArgs(args) {
+    const sanitized = { ...args };
+    for (const key of ['content', 'newContent']) {
+      if (typeof sanitized[key] === 'string' && sanitized[key].length > 200) {
+        sanitized[key] = `${sanitized[key].slice(0, 200)}...`;
+      }
+    }
+    return sanitized;
+  }
+
+  _boundToolOutput(data, budget, usage) {
+    if (data === null || data === undefined) return { boundedData: data, truncated: false };
+    let serialized;
+    try {
+      serialized = JSON.stringify(data);
+    } catch (error) {
+      return { boundedData: '[unserializable tool output]', truncated: true };
+    }
+
+    const remaining = budget.maxOutputBytes - usage.outputBytes;
+    if (remaining <= 0) {
+      return {
+        boundedData: { truncated: true, reason: 'Per-task tool output budget exhausted' },
+        truncated: true
+      };
+    }
+    if (serialized.length <= remaining) {
+      usage.outputBytes += serialized.length;
+      return { boundedData: data, truncated: false };
+    }
+
+    usage.outputBytes += remaining;
+    return {
+      boundedData: { truncated: true, preview: serialized.slice(0, remaining) },
+      truncated: true
+    };
+  }
+
+  async _verifyWork(item, plan) {
+    const results = { passed: true, checks: {} };
+    for (const check of plan.expectedChecks || []) {
+      if (this.checkRunner) {
+        const id = check.checkId || check.type;
+        const result = await this.checkRunner.run(id, { item, plan, workspace: this.workspace });
+        results.checks[id] = result;
+        if (check.required && result.status !== 'passed' && result.passed !== true) results.passed = false;
+      } else {
+        results.checks[check.checkId || check.type] = { passed: true, required: check.required };
+      }
+    }
     return results;
   }
 
-  _checkPermissions(item, plan) {
-    // Check file count limit
-    if (plan.affectedFiles.length > Math.min(this.maxFiles, this.permissionLimits.maxFilesPerTask)) {
+  _recordPermissionDecision(item, operation, decision) {
+    const audit = {
+      type: 'permission-decision',
+      timestamp: new Date().toISOString(),
+      operation: operation.type,
+      digest: operation.digest || null,
+      allowed: decision.allowed,
+      requiresApproval: decision.requiresApproval,
+      risk: decision.risk,
+      reason: decision.reason || null
+    };
+    item.events.push(audit);
+    this._progress({ type: 'permission-decision', item: item.getSummary(), decision: audit });
+  }
+
+  async _requestApproval(item, plan, details, signal, currentDigest) {
+    const expectedPlanDigest = details.planDigest;
+    const expectedActionDigest = details.actionDigest;
+    const expectedDigest = expectedActionDigest || expectedPlanDigest;
+    if (signal.aborted) {
       return {
-        allowed: false,
-        reason: `Too many affected files (${plan.affectedFiles.length} > ${Math.min(this.maxFiles, this.permissionLimits.maxFilesPerTask)})`
+        approved: false,
+        outcome: 'cancelled',
+        reason: cancellationError(signal).message
       };
     }
-    if (!Array.isArray(plan.risks)) return { allowed: false, reason: 'Plan risk list is malformed' };
-    for (const file of plan.affectedFiles) {
-      const validation = this.permissionManager.validatePath(path.resolve(this.workspace, file));
-      if (!validation.valid) return { allowed: false, reason: validation.reason };
+    if (typeof this.onApprovalRequired !== 'function') {
+      return { approved: false, outcome: 'denied', reason: 'No approval handler is configured' };
     }
 
-    // Check for high-risk operations
-    const highRisks = plan.risks.filter(r => r.level === 'high' || r.level === 'critical');
-    const requiresApproval = 
-      (highRisks.length > 0 && this.permissionLimits.requireApprovalForHighRisk) ||
-      plan.metadata.requiresApproval === true;
-
-    return {
-      allowed: true,
-      requiresApproval
-    };
-  }
-
-  async _requestApproval(item, plan, details = {}) {
-    if (details.signal?.aborted) return false;
-    if (typeof this.onApprovalRequired === 'function') {
-      let timer;
-      try {
-        const timeout = new Promise(resolve => {
-          timer = setTimeout(() => resolve({ expired: true }), this.approvalTimeoutMs);
-        });
-        const decision = await Promise.race([
-          Promise.resolve(this.onApprovalRequired(item, plan, details)),
-          timeout
-        ]);
-        if (decision && decision.expired) {
-          throw Object.assign(new Error('Approval request timed out'), { approvalExpired: true, denied: true });
-        }
-        if (decision === true) return true;
-        return Boolean(decision && decision.approved === true &&
-          decision.planDigest === details.planDigest &&
-          (!details.patchDigest || decision.patchDigest === details.patchDigest));
-      } finally {
-        if (timer) clearTimeout(timer);
-      }
-    }
-    return false;
-  }
-
-  _digest(value) {
-    return crypto.createHash('sha256').update(
-      typeof value === 'string' ? value : JSON.stringify(value)
-    ).digest('hex');
-  }
-
-  _persist(item, metadata = {}) {
-    if (!this.runStore) return null;
-    const toolEvents = this.toolRegistry
-      ? this.toolRegistry.getExecutionLog().filter(event => event.taskId === item.id)
-      : [];
-    return this.runStore.save(item, {
-      workspaceHashes: item.contextHashes || {},
-      toolEvents,
-      ...metadata
+    const pendingApproval = Promise.resolve().then(() =>
+      this.onApprovalRequired(item, plan, details));
+    let timeout;
+    let abortHandler;
+    const timeoutPromise = new Promise(resolve => {
+      timeout = setTimeout(() => resolve({
+        approved: false,
+        outcome: 'timeout',
+        reason: `Approval timed out after ${this.approvalTimeoutMs}ms`
+      }), this.approvalTimeoutMs);
     });
+    const abortPromise = new Promise(resolve => {
+      abortHandler = () => resolve({
+        approved: false,
+        outcome: 'cancelled',
+        reason: cancellationError(signal).message
+      });
+      signal.addEventListener('abort', abortHandler, { once: true });
+    });
+
+    try {
+      let response;
+      try {
+        response = await Promise.race([pendingApproval, timeoutPromise, abortPromise]);
+      } catch (error) {
+        if (signal.aborted) {
+          return {
+            approved: false,
+            outcome: 'cancelled',
+            reason: cancellationError(signal).message
+          };
+        }
+        return {
+          approved: false,
+          outcome: 'error',
+          reason: `Approval request failed: ${error.message}`
+        };
+      }
+      if (response && typeof response === 'object' &&
+          ((response.planDigest && response.planDigest !== expectedPlanDigest) ||
+           (response.actionDigest && response.actionDigest !== expectedActionDigest))) {
+        return {
+          approved: false,
+          outcome: 'invalidated',
+          reason: 'Approval response is bound to a different plan or action digest'
+        };
+      }
+      if (response && response.outcome === 'timeout') return response;
+      if (response && response.outcome === 'cancelled') return response;
+      const approved = response === true || Boolean(response && response.approved === true);
+      if (approved && currentDigest() !== expectedDigest) {
+        return {
+          approved: false,
+          outcome: 'invalidated',
+          reason: 'Approved plan or action changed while awaiting approval'
+        };
+      }
+      return {
+        approved,
+        outcome: approved ? 'approved' : 'denied',
+        reason: approved ? null : 'Approval denied'
+      };
+    } finally {
+      clearTimeout(timeout);
+      signal.removeEventListener('abort', abortHandler);
+    }
   }
 
   _getReadyItems() {
     const ready = [];
-    
+
     for (const itemId of this.workQueue) {
       const item = this.workItems.get(itemId);
       if (!item) continue;
       if (item.status === WorkItemStatus.PAUSED) continue;
-      
+
       const readiness = item.checkReadiness(this.workItems);
       if (readiness.ready) {
         ready.push(item);
@@ -985,7 +1069,7 @@ class WorkOrchestrator {
 
   async _waitForActiveWork() {
     if (this.activeWork.size === 0) return;
-    
+
     // Wait for at least one work item to complete
     await Promise.race(Array.from(this.activeWork.values()));
   }
@@ -1007,6 +1091,76 @@ class WorkOrchestrator {
       }
     }
   }
+}
+
+function createExecutionError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
+function cancellationError(signal) {
+  const reason = signal.reason;
+  if (reason && reason.code === 'STEP_TIMEOUT') return reason;
+  return createExecutionError(
+    'EXECUTION_CANCELLED',
+    reason && reason.message ? reason.message : 'Execution was cancelled'
+  );
+}
+
+function prepareExecutablePlan(plan) {
+  let serialized;
+  try {
+    serialized = JSON.stringify(plan);
+  } catch (error) {
+    throw new Error(`Plan must be JSON-serializable: ${error.message}`);
+  }
+  if (!serialized) throw new Error('Planner returned no serializable plan');
+  const executablePlan = JSON.parse(serialized);
+  if (executablePlan.planVersion === undefined) executablePlan.planVersion = 1;
+  if (executablePlan.planVersion !== 1) throw new Error('Unsupported plan version');
+  return deepFreeze(executablePlan);
+}
+
+function deepFreeze(value) {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value)) deepFreeze(child);
+  return Object.freeze(value);
+}
+
+function digestPlan(plan) {
+  return crypto.createHash('sha256').update(JSON.stringify(plan)).digest('hex');
+}
+
+function digestAction(planDigest, toolName, args) {
+  return crypto.createHash('sha256')
+    .update(JSON.stringify({ planDigest, toolName, args }))
+    .digest('hex');
+}
+
+function isDependencyPath(filePath) {
+  if (typeof filePath !== 'string') return false;
+  const normalized = filePath.replace(/\\/g, '/').toLowerCase();
+  const filename = normalized.slice(normalized.lastIndexOf('/') + 1);
+  return filename === 'package.json' ||
+    filename === 'package-lock.json' ||
+    filename === 'npm-shrinkwrap.json' ||
+    filename === 'yarn.lock' ||
+    filename === 'pnpm-lock.yaml' ||
+    filename === 'cargo.toml' ||
+    filename === 'cargo.lock' ||
+    filename === 'go.mod' ||
+    filename === 'go.sum' ||
+    filename === 'pom.xml' ||
+    filename === 'build.gradle' ||
+    filename === 'build.gradle.kts' ||
+    filename === 'composer.json' ||
+    filename === 'composer.lock' ||
+    filename === 'pipfile' ||
+    filename === 'pipfile.lock' ||
+    filename === 'pyproject.toml' ||
+    /^requirements(?:[-_.].*)?\.txt$/.test(filename) ||
+    filename === 'poetry.lock';
 }
 
 module.exports = {

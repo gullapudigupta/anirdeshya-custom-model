@@ -1,9 +1,11 @@
 /**
- * Coding Agent Tool Registry (P9-T013)
+ * Coding Agent Tool Registry (P9-T013, P12-T003)
  *
  * Exposes typed agent tools for file operations, searching, editing,
- * diagnostics, terminal execution, and more. All tools have validated
- * inputs, structured outputs, and bounded execution.
+ * diagnostics, and allowlisted verification checks. All tools have validated
+ * inputs, structured outputs, and bounded execution. No tool reachable by the
+ * agent executes arbitrary model-supplied shell text: terminal-shaped
+ * operations are limited to a fixed set of check ids (see `run_check`).
  *
  * @module agent/tool-registry
  */
@@ -13,6 +15,14 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { execFile } = require('child_process');
+const util = require('util');
+const execFileAsync = util.promisify(execFile);
+const { PermissionManager } = require('./permissions');
+const { LinterOrchestrator } = require('../integrations/linter-cli');
+
+/** Check ids accepted by the `run_check` tool. The model supplies only an id; it never supplies shell text. */
+const ALLOWED_CHECK_IDS = Object.freeze(['lint', 'typecheck', 'test', 'build']);
 
 /**
  * Tool execution result
@@ -20,6 +30,7 @@ const crypto = require('crypto');
  * @property {boolean} success
  * @property {*} data - Tool-specific output data
  * @property {string} [error] - Error message if failed
+ * @property {string} [code] - Machine-readable failure classification
  * @property {number} duration - Execution duration in ms
  */
 
@@ -33,19 +44,21 @@ class ToolRegistry {
     this.tools = new Map();
     this.executionLog = [];
     this.maxLogSize = options.maxLogSize || 1000;
-    this.permissionManager = options.permissionManager || null;
-    this.checkRunners = options.checkRunners || {};
+    this.permissionManager = options.permissionManager || new PermissionManager({ workspace: this.workspace });
+    // Injectable for tests; defaults to the real check runners below.
+    this.checkRunners = options.checkRunners || null;
     this.taskBudgets = new Map();
-    
+
     // Execution limits
     this.limits = {
       maxFileSize: options.maxFileSize || 1024 * 1024, // 1MB
       maxOutputSize: options.maxOutputSize || 100 * 1024, // 100KB
+      checkTimeout: options.checkTimeout || options.terminalTimeout || 30000, // 30s
       maxSearchResults: options.maxSearchResults || 100,
       maxCallsPerTask: options.maxCallsPerTask || 100,
       maxOutputPerTask: options.maxOutputPerTask || 10 * 1024 * 1024
     };
-    
+
     this._registerBuiltInTools();
   }
 
@@ -59,14 +72,14 @@ class ToolRegistry {
   async execute(toolName, args = {}, context = {}) {
     const tool = this.tools.get(toolName);
     if (!tool) {
-      const missing = this._result(false, null, `Tool '${toolName}' not found`, 0);
-      this._logExecution(toolName, args, missing, context, false);
-      return missing;
+      const result = this._result(false, null, `Tool '${toolName}' not found`, 0, 'UNKNOWN_TOOL');
+      this._logExecution(toolName, args, result, context);
+      return result;
     }
 
     const startTime = Date.now();
     let argsValidated = false;
-    
+
     try {
       const budgetKey = context.taskId || 'unscoped';
       const budget = this.taskBudgets.get(budgetKey) || { calls: 0, outputBytes: 0 };
@@ -98,25 +111,14 @@ class ToolRegistry {
       // Validate arguments
       const validation = this._validateArgs(tool, args);
       if (!validation.valid) {
-        const invalid = this._result(false, null, `Invalid arguments: ${validation.errors.join(', ')}`, Date.now() - startTime);
-        this._logExecution(toolName, args, invalid, context, false);
-        return invalid;
+        const result = this._result(
+          false, null, `Invalid arguments: ${validation.errors.join(', ')}`,
+          Date.now() - startTime, 'INVALID_ARGUMENTS'
+        );
+        this._logExecution(toolName, args, result, context);
+        return result;
       }
       argsValidated = true;
-
-      if (this.permissionManager) {
-        const permission = await this.permissionManager.checkPermission({
-          type: toolName,
-          params: args,
-          taskId: context.taskId,
-          planStepId: context.planStepId
-        });
-        if (!permission.allowed) {
-          const denied = this._result(false, null, permission.reason || 'Permission denied', Date.now() - startTime);
-          this._logExecution(toolName, args, denied, context, argsValidated);
-          return denied;
-        }
-      }
 
       // Execute tool
       const rawData = await tool.handler({ ...args, workspace: this.workspace }, context);
@@ -130,16 +132,16 @@ class ToolRegistry {
         return exhausted;
       }
       const duration = Date.now() - startTime;
-      
-      const result = this._result(true, data, null, duration);
+
+      const result = this._result(true, data, null, duration, null);
       this._logExecution(toolName, args, result, context, argsValidated);
-      
+
       return result;
     } catch (error) {
       const duration = Date.now() - startTime;
-      const result = this._result(false, null, error.message, duration);
+      const result = this._result(false, null, error.message, duration, error.code || 'TOOL_EXECUTION_FAILED');
       this._logExecution(toolName, args, result, context, argsValidated);
-      
+
       return result;
     }
   }
@@ -154,7 +156,7 @@ class ToolRegistry {
   }
 
   /**
-   * List all available tools
+   * List all registered tools (including ones not exposed to a model executor)
    * @returns {Array<Object>}
    */
   listTools() {
@@ -162,7 +164,8 @@ class ToolRegistry {
       name: tool.name,
       description: tool.description,
       category: tool.category,
-      parameters: tool.parameters
+      parameters: tool.parameters,
+      exposed: tool.exposed !== false
     }));
   }
 
@@ -176,6 +179,15 @@ class ToolRegistry {
       category: tool.category,
       parameters: tool.parameters
     }));
+  }
+
+  /**
+   * List only the tool schemas a model executor is allowed to call.
+   * This is the allowlist enforced by agent execution: read/search/edit/check tools only.
+   * @returns {Array<Object>}
+   */
+  listExposedTools() {
+    return this.listTools().filter(tool => tool.exposed);
   }
 
   /**
@@ -232,21 +244,87 @@ class ToolRegistry {
           totalLines: lines.length,
           offset,
           linesRead: selectedLines.length,
-          hash: crypto.createHash('sha256').update(content).digest('hex')
+          // Hash of the full current file content, to be echoed back as
+          // `expectedHash` on a subsequent edit_file call.
+          fileHash: this._hashContent(content)
         };
       }
     });
 
+    // write_file is kept for internal/back-compat callers but is not exposed
+    // to agent-executed model calls: it has no staleness guard. Use edit_file instead.
     this.register({
       name: 'write_file',
-      description: 'Write content to a file',
+      description: 'Write content to a file (no staleness guard; not exposed to model execution)',
       category: 'file',
+      exposed: false,
       parameters: {
         path: { type: 'string', required: true, description: 'Relative file path' },
         content: { type: 'string', required: true, description: 'File content' }
       },
       handler: async (args) => {
         throw new Error(`Direct file writes are unavailable to agent tools; use edit_file with a hash-guarded patch approval (${args.path})`);
+      }
+    });
+
+    // Hash-guarded edit: the only file-write tool exposed to model execution.
+    // Rejects the edit outright if the file changed since `expectedHash` was read.
+    this.register({
+      name: 'edit_file',
+      description: 'Create or overwrite a file, rejecting the edit if the file changed since it was last read',
+      category: 'edit',
+      parameters: {
+        path: { type: 'string', required: true, description: 'Relative file path' },
+        content: { type: 'string', required: true, description: 'New full file content' },
+        expectedHash: {
+          type: 'string',
+          required: false,
+          description: 'sha256 hex digest from a prior read_file call; omit only when creating a new file'
+        }
+      },
+      handler: async (args) => {
+        const filePath = this._resolvePath(args.path);
+        this._validateWorkspacePath(filePath);
+
+        const exists = fs.existsSync(filePath);
+        if (exists) {
+          const currentContent = fs.readFileSync(filePath, 'utf8');
+          const currentHash = this._hashContent(currentContent);
+          if (!args.expectedHash) {
+            const error = new Error(
+              `File '${args.path}' already exists; provide expectedHash from a prior read_file call to edit it`
+            );
+            error.code = 'HASH_REQUIRED';
+            throw error;
+          }
+          if (currentHash !== args.expectedHash) {
+            const error = new Error(
+              `File '${args.path}' changed since it was last read (expected ${args.expectedHash}, found ${currentHash}); re-read before editing`
+            );
+            error.code = 'STALE_FILE';
+            throw error;
+          }
+        } else if (args.expectedHash) {
+          const error = new Error(
+            `File '${args.path}' does not exist but expectedHash was provided; omit expectedHash to create a new file`
+          );
+          error.code = 'STALE_FILE';
+          throw error;
+        }
+
+        const dir = path.dirname(filePath);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+
+        fs.writeFileSync(filePath, args.content, 'utf8');
+
+        return {
+          path: args.path,
+          created: !exists,
+          bytesWritten: Buffer.byteLength(args.content, 'utf8'),
+          newHash: this._hashContent(args.content)
+        };
       }
     });
 
@@ -423,70 +501,196 @@ class ToolRegistry {
       }
     });
 
-    this.register({
-      name: 'edit_file',
-      description: 'Apply a hash-guarded content replacement through the approval-gated patch handler',
-      category: 'file',
-      parameters: {
-        path: { type: 'string', required: true, description: 'Relative file path' },
-        expectedHash: { type: 'string', required: true, description: 'SHA-256 hash returned by read_file' },
-        content: { type: 'string', required: true, description: 'Complete replacement content' }
-      },
-      handler: async (args, context) => {
-        if (Buffer.byteLength(args.content, 'utf8') > this.limits.maxFileSize) {
-          throw new Error(`File content exceeds size limit (${this.limits.maxFileSize} bytes)`);
-        }
-        const filePath = this._resolvePath(args.path);
-        this._validateWorkspacePath(filePath);
-        if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
-          throw new Error(`Cannot edit missing file: ${args.path}`);
-        }
-        const originalContent = fs.readFileSync(filePath, 'utf8');
-        const actualHash = crypto.createHash('sha256').update(originalContent).digest('hex');
-        if (actualHash !== args.expectedHash) {
-          throw new Error(`Stale source for ${args.path}: expected hash does not match current content`);
-        }
-        if (typeof context.applyPatch !== 'function') {
-          throw new Error('Approval-gated patch application is unavailable');
-        }
-        return context.applyPatch({
-          path: args.path,
-          expectedHash: actualHash,
-          originalContent,
-          content: args.content,
-          taskId: context.taskId,
-          planStepId: context.planStepId
-        });
-      }
-    });
-
+    // Allowlisted check runner: the model supplies only a check id (never shell
+    // text). Replaces the former execute_command tool, which allowed arbitrary
+    // model-supplied shell commands.
     this.register({
       name: 'run_check',
-      description: 'Run a configured verification check by its registered check ID',
-      category: 'verification',
+      description: `Run an allowlisted verification check by id (${ALLOWED_CHECK_IDS.join(', ')}). Does not accept shell text.`,
+      category: 'check',
       parameters: {
-        checkId: { type: 'string', required: true, description: 'Registered check ID; no shell text is accepted' }
+        checkId: { type: 'string', required: true, description: `One of: ${ALLOWED_CHECK_IDS.join(', ')}` },
+        files: { type: 'array', required: false, description: 'Workspace-relative files to scope the check to (lint only)' }
       },
-      handler: async (args, context) => {
-        const runner = this.checkRunners[args.checkId];
-        if (typeof runner !== 'function') {
-          throw new Error(`Verification check '${args.checkId}' is not configured`);
+      handler: async (args) => {
+        if (!ALLOWED_CHECK_IDS.includes(args.checkId)) {
+          const error = new Error(
+            `Unknown check id '${args.checkId}'. Allowed check ids: ${ALLOWED_CHECK_IDS.join(', ')}`
+          );
+          error.code = 'UNKNOWN_CHECK';
+          throw error;
         }
-        return runner({ workspace: this.workspace, taskId: context.taskId, signal: context.signal });
+
+        const files = Array.isArray(args.files) ? args.files : [];
+        for (const file of files) {
+          this._validateWorkspacePath(this._resolvePath(file));
+        }
+
+        return this._runCheck(args.checkId, files);
       }
     });
 
+    // Diagnostics: real linter output, or an explicit unavailable result.
+    // Never reports zero issues when diagnostics were not actually collected.
     this.register({
       name: 'get_diagnostics',
-      description: 'Get code diagnostics/issues for files',
+      description: 'Get real linter diagnostics for files, or report that diagnostics are unavailable',
       category: 'diagnostics',
       parameters: {
         files: { type: 'array', required: false, description: 'Files to analyze (default: all)' }
       },
-      handler: async () => {
-        throw new Error('Diagnostics provider is not configured');
+      handler: async (args) => {
+        const files = Array.isArray(args.files) ? args.files : [];
+        for (const file of files) {
+          this._validateWorkspacePath(this._resolvePath(file));
+        }
+        return this._collectDiagnostics(files);
       }
     });
+  }
+
+  // ─── Check runners ────────────────────────────────────────────────────────────
+
+  async _runCheck(checkId, files) {
+    if (this.checkRunners && typeof this.checkRunners[checkId] === 'function') {
+      return this.checkRunners[checkId](files, this);
+    }
+    switch (checkId) {
+      case 'lint':
+        return this._collectDiagnostics(files, 'lint');
+      case 'typecheck':
+        return this._runTypecheckCheck();
+      case 'test':
+        return this._runNpmScriptCheck('test', 'test');
+      case 'build':
+        return this._runNpmScriptCheck('build', 'build');
+      default:
+        throw new Error(`No runner configured for check id '${checkId}'`);
+    }
+  }
+
+  async _collectDiagnostics(files, checkId = 'diagnostics') {
+    const orchestrator = new LinterOrchestrator(this.workspace);
+    const availableLinters = orchestrator.detectAvailableLinters();
+    const anyAvailable = Object.values(availableLinters).some(Boolean);
+
+    if (!anyAvailable) {
+      return {
+        checkId,
+        available: false,
+        reason: 'No linters are configured or installed in this workspace',
+        files,
+        diagnostics: null,
+        summary: null
+      };
+    }
+
+    const result = await orchestrator.runAll(files, {});
+    const diagnostics = result.issues.slice(0, this.limits.maxSearchResults);
+    const errors = result.issues.filter(issue => issue.severity === 'ERROR').length;
+    const warnings = result.issues.filter(issue => issue.severity === 'WARNING').length;
+
+    return {
+      checkId,
+      available: true,
+      passed: result.totalIssues === 0,
+      files,
+      diagnostics,
+      truncated: result.issues.length > diagnostics.length,
+      summary: { total: result.totalIssues, errors, warnings }
+    };
+  }
+
+  async _runTypecheckCheck() {
+    const packageJson = this._readPackageJson();
+    const hasTypescript = !!(packageJson &&
+      ((packageJson.dependencies && packageJson.dependencies.typescript) ||
+       (packageJson.devDependencies && packageJson.devDependencies.typescript)));
+    if (!hasTypescript) {
+      return { checkId: 'typecheck', available: false, reason: 'TypeScript is not configured for this workspace' };
+    }
+
+    const tscBin = path.join(this.workspace, 'node_modules', '.bin', process.platform === 'win32' ? 'tsc.cmd' : 'tsc');
+    if (!fs.existsSync(tscBin)) {
+      return { checkId: 'typecheck', available: false, reason: 'tsc binary not found in node_modules/.bin' };
+    }
+
+    try {
+      const { stdout, stderr } = await execFileAsync(tscBin, ['--noEmit'], {
+        cwd: this.workspace,
+        timeout: this.limits.checkTimeout,
+        maxBuffer: this.limits.maxOutputSize,
+        // .cmd shims require a shell on Windows; args remain a fixed literal array.
+        shell: process.platform === 'win32'
+      });
+      return {
+        checkId: 'typecheck',
+        available: true,
+        passed: true,
+        stdout: stdout.substring(0, this.limits.maxOutputSize),
+        stderr: stderr.substring(0, this.limits.maxOutputSize)
+      };
+    } catch (error) {
+      return {
+        checkId: 'typecheck',
+        available: true,
+        passed: false,
+        exitCode: typeof error.code === 'number' ? error.code : 1,
+        stdout: (error.stdout || '').substring(0, this.limits.maxOutputSize),
+        stderr: (error.stderr || error.message).substring(0, this.limits.maxOutputSize)
+      };
+    }
+  }
+
+  async _runNpmScriptCheck(checkId, scriptName) {
+    const packageJson = this._readPackageJson();
+    if (!packageJson) {
+      return { checkId, available: false, reason: 'No package.json found in this workspace' };
+    }
+    if (!packageJson.scripts || !packageJson.scripts[scriptName]) {
+      return { checkId, available: false, reason: `No npm script named '${scriptName}' is configured` };
+    }
+
+    const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    try {
+      const { stdout, stderr } = await execFileAsync(npmBin, ['run', scriptName], {
+        cwd: this.workspace,
+        timeout: this.limits.checkTimeout,
+        maxBuffer: this.limits.maxOutputSize,
+        // .cmd shims require a shell on Windows; args remain a fixed literal array.
+        shell: process.platform === 'win32'
+      });
+      return {
+        checkId,
+        available: true,
+        passed: true,
+        stdout: stdout.substring(0, this.limits.maxOutputSize),
+        stderr: stderr.substring(0, this.limits.maxOutputSize)
+      };
+    } catch (error) {
+      return {
+        checkId,
+        available: true,
+        passed: false,
+        exitCode: typeof error.code === 'number' ? error.code : 1,
+        stdout: (error.stdout || '').substring(0, this.limits.maxOutputSize),
+        stderr: (error.stderr || error.message).substring(0, this.limits.maxOutputSize)
+      };
+    }
+  }
+
+  _readPackageJson() {
+    const packageJsonPath = path.join(this.workspace, 'package.json');
+    if (!fs.existsSync(packageJsonPath)) return null;
+    try {
+      return JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    } catch (error) {
+      return null;
+    }
+  }
+
+  _hashContent(content) {
+    return crypto.createHash('sha256').update(content, 'utf8').digest('hex');
   }
 
   // ─── Helper methods ───────────────────────────────────────────────────────────
@@ -496,11 +700,13 @@ class ToolRegistry {
   }
 
   _validateWorkspacePath(absolutePath) {
-    const normalized = path.resolve(absolutePath);
-    const relative = path.relative(this.workspace, normalized);
-    if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
-      throw new Error(`Path '${absolutePath}' is outside workspace`);
+    const check = this.permissionManager.validatePath(path.normalize(absolutePath));
+    if (!check.valid) {
+      const error = new Error(check.reason);
+      error.code = 'PATH_DENIED';
+      throw error;
     }
+    const normalized = path.resolve(absolutePath);
     let existingPath = normalized;
     while (!fs.existsSync(existingPath)) {
       const parent = path.dirname(existingPath);
@@ -544,45 +750,35 @@ class ToolRegistry {
     };
   }
 
+  _boundOutput(data) {
+    let serialized;
+    try { serialized = JSON.stringify(data); }
+    catch (error) { throw new Error(`Tool returned non-serializable output: ${error.message}`); }
+    if (Buffer.byteLength(serialized, 'utf8') <= this.limits.maxOutputSize) return data;
+    return { truncated: true, preview: serialized.slice(0, this.limits.maxOutputSize) };
+  }
+
   _matchPattern(name, pattern) {
     const regex = new RegExp(pattern.replace(/\*/g, '.*').replace(/\?/g, '.'));
     return regex.test(name);
   }
 
-  _result(success, data, error, duration) {
-    return { success, data, error: error || null, duration };
-  }
-
-  _boundOutput(data) {
-    let serialized;
-    try {
-      serialized = JSON.stringify(data);
-    } catch (error) {
-      throw new Error(`Tool returned non-serializable output: ${error.message}`);
-    }
-    if (Buffer.byteLength(serialized, 'utf8') <= this.limits.maxOutputSize) return data;
-    return {
-      truncated: true,
-      preview: serialized.slice(0, this.limits.maxOutputSize)
-    };
+  _result(success, data, error, duration, code = null) {
+    return { success, data, error: error || null, code: success ? null : (code || null), duration };
   }
 
   _logExecution(toolName, args, result, context = {}, argsValidated = false) {
-    const output = this._sanitizeForLog(result.success ? result.data : { error: result.error });
-    const boundedOutput = this._boundOutput(output);
-    const serializedOutput = JSON.stringify(boundedOutput);
     this.executionLog.push({
       tool: toolName,
       args: this._sanitizeArgs(args),
       argsValidated,
       success: result.success,
-      status: result.success ? 'succeeded' : 'failed',
+      code: result.code || null,
       duration: result.duration,
-      durationMs: result.duration,
-      outputBytes: Buffer.byteLength(serializedOutput, 'utf8'),
-      output: boundedOutput,
+      output: this._boundLoggedOutput(result.data),
+      itemId: context.itemId || null,
       taskId: context.taskId || null,
-      planStepId: context.planStepId || null,
+      stepId: context.stepId || null,
       timestamp: new Date().toISOString()
     });
     
@@ -613,8 +809,31 @@ class ToolRegistry {
     }
     return value;
   }
+
+  /**
+   * Bound a tool result's data for the execution log so logs cannot grow unbounded.
+   * @param {*} data
+   * @returns {*}
+   */
+  _boundLoggedOutput(data) {
+    if (data === null || data === undefined) return data;
+    let serialized;
+    try {
+      serialized = JSON.stringify(data);
+    } catch (error) {
+      return '[unserializable output]';
+    }
+    if (serialized.length <= this.limits.maxOutputSize) {
+      return data;
+    }
+    return {
+      truncated: true,
+      preview: serialized.substring(0, this.limits.maxOutputSize)
+    };
+  }
 }
 
 module.exports = {
-  ToolRegistry
+  ToolRegistry,
+  ALLOWED_CHECK_IDS
 };

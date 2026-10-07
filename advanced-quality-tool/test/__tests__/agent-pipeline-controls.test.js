@@ -1,12 +1,8 @@
 'use strict';
 
 const assert = require('assert');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
 const { WorkOrchestrator } = require('../../src/agent/work-orchestrator');
 const { WorkItemStatus } = require('../../src/agent/work-item');
-const { CONTRACT_VERSION } = require('../../src/agent/contracts');
 const { HttpApiServer } = require('../../src/integrations/http-api-server');
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -14,14 +10,13 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 function stubPlanner(stepCount = 4) {
   return {
     plan: async () => ({
-      schemaVersion: CONTRACT_VERSION,
       steps: Array.from({ length: stepCount }, (_, index) => ({
         id: index + 1,
         description: `Step ${index + 1}`,
         dependencies: []
       })),
       affectedFiles: ['src/example.js'],
-      expectedChecks: [{ type: 'test', required: true }],
+      expectedChecks: [],
       risks: [],
       metadata: { requiresApproval: false }
     }),
@@ -30,56 +25,21 @@ function stubPlanner(stepCount = 4) {
 }
 
 function createOrchestrator() {
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'aqt-orchestrator-'));
-  fs.mkdirSync(path.join(workspace, 'src'), { recursive: true });
-  fs.writeFileSync(path.join(workspace, 'src/example.js'), 'original\n', 'utf8');
-  const orchestrator = new WorkOrchestrator({
-    workspace,
+  return new WorkOrchestrator({
+    workspace: process.cwd(),
     planner: stubPlanner(),
-    executor: async ({ step, context }) => {
-      await delay(25);
-      const source = context.files.find(file => file.path === 'src/example.js');
-      return {
-        success: true,
-        stepId: step.id,
-        patches: step.id === 1 ? [{
-          schemaVersion: CONTRACT_VERSION,
-          path: 'src/example.js',
-          operation: 'modify',
-          expectedHash: source.hash,
-          content: 'updated\n'
-        }] : []
-      };
-    },
-    checkRunner: {
-      run: async id => ({ id, status: 'passed', required: true, exitCode: 0 })
-    },
-    onApprovalRequired: async () => true,
-    pausePollMs: 5
+    pausePollMs: 5,
+    stepExecutor: ({ step, signal }) => new Promise((resolve, reject) => {
+      const timer = setTimeout(() => resolve({ success: true, stepId: step.id, output: {} }), 100);
+      signal.addEventListener('abort', () => {
+        clearTimeout(timer);
+        const error = new Error('Execution cancelled');
+        error.code = 'EXECUTION_CANCELLED';
+        reject(error);
+      }, { once: true });
+    })
   });
-  orchestrator.testWorkspace = workspace;
-  return orchestrator;
 }
-
-afterEach(() => {
-  for (const orchestrator of orchestrators) {
-    fs.rmSync(orchestrator.testWorkspace, { recursive: true, force: true });
-  }
-  orchestrators.clear();
-});
-
-const orchestrators = new Set();
-function makeOrchestrator() {
-  const orchestrator = createOrchestrator();
-  orchestrators.add(orchestrator);
-  return orchestrator;
-}
-
-const taskParams = description => ({
-  description,
-  acceptanceCriteria: ['The scoped implementation is applied and verified'],
-  files: ['src/example.js']
-});
 
 async function waitForStatus(item, status, timeoutMs = 2000) {
   const started = Date.now();
@@ -100,8 +60,8 @@ function mockResponse() {
 
 describe('Agent pause, resume, and cancellation', () => {
   test('pausing a working item holds execution until it is resumed', async () => {
-    const orchestrator = makeOrchestrator();
-    const item = orchestrator.addWork(taskParams('Pause test'));
+    const orchestrator = createOrchestrator();
+    const item = orchestrator.addWork({ description: 'Pause test' });
     const execution = orchestrator.executeOne(item.id);
 
     await waitForStatus(item, WorkItemStatus.WORKING);
@@ -118,8 +78,8 @@ describe('Agent pause, resume, and cancellation', () => {
   });
 
   test('cancelled work is reported as cancelled, not completed', async () => {
-    const orchestrator = makeOrchestrator();
-    const item = orchestrator.addWork(taskParams('Cancel test'));
+    const orchestrator = createOrchestrator();
+    const item = orchestrator.addWork({ description: 'Cancel test' });
     const execution = orchestrator.executeOne(item.id);
 
     await waitForStatus(item, WorkItemStatus.WORKING);
@@ -131,8 +91,8 @@ describe('Agent pause, resume, and cancellation', () => {
   });
 
   test('cancelling paused work stops it without completing', async () => {
-    const orchestrator = makeOrchestrator();
-    const item = orchestrator.addWork(taskParams('Cancel while paused'));
+    const orchestrator = createOrchestrator();
+    const item = orchestrator.addWork({ description: 'Cancel while paused' });
     const execution = orchestrator.executeOne(item.id);
 
     await waitForStatus(item, WorkItemStatus.WORKING);
@@ -145,8 +105,8 @@ describe('Agent pause, resume, and cancellation', () => {
   });
 
   test('pause and resume reject invalid states', () => {
-    const orchestrator = makeOrchestrator();
-    const item = orchestrator.addWork(taskParams('State test'));
+    const orchestrator = createOrchestrator();
+    const item = orchestrator.addWork({ description: 'State test' });
     item.updateStatus(WorkItemStatus.COMPLETED);
 
     const pause = orchestrator.pause(item.id);
@@ -164,8 +124,8 @@ describe('Agent pause, resume, and cancellation', () => {
     assert.ok(routes.includes('POST /api/agent/:id/resume'));
     assert.ok(routes.includes('DELETE /api/pipelines/executions/:id'));
 
-    const orchestrator = makeOrchestrator();
-    const item = orchestrator.addWork(taskParams('API pause test'));
+    const orchestrator = createOrchestrator();
+    const item = orchestrator.addWork({ description: 'API pause test' });
     api.agentWorkStore.set(item.id, { orchestrator, item, logs: [] });
 
     const paused = mockResponse();
