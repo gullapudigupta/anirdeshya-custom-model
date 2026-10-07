@@ -2323,12 +2323,57 @@ function initializeSettingsPanel() {
   const settingsBtn = document.getElementById('settingsBtn');
   const form = document.getElementById('settingsForm');
   const provider = document.getElementById('aiSettingsProvider');
+  const modelSelect = document.getElementById('aiSettingsModel');
+  const customModelGroup = document.getElementById('aiSettingsCustomModelGroup');
+  const customModelInput = document.getElementById('aiSettingsCustomModel');
   const keyInput = document.getElementById('aiSettingsApiKey');
   const status = document.getElementById('settingsSaveStatus');
   const credentialStatus = document.getElementById('aiCredentialStatus');
   const apiBase = window.AQT_API_BASE || 'http://localhost:3000';
+  const modelsByProvider = {
+    openai: [
+      ['gpt-4o-mini', 'GPT-4o mini'],
+      ['gpt-4o', 'GPT-4o']
+    ],
+    anthropic: [
+      ['claude-3-5-sonnet', 'Claude 3.5 Sonnet'],
+      ['claude-3-haiku', 'Claude 3 Haiku']
+    ],
+    google: [
+      ['gemini-1.5-flash', 'Gemini 1.5 Flash'],
+      ['gemini-1.5-pro', 'Gemini 1.5 Pro']
+    ],
+    ollama: [
+      ['codellama:7b', 'CodeLlama 7B (local)'],
+      ['llama2', 'Llama 2 (local)'],
+      ['mistral', 'Mistral (local)'],
+      ['deepseek-coder', 'DeepSeek Coder (local)']
+    ]
+  };
 
   if (!dialog || !form || !settingsBtn) return;
+
+  function populateModels(selectedModel = '') {
+    const models = modelsByProvider[provider.value] || [];
+    modelSelect.replaceChildren();
+    for (const [modelId, label] of models) {
+      const option = document.createElement('option');
+      option.value = modelId;
+      option.textContent = label;
+      modelSelect.appendChild(option);
+    }
+    const customOption = document.createElement('option');
+    customOption.value = '__custom__';
+    customOption.textContent = 'Custom model ID...';
+    modelSelect.appendChild(customOption);
+
+    const isListed = models.some(([modelId]) => modelId === selectedModel);
+    modelSelect.value = isListed || !selectedModel
+      ? (selectedModel || models[0]?.[0] || '__custom__')
+      : '__custom__';
+    customModelGroup.hidden = modelSelect.value !== '__custom__';
+    customModelInput.value = modelSelect.value === '__custom__' ? selectedModel : '';
+  }
 
   settingsBtn.addEventListener('click', async () => {
     status.textContent = '';
@@ -2339,8 +2384,14 @@ function initializeSettingsPanel() {
   document.getElementById('settingsCloseBtn')?.addEventListener('click', () => dialog.close());
   document.getElementById('settingsCancelBtn')?.addEventListener('click', () => dialog.close());
 
+  modelSelect.addEventListener('change', () => {
+    customModelGroup.hidden = modelSelect.value !== '__custom__';
+    if (modelSelect.value !== '__custom__') customModelInput.value = '';
+  });
+
   provider.addEventListener('change', () => {
     const local = provider.value === 'ollama';
+    populateModels();
     keyInput.disabled = local;
     keyInput.placeholder = local ? 'Ollama does not require a key' : 'Enter a provider API key';
     credentialStatus.textContent = local
@@ -2355,12 +2406,12 @@ function initializeSettingsPanel() {
       if (!response.ok || !body.success) throw new Error(body.message || body.error || response.statusText);
       const data = body.data;
       provider.value = data.provider;
-      document.getElementById('aiSettingsModel').value = data.model || '';
+      provider.dispatchEvent(new Event('change'));
+      populateModels(data.model || '');
       document.getElementById('aiSettingsMaxCost').value = data.maxCost;
       document.getElementById('aiSettingsMonthlyBudget').value = data.monthlyBudget;
       document.getElementById('aiSettingsRateLimit').value = data.requestsPerMinute;
       keyInput.value = '';
-      provider.dispatchEvent(new Event('change'));
       credentialStatus.textContent = data.credentialsConfigured
         ? `Provider credential status: configured via ${data.credentialsSource || 'server settings'}.`
         : 'No provider credential is configured. Use an API key or configure the server environment.';
@@ -2374,7 +2425,9 @@ function initializeSettingsPanel() {
     status.textContent = 'Saving settings…';
     const payload = {
       provider: provider.value,
-      model: document.getElementById('aiSettingsModel').value.trim(),
+      model: modelSelect.value === '__custom__'
+        ? customModelInput.value.trim()
+        : modelSelect.value,
       maxCost: Number(document.getElementById('aiSettingsMaxCost').value),
       monthlyBudget: Number(document.getElementById('aiSettingsMonthlyBudget').value),
       requestsPerMinute: Number(document.getElementById('aiSettingsRateLimit').value)

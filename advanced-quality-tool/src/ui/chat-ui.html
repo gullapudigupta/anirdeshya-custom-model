@@ -749,7 +749,11 @@
         <option value="ollama">Ollama (local)</option>
       </select>
       <label for="aiSettingsModel">Model</label>
-      <input id="aiSettingsModel" name="model" maxlength="128" autocomplete="off">
+      <select id="aiSettingsModel" name="model"></select>
+      <div id="aiSettingsCustomModelGroup" hidden>
+        <label for="aiSettingsCustomModel">Custom model ID</label>
+        <input id="aiSettingsCustomModel" maxlength="128" autocomplete="off">
+      </div>
       <label for="aiSettingsApiKey">API key (optional; session-only)</label>
       <input id="aiSettingsApiKey" name="apiKey" type="password" autocomplete="new-password">
       <div id="aiCredentialStatus" class="settings-status" role="status"></div>

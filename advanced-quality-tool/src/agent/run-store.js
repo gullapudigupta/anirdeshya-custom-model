@@ -211,7 +211,9 @@ class AgentRunStore {
     if (Array.isArray(value)) return value.map(item => this._redact(item));
     if (value && typeof value === 'object') {
       return Object.fromEntries(Object.entries(value).map(([key, item]) => {
-        if (/password|secret|token|credential|api[-_]?key/i.test(key) && typeof item !== 'number') {
+        const isTokenCount = typeof item === 'number' &&
+          /^(?:repairTokensUsed|inputTokens|outputTokens|totalTokens|tokenCount)$/i.test(key);
+        if (/password|secret|token|credential|api[-_]?key/i.test(key) && !isTokenCount) {
           return [key, '[REDACTED]'];
         }
         if (['content', 'originalContent', 'modifiedContent'].includes(key) && typeof item === 'string') {

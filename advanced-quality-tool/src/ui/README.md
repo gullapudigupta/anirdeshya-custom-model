@@ -239,6 +239,9 @@ The chat UI's Settings dialog configures AI provider/model/budget preferences.
 API keys are held only in the running server process and are not written to the
 project configuration file. Workspace dashboard history and usage analytics
 remain separate; analytics requires explicit opt-in via `aqt analytics enable`.
+The global model selector offers provider presets and a custom model ID; local
+Ollama selections run on the configured local service. A custom RAG endpoint is
+not available until its request protocol is defined and implemented.
 
 ### WebSocketServer
 

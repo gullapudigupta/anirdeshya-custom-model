@@ -334,7 +334,7 @@
         "Phase 12 exit requires all critical acceptance cases passing"
       ],
       "reuses": ["src/agent/acceptance-workflow.js", "src/agent/requirement-traceability.js"],
-      "notes": "Added focused offline tests and an operator guide/provider matrix, but the complete required feature/bug-fix/unsafe-request/missing-toolchain/failure/denial matrix with a real model-backed executor has not been proven. Existing focused execution tests use injected deterministic executors, so phase exit criteria are not met.",
+      "notes": "Added focused offline tests and an operator guide/provider matrix, but the complete required feature/bug-fix/unsafe-request/missing-toolchain/failure/denial matrix with a real model-backed executor has not been proven. Existing focused execution tests use injected deterministic executors, so phase exit criteria are not met. The global settings UI now offers model presets, custom model IDs, and local Ollama choices; the planned RAG custom endpoint remains unimplemented until its protocol and model ID are defined.",
       "tags": ["agent", "end-to-end", "acceptance", "level-2"]
     }
   ],
