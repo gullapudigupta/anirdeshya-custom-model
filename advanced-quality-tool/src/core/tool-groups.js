@@ -78,7 +78,8 @@ const TOOL_GROUPS = [
       'aqt_agent_start',
       'aqt_agent_status',
       'aqt_agent_list',
-      'aqt_agent_cancel'
+      'aqt_agent_cancel',
+      'aqt_agent_approve'
     ]
   },
   {

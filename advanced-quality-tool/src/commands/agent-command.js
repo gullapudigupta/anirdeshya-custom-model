@@ -13,7 +13,6 @@
  *   --workspace, -w   Workspace path (default: current directory)
  *   --files           Files to include in the work
  *   --priority        Priority: 'critical', 'high', 'medium', 'low' (default: 'medium')
- *   --auto-approve    Automatically approve high-risk operations
  *   --max-files       Maximum files to modify (default: 50)
  *   --format, -f      Output format: 'json', 'table' (default: 'table')
  *   --follow          Follow logs in real-time
@@ -25,15 +24,16 @@
 
 'use strict';
 
-const { WorkOrchestrator } = require('../agent/work-orchestrator');
-const { AgentPlanner } = require('../agent/planner');
-const { WorkItem, WorkItemStatus } = require('../agent/work-item');
+const { WorkItemStatus } = require('../agent/work-item');
+const { SharedAppServices } = require('../core/shared-app-services');
 const path = require('path');
 const fs = require('fs');
-const crypto = require('crypto');
+const readline = require('readline/promises');
 
 // In-memory work storage (in production, this would be persistent)
-const workStore = new Map();
+const sharedServices = new SharedAppServices();
+const agentWorkflow = sharedServices.getAgentWorkflow();
+const workStore = agentWorkflow.records;
 
 /**
  * Main command router
@@ -87,77 +87,67 @@ async function startAgent(args) {
   console.log(`  Max Files:   ${options.maxFiles}`);
   console.log('');
   
-  // Create work orchestrator
-  const planner = new AgentPlanner({ workspace: options.workspace });
-  const orchestrator = new WorkOrchestrator({
-    workspace: options.workspace,
-    planner,
-    maxConcurrent: 1,
-    permissionLimits: {
-      maxFilesPerTask: options.maxFiles,
-      requireApprovalForHighRisk: !options.autoApprove,
-      requireApprovalForDelete: !options.autoApprove
-    },
-    onProgress: options.verbose ? (event) => {
-      console.log(`  [${event.type}] ${event.item?.id || ''}`);
-    } : null,
-    onApprovalRequired: async (item, plan) => {
-      console.log('\n  ⚠️  Approval Required');
-      console.log(`  Work: ${item.description}`);
-      console.log(`  Risk Level: ${plan.risks.map(r => r.level).join(', ') || 'none'}`);
-      console.log(`  Affected Files: ${plan.affectedFiles.length}`);
-      return options.autoApprove;
-    }
-  });
-  
-  // Create work item
-  const workItem = orchestrator.addWork({
+  const approvalHandler = process.stdin.isTTY
+      ? async (item, plan, details) => {
+        console.log('\n  ⚠️  Approval Required');
+        console.log(`  Work: ${item.description}`);
+        console.log(`  Risks: ${plan.risks.map(risk => risk.description).join('; ') || 'none'}`);
+        console.log(`  Affected files: ${plan.affectedFiles.length}`);
+        console.log(`  Plan digest: ${details.planDigest}`);
+        const prompt = readline.createInterface({ input: process.stdin, output: process.stdout });
+        try {
+          return (await prompt.question('  Approve this plan? [y/N] ')).trim().toLowerCase() === 'y';
+        } finally {
+          prompt.close();
+        }
+      }
+      : null;
+  const started = agentWorkflow.start({
     description,
     files: options.files,
     priority: options.priority,
-    plan: {
-      deliverables: options.deliverables || []
-    }
+    workspace: options.workspace,
+    maxFiles: options.maxFiles,
+    deliverables: options.deliverables || [],
+    acceptanceCriteria: options.acceptanceCriteria || []
+  }, {
+    approvalHandler,
+    onProgress: options.verbose ? event => console.log(`  [${event.type}] ${event.item?.id || ''}`) : null
   });
-  
-  // Store for later reference
-  workStore.set(workItem.id, {
-    orchestrator,
-    item: workItem,
-    options,
-    logs: [],
-    started: new Date().toISOString()
-  });
-  
-  console.log(`  Work ID: ${workItem.id}`);
+  console.log(`  Work ID: ${started.id}`);
   console.log('\n  Planning execution...');
   
   try {
-    // Execute the work
-    const results = await orchestrator.executeOne(workItem.id);
+    const finalStatus = await agentWorkflow.wait(started.id);
+    const results = finalStatus.result || finalStatus;
     
     console.log('\n  ─────────────────────────────────────');
-    console.log(`  Status: ${results.status}`);
+    console.log(`  Status: ${finalStatus.status}`);
     
-    if (results.status === 'completed') {
+    if (finalStatus.status === 'completed') {
       console.log('  ✅ Work completed successfully');
       
-      if (results.output && options.verbose) {
+      if (finalStatus.result?.output && options.verbose) {
         console.log('\n  Output:');
-        console.log(JSON.stringify(results.output, null, 4));
+        console.log(JSON.stringify(finalStatus.result.output, null, 4));
       }
-    } else if (results.status === 'failed') {
-      console.log(`  ❌ Work failed: ${results.error}`);
-    } else if (results.status === 'cancelled') {
-      console.log(`  ⚠️ Work cancelled: ${results.reason}`);
+    } else if (finalStatus.status === 'failed') {
+      console.log(`  ❌ Work failed: ${finalStatus.error}`);
+    } else if (finalStatus.status === 'denied' || finalStatus.status === 'cancelled') {
+      console.log(`  ⚠️ Work ${finalStatus.status}: ${finalStatus.approvalReason || results.reason || 'Approval was not granted'}`);
     }
     
     console.log('');
     
     // Save work record
-    saveWorkRecord(workItem.id, results);
+    saveWorkRecord(started.id, {
+      ...results,
+      status: finalStatus.status,
+      output: finalStatus.result?.output || null,
+      error: finalStatus.error
+    });
     
-    process.exit(results.status === 'completed' ? 0 : 1);
+    process.exit(finalStatus.status === 'completed' ? 0 : 1);
     
   } catch (error) {
     console.error(`\n❌ Execution failed: ${error.message}\n`);
@@ -185,11 +175,10 @@ async function workStatus(args) {
   const stored = workStore.get(workId);
   
   if (stored) {
-    const item = stored.item;
-    const summary = item.getSummary();
+    const summary = agentWorkflow.get(workId);
     
     if (options.format === 'json') {
-      console.log(JSON.stringify(summary, null, 2));
+      console.log(JSON.stringify(agentWorkflow.get(workId), null, 2));
       return;
     }
     
@@ -209,8 +198,13 @@ async function workStatus(args) {
     console.log(`  Description:  ${summary.description}`);
     console.log(`  Status:       ${summary.status}`);
     console.log(`  Priority:     ${summary.priority}`);
+    console.log(`  Approval:     ${summary.approvalState}`);
+    console.log(`  Autonomy:     Level ${summary.autonomyProfile.level} (${summary.autonomyProfile.name})`);
     console.log(`  Retry Count:  ${summary.retryCount}/${summary.maxRetries}`);
     console.log(`  Started:      ${stored.started}`);
+    if (summary.planDigest) {
+      console.log(`  Plan Digest:  ${summary.planDigest}`);
+    }
     
     if (summary.plan) {
       console.log('\n  Plan:');
@@ -365,15 +359,12 @@ async function cancelWork(args) {
     process.exit(1);
   }
   
-  const stored = workStore.get(workId);
-  
-  if (!stored) {
+  const cancelled = agentWorkflow.cancel(workId);
+  if (!cancelled.cancelled) {
     console.error(`\n❌ Active work '${workId}' not found.\n`);
     console.log('Only active work can be cancelled.\n');
     process.exit(1);
   }
-  
-  stored.orchestrator.cancel(workId);
   
   console.log(`\n✅ Work '${workId}' cancelled.\n`);
 }
@@ -392,19 +383,27 @@ async function approveWork(args) {
   }
   
   const stored = workStore.get(workId);
-  
   if (!stored) {
     console.error(`\n❌ Work '${workId}' not found.\n`);
     process.exit(1);
   }
   
-  if (stored.item.status !== WorkItemStatus.AWAITING_APPROVAL) {
-    console.error(`\n❌ Work is not awaiting approval (status: ${stored.item.status})\n`);
+  const summary = agentWorkflow.get(workId);
+  const planDigest = options.planDigest || summary?.planDigest;
+  if (!planDigest) {
+    console.error(`\n❌ Work is not awaiting approval or the plan digest is missing.\n`);
     process.exit(1);
   }
   
-  // Set approval flag
-  stored.approved = true;
+  const approval = agentWorkflow.approve(workId, {
+    approved: true,
+    planDigest,
+    actionDigest: options.actionDigest
+  });
+  if (!approval.accepted) {
+    console.error(`\n❌ ${approval.reason}\n`);
+    process.exit(1);
+  }
   
   console.log(`\n✅ Work '${workId}' approved.\n`);
   console.log('  The agent will continue execution.\n');
@@ -474,11 +473,13 @@ function parseOptions(args) {
     files: [],
     priority: 'medium',
     maxFiles: 50,
-    autoApprove: false,
     deliverables: [],
+    acceptanceCriteria: [],
     format: 'table',
     verbose: false,
-    follow: false
+    follow: false,
+    planDigest: null,
+    actionDigest: null
   };
   
   for (let i = 0; i < args.length; i++) {
@@ -492,16 +493,20 @@ function parseOptions(args) {
       options.priority = args[++i];
     } else if (arg === '--max-files') {
       options.maxFiles = parseInt(args[++i], 10);
-    } else if (arg === '--auto-approve') {
-      options.autoApprove = true;
     } else if (arg === '--deliverables') {
       options.deliverables = args[++i].split(',');
+    } else if (arg === '--acceptance-criteria') {
+      options.acceptanceCriteria = args[++i].split(',');
     } else if (arg === '--format' || arg === '-f') {
       options.format = args[++i];
     } else if (arg === '--verbose' || arg === '-v') {
       options.verbose = true;
     } else if (arg === '--follow') {
       options.follow = true;
+    } else if (arg === '--plan-digest') {
+      options.planDigest = args[++i];
+    } else if (arg === '--action-digest') {
+      options.actionDigest = args[++i];
     } else if (!arg.startsWith('-')) {
       options.positional.push(arg);
     }
@@ -587,8 +592,10 @@ Options:
   --files <paths>            Comma-separated list of files to include
   --priority <level>         Priority: 'critical', 'high', 'medium', 'low'
   --max-files <n>            Maximum files to modify (default: 50)
-  --auto-approve             Automatically approve high-risk operations
+  --plan-digest <digest>     Bind an approval to the displayed plan digest
+  --action-digest <digest>   Bind an approval to the displayed action digest
   --deliverables <items>     Comma-separated list of expected deliverables
+  --acceptance-criteria <items> Comma-separated completion criteria
   --format, -f <format>      Output format: 'json', 'table'
   --follow                   Follow logs in real-time
   --verbose, -v              Verbose output
@@ -620,6 +627,7 @@ Safety Features:
   - Delete operations require approval
   - All changes are logged
   - Work can be cancelled at any time
+  - Headless runs deny approval-required work unless an explicit approval channel is configured
 
 Note:
   - The agent operates within the workspace directory

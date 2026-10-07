@@ -83,6 +83,20 @@ describe('Phase 12 execution contracts', () => {
       expectedHash: digest,
       content: 'updated'
     }).valid, false);
+    assert.strictEqual(validatePatch({
+      schemaVersion: 1,
+      path: 'src/empty.js',
+      operation: 'create',
+      expectedHash: null,
+      content: '  '
+    }).valid, false);
+    assert.strictEqual(validatePatch({
+      schemaVersion: 1,
+      path: 'src/stub.js',
+      operation: 'create',
+      expectedHash: null,
+      content: '// TODO: Implement functionality'
+    }).valid, false);
     assert.strictEqual(validateVerification({
       schemaVersion: 1,
       checks: { test: { status: 'passed', required: true } }
@@ -160,6 +174,31 @@ describe('Configured verification checks', () => {
     assert.strictEqual(passed.output, 'ok');
     assert.strictEqual(unavailable.status, 'unavailable');
     assert.strictEqual((await runner.run('node; malicious')).status, 'unavailable');
+  });
+
+  test('bounds, redacts, and times out configured verification output', async () => {
+    const runner = new ConfiguredCheckRunner({
+      workspace: process.cwd(),
+      timeoutMs: 5000,
+      maxOutputBytes: 64,
+      checks: {
+        redact: {
+          command: process.execPath,
+          args: ['-e', "process.stdout.write('API_KEY=supersecret')"]
+        },
+        timeout: {
+          command: process.execPath,
+          args: ['-e', 'setInterval(() => {}, 1000)'],
+          timeoutMs: 30
+        }
+      }
+    });
+    const redacted = await runner.run('redact');
+    const timedOut = await runner.run('timeout');
+    assert.strictEqual(redacted.status, 'passed');
+    assert.ok(!redacted.output.includes('supersecret'));
+    assert.ok(redacted.output.includes('[REDACTED]'));
+    assert.strictEqual(timedOut.status, 'timed-out');
   });
 
   test('does not mark unavailable required checks as passed', async () => {

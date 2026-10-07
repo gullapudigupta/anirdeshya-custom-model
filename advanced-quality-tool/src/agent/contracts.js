@@ -241,6 +241,13 @@ function validatePatch(patch, options = {}) {
   }
   if (patch.operation === 'delete' && patch.content != null) issues.push('Delete patch content must be null');
   if (patch.operation !== 'delete' && typeof patch.content !== 'string') issues.push('Patch content must be a string');
+  if (patch.operation !== 'delete' && typeof patch.content === 'string' && !patch.content.trim()) {
+    issues.push('Create and modify patches must contain non-empty content');
+  }
+  if (patch.operation !== 'delete' && typeof patch.content === 'string' &&
+      /Generated implementation stub|TODO:\s*Implement functionality/i.test(patch.content)) {
+    issues.push('Scaffold-only patches are not valid implementations');
+  }
   if (typeof patch.content === 'string' &&
       Buffer.byteLength(patch.content, 'utf8') > (options.maxBytes || 1024 * 1024)) {
     issues.push('Patch content exceeds the configured byte limit');

@@ -503,7 +503,7 @@ paths:
     post:
       tags: [Agent]
       summary: Start agent work
-      description: Start an autonomous agent to perform code tasks
+      description: Start supervised agent work. Risky actions require approval through the approve endpoint; headless callers without an approval channel are denied.
       requestBody:
         required: true
         content:
@@ -532,9 +532,6 @@ paths:
                 maxFiles:
                   type: integer
                   default: 50
-                autoApprove:
-                  type: boolean
-                  default: false
                 deliverables:
                   type: array
                   items:
@@ -552,15 +549,28 @@ paths:
                   data:
                     type: object
                     properties:
+                      id:
+                        type: string
                       workId:
+                        type: string
+                      taskId:
                         type: string
                       status:
                         type: string
-                        enum: [started]
+                        enum: [queued, planning, awaiting_approval, working, verifying, completed, denied, failed, cancelled]
                       description:
                         type: string
                       workspace:
                         type: string
+                      autonomyProfile:
+                        type: object
+                        properties:
+                          level:
+                            type: integer
+                            enum: [2]
+                          name:
+                            type: string
+                            enum: [supervised]
 
   /api/agent:
     get:
@@ -571,7 +581,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [queued, planning, awaiting_approval, working, verifying, completed, failed, cancelled, blocked]
+            enum: [queued, planning, awaiting_approval, working, verifying, completed, denied, failed, cancelled, blocked, paused]
         - name: limit
           in: query
           schema:
@@ -651,13 +661,29 @@ paths:
     post:
       tags: [Agent]
       summary: Approve agent work
-      description: Approve high-risk agent operations
+      description: Approve or deny a pending plan using its exact plan digest (and action digest when present).
       parameters:
         - name: id
           in: path
           required: true
           schema:
             type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [planDigest, approved]
+              properties:
+                planDigest:
+                  type: string
+                actionDigest:
+                  type: string
+                approved:
+                  type: boolean
+                reason:
+                  type: string
       responses:
         '200':
           description: Work approved
@@ -673,10 +699,13 @@ paths:
                     properties:
                       id:
                         type: string
-                      status:
+                      accepted:
+                        type: boolean
+                      approved:
+                        type: boolean
+                      planDigest:
                         type: string
-                        enum: [approved]
-        '400':
+        '409':
           description: Work is not awaiting approval
         '404':
           description: Work item not found
@@ -1662,14 +1691,34 @@ components:
       properties:
         id:
           type: string
+        workId:
+          type: string
+        taskId:
+          type: string
         description:
           type: string
         status:
           type: string
-          enum: [queued, planning, awaiting_approval, working, verifying, completed, failed, cancelled, blocked]
+          enum: [queued, planning, awaiting_approval, working, verifying, completed, denied, failed, cancelled, blocked]
+        workspace:
+          type: string
         priority:
           type: string
           enum: [critical, high, medium, low]
+        autonomyProfile:
+          type: object
+          properties:
+            level:
+              type: integer
+            name:
+              type: string
+        approvalState:
+          type: string
+          enum: [not_required, awaiting_approval, approved, denied, cancelled]
+        planDigest:
+          type: string
+        actionDigest:
+          type: string
         started:
           type: string
           format: date-time
@@ -1678,7 +1727,24 @@ components:
           format: date-time
         plan:
           $ref: '#/components/schemas/ExecutionPlan'
-        output:
+        progress:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        patchSummary:
+          type: object
+          properties:
+            changedFiles:
+              type: array
+              items:
+                type: string
+            patchCount:
+              type: integer
+        verification:
+          type: object
+          additionalProperties: true
+        result:
           type: object
           additionalProperties: true
         error:

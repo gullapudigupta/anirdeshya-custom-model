@@ -2,6 +2,9 @@
 
 const assert = require('assert');
 const crypto = require('crypto');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const { AgentPlanner } = require('../../src/agent/planner');
 const { WorkOrchestrator } = require('../../src/agent/work-orchestrator');
 
@@ -22,6 +25,18 @@ function validPlan(overrides = {}) {
 }
 
 describe('Phase 12 execution planning (P12-T005)', () => {
+  let workspace;
+
+  beforeEach(() => {
+    workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'aqt-p12-planning-'));
+    fs.mkdirSync(path.join(workspace, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(workspace, 'src/feature.js'), 'module.exports = true;');
+  });
+
+  afterEach(() => {
+    fs.rmSync(workspace, { recursive: true, force: true });
+  });
+
   test('builds a deterministic structured fallback plan from gathered file scope', async () => {
     const planner = new AgentPlanner({ workspace: process.cwd() });
     const input = {
@@ -123,19 +138,26 @@ describe('Phase 12 execution planning (P12-T005)', () => {
     let executionPlan;
     let planningContext;
     const planner = new AgentPlanner({
-      workspace: process.cwd(),
+      workspace,
       planExecutor: async input => {
         planningContext = input.context;
         return plan;
       }
     });
     const orchestrator = new WorkOrchestrator({
-      workspace: process.cwd(),
+      workspace,
       planner,
       workspaceContext: {
         collect: () => ({
-          files: [{ path: 'src/feature.js', content: 'module.exports = true;', hash: 'abc' }],
-          provenance: [{ path: 'src/feature.js', hash: 'abc' }]
+          files: [{
+            path: 'src/feature.js',
+            content: 'module.exports = true;',
+            hash: crypto.createHash('sha256').update('module.exports = true;').digest('hex')
+          }],
+          provenance: [{
+            path: 'src/feature.js',
+            hash: crypto.createHash('sha256').update('module.exports = true;').digest('hex')
+          }]
         })
       },
       checkRunner: { run: async id => ({ id, status: 'passed' }) },
@@ -147,7 +169,20 @@ describe('Phase 12 execution planning (P12-T005)', () => {
       },
       stepExecutor: async input => {
         executionPlan = input.plan;
-        return { success: true, stepId: input.step.id, output: { done: true } };
+        if (input.step.id !== 'implement') {
+          return { success: true, stepId: input.step.id, output: { inspected: true } };
+        }
+        return {
+          success: true,
+          stepId: input.step.id,
+          patches: [{
+            schemaVersion: 1,
+            path: 'src/feature.js',
+            operation: 'modify',
+            expectedHash: input.context.files[0].hash,
+            content: 'module.exports = false;'
+          }]
+        };
       }
     });
     const item = orchestrator.addWork({
@@ -177,5 +212,6 @@ describe('Phase 12 execution planning (P12-T005)', () => {
       serialized.approval.planDigest,
       crypto.createHash('sha256').update(JSON.stringify(approvalPlan)).digest('hex')
     );
+    assert.strictEqual(fs.readFileSync(path.join(workspace, 'src/feature.js'), 'utf8'), 'module.exports = false;');
   });
 });

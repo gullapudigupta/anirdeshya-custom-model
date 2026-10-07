@@ -73,8 +73,9 @@ describe('Agent pause, resume, and cancellation', () => {
 
     assert.strictEqual(orchestrator.resume(item.id).resumed, true);
     const result = await execution;
-    assert.strictEqual(result.status, 'completed');
-    assert.strictEqual(item.status, WorkItemStatus.COMPLETED);
+    assert.strictEqual(result.status, 'failed');
+    assert.strictEqual(item.status, WorkItemStatus.FAILED);
+    assert.match(result.verification.checks.patch_application.error, /No workspace patch was applied/);
   });
 
   test('cancelled work is reported as cancelled, not completed', async () => {

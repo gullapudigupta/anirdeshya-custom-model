@@ -1,7 +1,11 @@
 'use strict';
 
 const assert = require('assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const { WorkOrchestrator } = require('../../src/agent/work-orchestrator');
+const { CONTRACT_VERSION } = require('../../src/agent/contracts');
 const { WorkItemStatus } = require('../../src/agent/work-item');
 
 function createPlanner(steps = [{ id: 'step-1', description: 'Implement feature', files: ['src/feature.js'] }]) {
@@ -199,7 +203,18 @@ describe('WorkOrchestrator tool registry wiring (P12-T003)', () => {
 });
 
 describe('WorkOrchestrator step execution', () => {
+  let workspaces;
+
+  beforeEach(() => { workspaces = []; });
+  afterEach(() => {
+    for (const workspace of workspaces) fs.rmSync(workspace, { recursive: true, force: true });
+  });
+
   test('runs deterministically end-to-end with injected executor and bounded input', async () => {
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'aqt-orchestrator-success-'));
+    workspaces.push(workspace);
+    fs.mkdirSync(path.join(workspace, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(workspace, 'src/feature.js'), 'bounded');
     const calls = [];
     const context = { files: [{ path: 'src/feature.js', content: 'bounded' }] };
     const taskContract = {
@@ -208,18 +223,38 @@ describe('WorkOrchestrator step execution', () => {
       description: 'Implement the requested feature',
       acceptanceCriteria: ['The feature is implemented']
     };
+    const planner = createPlanner();
+    const createPlan = planner.plan;
+    planner.plan = async (...args) => ({
+      ...await createPlan(...args),
+      expectedChecks: [{ type: 'test', required: true }]
+    });
     const orchestrator = new WorkOrchestrator({
-      workspace: process.cwd(),
-      planner: createPlanner(),
+      workspace,
+      planner,
+      toolRegistry: null,
+      checkRunner: { run: async id => ({ id, status: 'passed', exitCode: 0 }) },
+      onApprovalRequired: async () => true,
       stepExecutor: async input => {
         calls.push(input);
-        return { success: true, stepId: input.step.id, output: { changed: true } };
+        return {
+          success: true,
+          stepId: input.step.id,
+          patches: [{
+            schemaVersion: CONTRACT_VERSION,
+            path: 'src/feature.js',
+            operation: 'modify',
+            expectedHash: input.context.files[0].hash,
+            content: 'implemented'
+          }]
+        };
       }
     });
     const item = orchestrator.addWork({
       taskId: 'task-1',
       description: taskContract.description,
       taskContract,
+      files: ['src/feature.js'],
       context
     });
 
@@ -236,6 +271,7 @@ describe('WorkOrchestrator step execution', () => {
     assert.ok(calls[0].signal instanceof AbortSignal);
     assert.strictEqual(calls[0].provider, null);
     assert.strictEqual(calls[0].model, null);
+    assert.strictEqual(fs.readFileSync(path.join(workspace, 'src/feature.js'), 'utf8'), 'implemented');
   });
 
   test('fails explicitly instead of invoking a provider when no executor is configured', async () => {

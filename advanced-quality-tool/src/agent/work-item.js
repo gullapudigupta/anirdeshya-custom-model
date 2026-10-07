@@ -63,6 +63,8 @@ class WorkItem {
     this.risks = [];
     this.retryCount = 0;
     this.maxRetries = params.maxRetries || 3;
+    this.repairTokensUsed = params.repairTokensUsed || 0;
+    this.repairCostUsed = params.repairCostUsed || 0;
     
     // Results
     this.output = null;
@@ -70,7 +72,7 @@ class WorkItem {
     this.changedFiles = [];
     this.verificationResults = {};
     this.toolCalls = [];
-    this._toolBudgetUsed = { calls: 0, outputBytes: 0 };
+    this._toolBudgetUsed = params.toolBudgetUsed || { calls: 0, outputBytes: 0 };
     
     // Timing
     this.createdAt = new Date().toISOString();
@@ -300,6 +302,10 @@ class WorkItem {
       id: this.id,
       taskId: this.taskId,
       description: this.description,
+      schemaVersion: this.schemaVersion,
+      acceptanceCriteria: this.acceptanceCriteria,
+      files: this.files,
+      deliverables: this.deliverables,
       status: this.status,
       priority: this.priority,
       dependencies: this.dependencies,
@@ -317,6 +323,9 @@ class WorkItem {
       risks: this.risks,
       retryCount: this.retryCount,
       maxRetries: this.maxRetries,
+      repairTokensUsed: this.repairTokensUsed,
+      repairCostUsed: this.repairCostUsed,
+      toolBudgetUsed: this._toolBudgetUsed,
       output: this.output,
       error: this.error,
       changedFiles: this.changedFiles,
@@ -328,6 +337,69 @@ class WorkItem {
       elapsedMs: this.elapsedMs,
       events: this.events
     };
+  }
+
+  static fromJSON(record) {
+    if (!record || typeof record !== 'object' || Array.isArray(record) ||
+        typeof record.id !== 'string' || typeof record.description !== 'string') {
+      throw new Error('Invalid persisted work item');
+    }
+    const files = Array.isArray(record.files) ? record.files : [];
+    const item = new WorkItem({
+      id: record.id,
+      taskId: record.taskId,
+      description: record.description,
+      schemaVersion: record.schemaVersion,
+      acceptanceCriteria: Array.isArray(record.acceptanceCriteria) ? record.acceptanceCriteria : [],
+      files,
+      deliverables: Array.isArray(record.deliverables) ? record.deliverables : [],
+      dependencies: Array.isArray(record.dependencies) ? record.dependencies : [],
+      priority: record.priority,
+      assignedAgent: record.assignedAgent,
+      assignedModel: record.assignedModel,
+      toolPolicy: record.toolPolicy,
+      taskContract: record.taskContract,
+      maxRetries: Number.isSafeInteger(record.maxRetries) && record.maxRetries > 0 ? record.maxRetries : 3,
+      repairTokensUsed: Number.isSafeInteger(record.repairTokensUsed) && record.repairTokensUsed >= 0
+        ? record.repairTokensUsed
+        : 0,
+      repairCostUsed: Number.isFinite(record.repairCostUsed) && record.repairCostUsed >= 0
+        ? record.repairCostUsed
+        : 0,
+      toolBudgetUsed: record.toolBudgetUsed &&
+        Number.isSafeInteger(record.toolBudgetUsed.calls) &&
+        record.toolBudgetUsed.calls >= 0 &&
+        Number.isSafeInteger(record.toolBudgetUsed.outputBytes) &&
+        record.toolBudgetUsed.outputBytes >= 0
+        ? record.toolBudgetUsed
+        : { calls: 0, outputBytes: 0 }
+    });
+    item.createdAt = typeof record.createdAt === 'string' ? record.createdAt : item.createdAt;
+    item.startedAt = typeof record.startedAt === 'string' ? record.startedAt : null;
+    item.retryCount = Number.isSafeInteger(record.retryCount) && record.retryCount >= 0
+      ? record.retryCount
+      : 0;
+    item.changedFiles = Array.isArray(record.changedFiles)
+      ? [...new Set(record.changedFiles.filter(file => typeof file === 'string'))]
+      : [];
+    item.toolCalls = Array.isArray(record.toolCalls) ? record.toolCalls : [];
+    item.events = Array.isArray(record.events) ? record.events : [];
+    item.context = record.context && typeof record.context === 'object'
+      ? { ...record.context }
+      : null;
+    item.plan = null;
+    item.planVersion = null;
+    item.approval = null;
+    item.output = null;
+    item.error = null;
+    item.verificationResults = {};
+    item.status = WorkItemStatus.QUEUED;
+    item.events.push({
+      type: 'checkpoint-resumed',
+      timestamp: new Date().toISOString(),
+      previousStatus: record.status
+    });
+    return item;
   }
 
   _generateId() {

@@ -2,6 +2,12 @@
 
 const { execFile } = require('child_process');
 const path = require('path');
+const { PermissionManager } = require('./permissions');
+
+const DEFAULT_ENVIRONMENT_KEYS = Object.freeze([
+  'PATH', 'PATHEXT', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'HOME',
+  'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'COMSPEC', 'CI', 'NODE_ENV'
+]);
 
 class ConfiguredCheckRunner {
   constructor(options = {}) {
@@ -9,7 +15,10 @@ class ConfiguredCheckRunner {
     this.checks = new Map(Object.entries(options.checks || {}));
     this.timeoutMs = options.timeoutMs || 120000;
     this.maxOutputBytes = options.maxOutputBytes || 128 * 1024;
+    this.environmentKeys = new Set(options.environmentKeys || DEFAULT_ENVIRONMENT_KEYS);
     this.env = options.env || process.env;
+    this.permissionManager = options.permissionManager ||
+      new PermissionManager({ workspace: this.workspace });
   }
 
   listChecks() {
@@ -50,28 +59,36 @@ class ConfiguredCheckRunner {
     const timeout = Math.min(check.timeoutMs || this.timeoutMs, this.timeoutMs);
     const maxBuffer = Math.min(check.maxOutputBytes || this.maxOutputBytes, this.maxOutputBytes);
     const startedAt = Date.now();
+    const environment = Object.fromEntries(
+      Object.entries(this.env).filter(([key]) => this.environmentKeys.has(key))
+    );
     return new Promise(resolve => {
       execFile(check.command, check.args, {
         cwd,
         timeout,
         maxBuffer,
         windowsHide: true,
-        env: this.env,
+        env: environment,
         signal: options.signal
       }, (error, stdout = '', stderr = '') => {
-        const output = `${stdout}${stderr ? `\n${stderr}` : ''}`;
+        const rawOutput = `${stdout}${stderr ? `\n${stderr}` : ''}`;
+        const output = this.permissionManager.redactSecrets(rawOutput);
         const boundedOutput = Buffer.from(output).subarray(0, maxBuffer).toString('utf8');
-        const timedOut = error && (error.killed || error.code === 'ETIMEDOUT');
+        const timedOut = error && (error.code === 'ETIMEDOUT' ||
+          (error.killed && !options.signal?.aborted));
+        const sanitizedCommand = this.permissionManager.redactSecrets(
+          [check.command, ...check.args].join(' ')
+        );
         resolve({
           id: checkId,
           status: !error ? 'passed' : (timedOut ? 'timed-out' : 'failed'),
           required: options.required !== false,
-          command: [check.command, ...check.args].join(' '),
+          command: sanitizedCommand,
           exitCode: error ? (Number.isInteger(error.code) ? error.code : null) : 0,
           durationMs: Date.now() - startedAt,
           output: boundedOutput,
           truncated: Buffer.byteLength(output, 'utf8') > Buffer.byteLength(boundedOutput, 'utf8'),
-          error: error ? error.message : null
+          error: error ? this.permissionManager.redactSecrets(error.message) : null
         });
       });
     });

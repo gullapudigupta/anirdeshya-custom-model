@@ -18,11 +18,14 @@ const path = require('path');
 const { WorkItem, WorkItemStatus } = require('./work-item');
 const { AgentPlanner } = require('./planner');
 const { PipelineExecutor } = require('../pipelines/pipeline-executor');
+const { ConfiguredCheckRunner } = require('./check-runner');
 const { ToolRegistry } = require('./tool-registry');
 const { WorkspaceContext } = require('./workspace-context');
 const { PermissionManager } = require('./permissions');
 const { DiffReviewSystem, hashContent } = require('./diff-review-system');
 const { CONTRACT_VERSION, validatePatch } = require('./contracts');
+const { AgentRunStore } = require('./run-store');
+const { BudgetManager, BudgetEnforcement } = require('./privacy-cost-controls');
 
 const DEFAULT_TOOL_BUDGET = Object.freeze({
   maxCalls: 25,
@@ -38,7 +41,11 @@ class WorkOrchestrator {
     this.planner = options.planner || new AgentPlanner({ workspace: this.workspace });
     this.pipelineExecutor = options.pipelineExecutor || new PipelineExecutor();
     this.stepExecutor = options.stepExecutor || options.executor || null;
-    this.checkRunner = options.checkRunner || null;
+    this.checkRunner = options.checkRunner || new ConfiguredCheckRunner({
+      workspace: this.workspace,
+      ...(options.checkRunnerOptions || {}),
+      checks: options.checks || options.checkRunnerOptions?.checks || {}
+    });
     this.diffReviewSystem = options.diffReviewSystem || new DiffReviewSystem({
       workspace: this.workspace,
       backupDir: path.join(this.workspace, '.aqt-backups')
@@ -51,6 +58,22 @@ class WorkOrchestrator {
     if (!Number.isFinite(this.stepTimeoutMs) || this.stepTimeoutMs <= 0) {
       throw new Error('stepTimeoutMs must be a positive finite number');
     }
+    this.maxRepairElapsedMs = options.maxRepairElapsedMs ?? 10 * 60 * 1000;
+    if (!Number.isFinite(this.maxRepairElapsedMs) || this.maxRepairElapsedMs <= 0) {
+      throw new Error('maxRepairElapsedMs must be a positive finite number');
+    }
+    this.maxRepairTokens = options.maxRepairTokens ?? 100000;
+    this.maxRepairCost = options.maxRepairCost ?? 1;
+    this.maxRepairOutputTokens = options.maxRepairOutputTokens ?? 12000;
+    if (!Number.isSafeInteger(this.maxRepairTokens) || this.maxRepairTokens <= 0 ||
+        !Number.isFinite(this.maxRepairCost) || this.maxRepairCost <= 0 ||
+        !Number.isSafeInteger(this.maxRepairOutputTokens) || this.maxRepairOutputTokens <= 0) {
+      throw new Error('Repair token, output token, and cost limits must be positive');
+    }
+    this.budgetManager = options.budgetManager || new BudgetManager({
+      perRunLimit: this.maxRepairCost,
+      enforcementMode: BudgetEnforcement.BLOCK
+    });
     this.approvalTimeoutMs = options.approvalTimeoutMs === undefined ? 30000 : options.approvalTimeoutMs;
     if (!Number.isFinite(this.approvalTimeoutMs) || this.approvalTimeoutMs <= 0) {
       throw new Error('approvalTimeoutMs must be a positive finite number');
@@ -65,6 +88,12 @@ class WorkOrchestrator {
         maxFilesPerTask: this.permissionLimits.maxFilesPerTask ?? options.permissionOptions?.maxFilesPerTask,
         requireApprovalForHighRisk:
           this.permissionLimits.requireApprovalForHighRisk ?? options.permissionOptions?.requireApprovalForHighRisk
+      });
+    this.runStore = options.runStore === false
+      ? null
+      : options.runStore || new AgentRunStore({
+        workspace: this.workspace,
+        permissionManager: this.permissionManager
       });
     // Tool registry: injected into every step execution. Pass `toolRegistry: null`
     // explicitly to disable tool access entirely for a given orchestrator.
@@ -109,6 +138,7 @@ class WorkOrchestrator {
     this.workItems.set(item.id, item);
     this.workQueue.push(item.id);
 
+    this._persistRun(item);
     this._progress({ type: 'work-added', item: item.getSummary() });
     return item;
   }
@@ -203,14 +233,23 @@ class WorkOrchestrator {
     }
 
     const results = { total: 1, completed: 0, failed: 0, cancelled: 0, items: [] };
-    await this._executeWorkItem(item, results);
+    this.workQueue = this.workQueue.filter(id => id !== itemId);
+    do {
+      await this._executeWorkItem(item, results);
+      while (this.activeWork.has(itemId)) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      if (item.status === WorkItemStatus.QUEUED) {
+        this.workQueue = this.workQueue.filter(id => id !== itemId);
+      }
+    } while (item.status === WorkItemStatus.QUEUED);
 
-    // Wait for completion
-    while (this.activeWork.has(itemId)) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-
-    return results.items[0];
+    return results.items[results.items.length - 1] || {
+      itemId,
+      status: item.status,
+      error: item.error || null,
+      verification: item.verificationResults
+    };
   }
 
   /**
@@ -284,6 +323,25 @@ class WorkOrchestrator {
     return this.workItems.get(itemId) || null;
   }
 
+  resumeFromCheckpoint(itemId) {
+    if (!this.runStore) throw new Error('Run persistence is disabled for this orchestrator');
+    if (this.workItems.has(itemId)) throw new Error(`Work item '${itemId}' is already loaded`);
+    const checkpoint = this.runStore.validateResume(itemId);
+    if (checkpoint.status !== 'loaded') {
+      throw new Error(`Cannot resume checkpoint '${itemId}': ${checkpoint.reason || checkpoint.status}`);
+    }
+    if (!checkpoint.resumable) {
+      throw new Error(`Cannot resume terminal work item '${itemId}'`);
+    }
+
+    const item = WorkItem.fromJSON(checkpoint.item);
+    this.workItems.set(item.id, item);
+    this.workQueue.push(item.id);
+    this._persistRun(item);
+    this._progress({ type: 'checkpoint-resumed', item: item.getSummary() });
+    return item;
+  }
+
   /**
    * Get all work items
    * @returns {Array<WorkItem>}
@@ -321,6 +379,7 @@ class WorkOrchestrator {
 
         this._progress({ type: 'work-start', item: item.getSummary() });
         item.updateStatus(WorkItemStatus.PLANNING);
+        this._persistRun(item);
 
         if (this.workspaceContext) {
           const suppliedContext = item.context && typeof item.context === 'object' ? item.context : {};
@@ -338,19 +397,20 @@ class WorkOrchestrator {
           description: item.description,
           deliverables: item.plan?.deliverables || [],
           dependencies: item.dependencies,
-          acceptanceCriteria: item.taskContract?.acceptanceCriteria || [],
+          acceptanceCriteria: item.taskContract?.acceptanceCriteria || item.acceptanceCriteria || [],
           context: {
             workspace: this.workspace,
             files: (item.context?.files || []).map(file =>
               typeof file === 'string' ? file : file.path),
             gatheredContext: item.context || {},
-            scopeFiles: item.taskContract?.files || []
+            scopeFiles: item.taskContract?.files || item.files || []
           }
         });
         if (controller.signal.aborted) throw cancellationError(controller.signal);
 
         const executablePlan = prepareExecutablePlan(plan);
         item.setPlan(executablePlan);
+        this._persistRun(item);
         this._progress({ type: 'plan-created', item: item.getSummary(), plan: executablePlan });
 
         // 2. Validate plan
@@ -439,18 +499,22 @@ class WorkOrchestrator {
             planDigest,
             approvedAt: new Date().toISOString()
           };
+          this._persistRun(item);
         }
         if (controller.signal.aborted) throw cancellationError(controller.signal);
 
         // 4. Execute work
         item.updateStatus(WorkItemStatus.WORKING);
+        item._currentAttemptChanges = [];
         this._progress({ type: 'work-executing', item: item.getSummary() });
 
         const output = await this._executeSteps(item, executablePlan, controller);
+        output.toolChanges = item._currentAttemptChanges;
         if (output.patches.length) {
           output.appliedPatches = await this._applyPatches(item, executablePlan, output.patches, controller.signal);
         }
         item.setOutput(output);
+        this._persistRun(item);
 
         if (item.status === WorkItemStatus.CANCELLED) {
           results.cancelled++;
@@ -467,29 +531,57 @@ class WorkOrchestrator {
 
         // 5. Verify results
         item.updateStatus(WorkItemStatus.VERIFYING);
-        const verificationResults = await this._verifyWork(item, executablePlan);
+        const previousVerification = item.verificationResults;
+        const verificationResults = await this._verifyWork(item, executablePlan, controller.signal);
+        output.verifiedChangedFiles = verificationResults.verifiedChangedFiles;
+        item.setOutput(output);
         item.setVerificationResults(verificationResults);
+        this._persistRun(item);
         if (controller.signal.aborted) throw cancellationError(controller.signal);
 
         if (!verificationResults.passed) {
+          if (hasVerificationRegression(previousVerification, verificationResults)) {
+            throw new Error('Verification repair caused a regression in a previously passing required check');
+          }
           const unavailableRequiredCheck = Object.values(verificationResults.checks || {})
             .some(check => check.required && check.status === 'unavailable');
           if (unavailableRequiredCheck) {
             throw new Error('Verification failed: required check is unavailable');
           }
+          if (verificationResults.checks?.patch_application) {
+            throw new Error(verificationResults.checks.patch_application.error || 'Patch application was not verified');
+          }
           // Retry if available
-          if (item.incrementRetry()) {
+          const now = Date.now();
+          item._repairStartedAt = item._repairStartedAt || now;
+          const repairTimeRemaining = this.maxRepairElapsedMs - (now - item._repairStartedAt);
+          if (repairTimeRemaining > 0 && item.incrementRetry()) {
+            item.context = {
+              ...(item.context || {}),
+              repairDiagnostics: buildRepairDiagnostics(verificationResults)
+            };
+            item.events.push({
+              type: 'repair-feedback',
+              timestamp: new Date().toISOString(),
+              attempt: item.retryCount,
+              checkIds: Object.keys(item.context.repairDiagnostics)
+            });
+            this._persistRun(item);
             this._progress({ type: 'work-retry', item: item.getSummary() });
             this.workQueue.push(item.id);
             item.updateStatus(WorkItemStatus.QUEUED, { reason: 'Verification failed, retrying' });
             return;
           } else {
-            throw new Error(`Verification failed after ${item.retryCount} attempts`);
+            const reason = repairTimeRemaining <= 0
+              ? `Verification repair time limit (${this.maxRepairElapsedMs}ms) exhausted`
+              : `Verification failed after ${item.retryCount} attempts`;
+            throw new Error(reason);
           }
         }
 
         // 6. Complete
         item.updateStatus(WorkItemStatus.COMPLETED);
+        this._persistRun(item);
         results.completed++;
         results.items.push({
           itemId: item.id,
@@ -506,6 +598,7 @@ class WorkOrchestrator {
           if (item.status !== WorkItemStatus.CANCELLED) {
             item.updateStatus(WorkItemStatus.CANCELLED, { reason: failure.message });
           }
+          this._persistRun(item);
           results.cancelled++;
           results.items.push({
             itemId: item.id,
@@ -519,6 +612,7 @@ class WorkOrchestrator {
         }
         if (failure.denied) {
           item.updateStatus(WorkItemStatus.DENIED, { error: failure.message });
+          this._persistRun(item);
           results.denied = (results.denied || 0) + 1;
           results.items.push({ itemId: item.id, status: 'denied', error: failure.message, code: failure.code || 'DENIED' });
           this._progress({ type: 'work-denied', item: item.getSummary(), error: failure.message });
@@ -526,6 +620,7 @@ class WorkOrchestrator {
         }
         item.setError(failure);
         item.updateStatus(WorkItemStatus.FAILED, { error: failure.message });
+        this._persistRun(item);
         results.failed++;
         results.items.push({
           itemId: item.id,
@@ -552,8 +647,38 @@ class WorkOrchestrator {
     return item.context?.provenance || [];
   }
 
+  _persistRun(item) {
+    if (!this.runStore) return;
+    const workspaceHashes = {};
+    for (const entry of item.context?.files || []) {
+      const relativePath = typeof entry === 'string' ? entry : entry.path;
+      if (typeof relativePath !== 'string') continue;
+      const absolutePath = path.resolve(this.workspace, relativePath);
+      const relative = path.relative(this.workspace, absolutePath);
+      if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+        continue;
+      }
+      try {
+        if (fs.statSync(absolutePath).isFile()) {
+          workspaceHashes[relative.split(path.sep).join('/')] =
+            crypto.createHash('sha256').update(fs.readFileSync(absolutePath)).digest('hex');
+        }
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+      }
+    }
+    this.runStore.save(item, {
+      contractVersion: CONTRACT_VERSION,
+      planDigest: item.plan ? digestPlan(item.plan) : null,
+      patchDigest: item.output?.appliedPatches?.length
+        ? crypto.createHash('sha256').update(JSON.stringify(item.output.appliedPatches)).digest('hex')
+        : null,
+      workspaceHashes
+    });
+  }
+
   async _executeSteps(item, plan, controller) {
-    const output = { completedSteps: [], results: {}, patches: [] };
+    const output = { completedSteps: [], results: {}, patches: [], toolChanges: [] };
 
     for (const step of plan.steps) {
       await this._waitWhilePaused(item);
@@ -611,7 +736,7 @@ class WorkOrchestrator {
     const provider = this.provider;
     const model = item.assignedModel || this.model;
     const toolContext = this._createToolContext(item, step, plan, controller);
-    const execution = Promise.resolve().then(() => execute.call(executor, {
+    const executorInput = {
       step,
       plan,
       task: item.taskContract || {
@@ -629,8 +754,56 @@ class WorkOrchestrator {
       model,
       providerConfig: this.providerConfig,
       tools: toolContext ? toolContext.call : null,
-      toolSchemas: toolContext ? toolContext.schemas : []
-    }));
+      toolSchemas: toolContext ? toolContext.schemas : [],
+      limits: {
+        maxRepairTokens: this.maxRepairTokens,
+        maxOutputTokens: this.maxRepairOutputTokens,
+        maxRepairCost: this.maxRepairCost
+      }
+    };
+    let repairReservation = null;
+    if (item.retryCount > 0) {
+      const inputBytes = Buffer.byteLength(JSON.stringify({
+        task: executorInput.task,
+        plan: executorInput.plan,
+        step: executorInput.step,
+        context: executorInput.context
+      }), 'utf8');
+      const estimatedInputTokens = Math.max(1, Math.ceil(inputBytes / 4));
+      if (item.repairTokensUsed + estimatedInputTokens > this.maxRepairTokens) {
+        throw createExecutionError('REPAIR_TOKEN_LIMIT', 'Verification repair token budget exhausted');
+      }
+      const rateLimit = this.budgetManager.checkRateLimit();
+      if (!rateLimit.allowed) {
+        throw createExecutionError('REPAIR_RATE_LIMIT', rateLimit.reason);
+      }
+      const providerName = provider || 'unknown';
+      const modelName = model || 'unknown';
+      const budgetCheck = this.budgetManager.checkBudget(
+        providerName,
+        modelName,
+        Math.max(estimatedInputTokens, this.maxRepairOutputTokens)
+      );
+      const estimatedCost = this.budgetManager.calculator.calculateCost(
+        providerName,
+        modelName,
+        estimatedInputTokens,
+        this.maxRepairOutputTokens
+      );
+      if (!budgetCheck.allowed || item.repairCostUsed + estimatedCost > this.maxRepairCost) {
+        throw createExecutionError('REPAIR_COST_LIMIT', budgetCheck.reason || 'Verification repair cost budget exhausted');
+      }
+      item.repairTokensUsed += estimatedInputTokens;
+      item.repairCostUsed += estimatedCost;
+      repairReservation = { providerName, modelName, estimatedInputTokens, estimatedCost };
+      executorInput.repairBudget = {
+        tokensRemaining: this.maxRepairTokens - item.repairTokensUsed,
+        costRemaining: Math.max(0, this.maxRepairCost - item.repairCostUsed),
+        maxOutputTokens: this.maxRepairOutputTokens
+      };
+      this._persistRun(item);
+    }
+    const execution = Promise.resolve().then(() => execute.call(executor, executorInput));
 
     let timeout;
     let abortHandler;
@@ -672,6 +845,46 @@ class WorkOrchestrator {
     } finally {
       clearTimeout(timeout);
       signal.removeEventListener('abort', abortHandler);
+    }
+
+    if (repairReservation) {
+      const usage = result && result.usage;
+      if (!usage || !Number.isSafeInteger(usage.inputTokens) || usage.inputTokens < 0 ||
+          !Number.isSafeInteger(usage.outputTokens) || usage.outputTokens < 0) {
+        throw createExecutionError(
+          'REPAIR_USAGE_MISSING',
+          'Repair executor must report inputTokens and outputTokens usage'
+        );
+      }
+      const actualCost = Number.isFinite(usage.cost) && usage.cost >= 0
+        ? usage.cost
+        : this.budgetManager.calculator.calculateCost(
+          repairReservation.providerName,
+          repairReservation.modelName,
+          usage.inputTokens,
+          usage.outputTokens
+        );
+      const actualTokens = usage.inputTokens + usage.outputTokens;
+      const adjustedTokens = item.repairTokensUsed - repairReservation.estimatedInputTokens + actualTokens;
+      if (adjustedTokens > this.maxRepairTokens) {
+        throw createExecutionError('REPAIR_TOKEN_LIMIT', 'Verification repair token budget exhausted');
+      }
+      const adjustedCost = item.repairCostUsed - repairReservation.estimatedCost + actualCost;
+      if (adjustedCost > this.maxRepairCost) {
+        throw createExecutionError('REPAIR_COST_LIMIT', 'Verification repair cost budget exhausted');
+      }
+      item.repairCostUsed = adjustedCost;
+      item.repairTokensUsed = adjustedTokens;
+      this.budgetManager.recordUsage({
+        provider: repairReservation.providerName,
+        model: repairReservation.modelName,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        cost: actualCost,
+        requestType: 'verification-repair',
+        success: result.success === true
+      });
+      this._persistRun(item);
     }
 
     if (result && typeof result === 'object' && result.success === false) {
@@ -781,6 +994,13 @@ class WorkOrchestrator {
       }, { planDigest, patchDigest });
       operations.push({ operation, diff, relativePath });
     }
+    const changedPathBudget = new Set([
+      ...item.changedFiles,
+      ...operations.map(operation => operation.relativePath)
+    ]);
+    if (changedPathBudget.size > this.maxFiles) {
+      throw new Error(`Cumulative changed-file limit exceeded (${changedPathBudget.size} > ${this.maxFiles})`);
+    }
 
     const currentDigest = () => crypto.createHash('sha256')
       .update(JSON.stringify({ planDigest: digestPlan(item.plan), patches }))
@@ -801,6 +1021,16 @@ class WorkOrchestrator {
       const { operation, diff, relativePath } = operations[index];
       const result = await review.applyDiff(index, { approval: { approved: true, planDigest, patchDigest } });
       if (!result.success) throw Object.assign(new Error(`Patch apply failed for ${relativePath}: ${result.error}`), { code: result.code });
+      const targetPath = path.resolve(this.workspace, relativePath);
+      const isPresentAsRequested = diff.type === 'delete'
+        ? !fs.existsSync(targetPath)
+        : fs.existsSync(targetPath) &&
+          hashContent(fs.readFileSync(targetPath, 'utf8')) === hashContent(diff.modifiedContent);
+      if (!isPresentAsRequested) {
+        throw Object.assign(new Error(`Patch application could not be verified for ${relativePath}`), {
+          code: 'PATCH_APPLY_UNVERIFIED'
+        });
+      }
       this.permissionManager.recordApproval(operation, { approved: true, planDigest, patchDigest, outcome: 'approved' });
       if (!item.changedFiles.includes(relativePath)) item.changedFiles.push(relativePath);
       applied.push({ path: relativePath, type: diff.type, unifiedDiff: diff.toUnifiedDiff() });
@@ -869,6 +1099,20 @@ class WorkOrchestrator {
         };
       }
       deepFreeze(actionArgs);
+
+      if (toolName === 'edit_file' && typeof actionArgs.path === 'string') {
+        const relativePath = actionArgs.path.replace(/\\/g, '/');
+        if (!item.changedFiles.includes(relativePath) && item.changedFiles.length >= this.maxFiles) {
+          this._recordToolCall(item, correlation, toolName, sanitizedArgs, {
+            success: false, code: 'TOOL_FILE_BUDGET_EXCEEDED', duration: 0, output: null
+          });
+          return {
+            success: false,
+            code: 'TOOL_FILE_BUDGET_EXCEEDED',
+            error: `Cumulative changed-file limit (${this.maxFiles}) exhausted`
+          };
+        }
+      }
 
       const planDigest = digestPlan(plan);
       const operation = {
@@ -974,6 +1218,35 @@ class WorkOrchestrator {
       }
 
       const result = await registry.execute(toolName, actionArgs, correlation);
+      if (result.success && toolName === 'edit_file') {
+        const absolutePath = path.resolve(this.workspace, actionArgs.path);
+        const relativePath = path.relative(this.workspace, absolutePath);
+        const verifiedWrite = relativePath !== '..' &&
+          !relativePath.startsWith(`..${path.sep}`) &&
+          !path.isAbsolute(relativePath) &&
+          fs.existsSync(absolutePath) &&
+          hashContent(fs.readFileSync(absolutePath, 'utf8')) === result.data?.newHash &&
+          result.data?.newHash === hashContent(actionArgs.content);
+        if (!verifiedWrite) {
+          const failure = {
+            success: false,
+            code: 'WRITE_NOT_VERIFIED',
+            error: `The edit tool did not leave the requested content in ${actionArgs.path}`,
+            duration: result.duration
+          };
+          this._recordToolCall(item, correlation, toolName, sanitizedArgs, {
+            success: false, code: failure.code, duration: result.duration, output: null
+          });
+          return failure;
+        }
+        const normalizedPath = relativePath.split(path.sep).join('/');
+        if (!item.changedFiles.includes(normalizedPath)) item.changedFiles.push(normalizedPath);
+        item._currentAttemptChanges.push({
+          path: normalizedPath,
+          type: 'modify',
+          expectedHash: result.data.newHash
+        });
+      }
 
       const { boundedData, truncated } = this._boundToolOutput(result.data, budget, usage);
       this._recordToolCall(item, correlation, toolName, sanitizedArgs, {
@@ -1012,6 +1285,7 @@ class WorkOrchestrator {
     if (typeof item.recordToolCall === 'function') {
       item.recordToolCall(entry);
     }
+    this._persistRun(item);
     this._progress({ type: 'tool-call', item: item.getSummary(), toolCall: entry });
   }
 
@@ -1053,18 +1327,109 @@ class WorkOrchestrator {
     };
   }
 
-  async _verifyWork(item, plan) {
-    const results = { schemaVersion: CONTRACT_VERSION, passed: true, checks: {}, requiredPassed: true };
+  async _verifyWork(item, plan, signal) {
+    const results = {
+      schemaVersion: CONTRACT_VERSION,
+      passed: true,
+      checks: {},
+      requiredPassed: true,
+      verifiedChangedFiles: []
+    };
+    const appliedPatches = item.output?.appliedPatches || [];
+    const toolChanges = item.output?.toolChanges || [];
+    const workspaceChanges = [...appliedPatches, ...toolChanges];
+    if (workspaceChanges.length === 0) {
+      results.checks.patch_application = {
+        status: 'failed',
+        required: true,
+        error: 'No workspace patch was applied'
+      };
+      results.passed = false;
+      results.requiredPassed = false;
+      return results;
+    }
+    for (const patch of workspaceChanges) {
+      const targetPath = path.resolve(this.workspace, patch.path);
+      const relative = path.relative(this.workspace, targetPath);
+      if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+        results.passed = false;
+        results.requiredPassed = false;
+        results.checks.patch_application = {
+          status: 'failed',
+          required: true,
+          error: `Applied patch path escaped the workspace: ${patch.path}`
+        };
+        return results;
+      }
+      const contentMatches = typeof patch.expectedHash === 'string' &&
+        fs.existsSync(targetPath) &&
+        hashContent(fs.readFileSync(targetPath, 'utf8')) === patch.expectedHash;
+      if (patch.type === 'delete' ? !fs.existsSync(targetPath) : contentMatches ||
+          (typeof patch.expectedHash !== 'string' && fs.existsSync(targetPath))) {
+        results.verifiedChangedFiles.push(patch.path);
+      } else {
+        results.passed = false;
+        results.requiredPassed = false;
+        results.checks.patch_application = {
+          status: 'failed',
+          required: true,
+          error: `Workspace does not contain the requested patch state for ${patch.path}`
+        };
+      }
+    }
+    if (results.verifiedChangedFiles.length !== workspaceChanges.length) {
+      return results;
+    }
+
     const checks = Array.isArray(plan.expectedChecks) ? plan.expectedChecks : [];
-    if (checks.length === 0) return results;
+    if (checks.length === 0 || !checks.some(check => check.required !== false)) {
+      results.checks.verification = {
+        status: 'unavailable',
+        required: true,
+        error: checks.length === 0
+          ? 'The approved plan contains no configured verification checks'
+          : 'The approved plan contains no required verification check'
+      };
+      results.passed = false;
+      results.requiredPassed = false;
+      return results;
+    }
     for (const check of checks) {
       const id = check.checkId || check.type;
-      const result = (this.checkRunner
-        ? await this.checkRunner.run(id, { item, plan, workspace: this.workspace })
-        : null) || { id, status: 'unavailable', required: check.required === true, error: 'No check runner is configured' };
-      results.checks[id] = { ...result, required: check.required === true };
-      const passed = result.status === 'passed' || result.passed === true;
-      if (check.required && !passed) {
+      const required = check.required !== false;
+      let result;
+      try {
+        result = await this.checkRunner.run(id, {
+          item,
+          plan,
+          workspace: this.workspace,
+          required,
+          signal
+        });
+      } catch (error) {
+        result = {
+          id,
+          status: 'errored',
+          required,
+          error: error.message
+        };
+      }
+      result = result || {
+        id,
+        status: 'unavailable',
+        required,
+        error: 'Verification runner returned no result'
+      };
+      const normalized = ['passed', 'failed', 'skipped', 'unavailable', 'errored', 'timed-out']
+        .includes(result.status)
+        ? result.status
+        : 'errored';
+      results.checks[id] = {
+        ...result,
+        status: normalized,
+        required
+      };
+      if (required && normalized !== 'passed') {
         results.passed = false;
         results.requiredPassed = false;
       }
@@ -1084,6 +1449,7 @@ class WorkOrchestrator {
       reason: decision.reason || null
     };
     item.events.push(audit);
+    this._persistRun(item);
     this._progress({ type: 'permission-decision', item: item.getSummary(), decision: audit });
   }
 
@@ -1225,6 +1591,31 @@ class WorkOrchestrator {
       }
     }
   }
+}
+
+function buildRepairDiagnostics(verification) {
+  const diagnostics = {};
+  const maxChecks = 8;
+  const maxOutputChars = 4000;
+  for (const [checkId, check] of Object.entries(verification.checks || {}).slice(0, maxChecks)) {
+    if (!check.required || check.status === 'passed') continue;
+    diagnostics[checkId] = {
+      status: check.status,
+      exitCode: Number.isInteger(check.exitCode) ? check.exitCode : null,
+      error: typeof check.error === 'string' ? check.error.slice(0, 1000) : null,
+      output: typeof check.output === 'string' ? check.output.slice(0, maxOutputChars) : null
+    };
+  }
+  return diagnostics;
+}
+
+function hasVerificationRegression(previous, current) {
+  if (!previous || !previous.checks || !current || !current.checks) return false;
+  return Object.entries(previous.checks).some(([checkId, result]) =>
+    result.required === true &&
+    result.status === 'passed' &&
+    current.checks[checkId]?.status !== 'passed'
+  );
 }
 
 function createExecutionError(code, message) {

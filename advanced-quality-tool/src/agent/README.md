@@ -64,6 +64,20 @@ This autonomy level does not merge, release, deploy, or resume an incomplete
 checkpoint automatically. The caller remains responsible for configuring a
 human approval channel and trusted check commands.
 
+### Supervised workflow interfaces
+
+The CLI, HTTP API, and MCP adapters use `SharedAppServices.getAgentWorkflow()`
+and the same `AgentWorkflowService` contract. A work snapshot carries the
+stable `id`/`taskId`, autonomy profile, plan and digest, approval state,
+progress events, patch summary, verification evidence, and result. HTTP and
+MCP expose digest-bound approval; the CLI prompts only when attached to a
+terminal. If no human approval channel is available, approval-required work is
+denied. Automatic approval is never enabled by default.
+
+The CLI asks for plan approval only on an interactive terminal; `agent approve`
+accepts the plan digest shown by `agent status --format json`. Non-interactive
+CLI runs deny approval-required work.
+
 ## Architecture
 
 ```

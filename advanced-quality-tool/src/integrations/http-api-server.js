@@ -14,9 +14,6 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const { SharedAppServices } = require('../core/shared-app-services');
 const { InterfaceAdapter } = require('../core/interface-adapter');
-const { WorkOrchestrator } = require('../agent/work-orchestrator');
-const { AgentPlanner } = require('../agent/planner');
-const { WorkItem, WorkItemStatus } = require('../agent/work-item');
 const { getRegistry } = require('../pipelines/pipeline-registry');
 const { PipelineExecutor } = require('../pipelines/pipeline-executor');
 const { ExecutionLedger, RunStatus } = require('../pipelines/execution-ledger');
@@ -49,12 +46,16 @@ class HttpApiServer {
     
     this.app = express();
     this.server = null;
-    this.sharedServices = new SharedAppServices();
+    this.sharedServices = config.services || new SharedAppServices({
+      projectRoot: config.projectRoot || config.workspace || process.cwd(),
+      agentWorkflowOptions: config.agentWorkflowOptions
+    });
+    this.agentWorkflow = this.sharedServices.getAgentWorkflow();
     this.interfaceAdapter = new InterfaceAdapter();
     this.rateLimitStore = new Map(); // In-memory store for rate limiting
     
     // Agent and Pipeline storage
-    this.agentWorkStore = new Map(); // Work ID -> { orchestrator, item, options }
+    this.agentWorkStore = this.agentWorkflow.records;
     this.pipelineExecutors = new Map(); // Run ID -> executor instance
     this.dashboardIntegration = null;
     this.pluginManager = null;
@@ -1359,75 +1360,24 @@ class HttpApiServer {
 
   async handleAgentStart(req, res) {
     try {
-      const { 
-        description, 
-        workspace, 
-        files, 
-        priority = 'medium',
-        maxFiles = 50,
-        autoApprove = false,
-        deliverables = []
-      } = req.body;
-      
-      if (!description) {
+      const { description, workspace, files, priority, maxFiles, deliverables, acceptanceCriteria } = req.body || {};
+      if (typeof description !== 'string' || !description.trim()) {
         return res.status(400).json({ error: 'description is required' });
       }
 
-      const workspacePath = workspace || process.cwd();
-      
-      // Create work orchestrator
-      const planner = new AgentPlanner({ workspace: workspacePath });
-      const orchestrator = new WorkOrchestrator({
-        workspace: workspacePath,
-        planner,
-        maxConcurrent: 1,
-        permissionLimits: {
-          maxFilesPerTask: maxFiles,
-          requireApprovalForHighRisk: !autoApprove,
-          requireApprovalForDelete: !autoApprove
-        },
-        onProgress: (event) => {
-          // Could emit to WebSocket for real-time updates
-          console.log(`[Agent] ${event.type}: ${event.item?.id || ''}`);
-        },
-        onApprovalRequired: async (item, plan) => {
-          // Approval will be handled via separate endpoint
-          return autoApprove;
-        }
-      });
-      
-      // Create work item
-      const workItem = orchestrator.addWork({
+      const started = this.agentWorkflow.start({
         description,
-        files: files || [],
+        workspace: workspace || this.sharedServices.projectRoot,
+        files: Array.isArray(files) ? files : [],
         priority,
-        plan: { deliverables }
-      });
-      
-      // Store for later reference
-      const workId = workItem.id;
-      this.agentWorkStore.set(workId, {
-        orchestrator,
-        item: workItem,
-        options: { workspace: workspacePath, maxFiles, autoApprove },
-        logs: [],
-        started: new Date().toISOString(),
-        approved: false
-      });
-      
-      // Start execution asynchronously (don't wait for completion)
-      this.executeAgentWork(workId).catch(err => {
-        console.error(`Agent work ${workId} failed:`, err);
-      });
-      
+        maxFiles,
+        deliverables,
+        acceptanceCriteria
+      }, { approvalChannel: true });
+
       res.json({
         success: true,
-        data: {
-          workId,
-          status: 'started',
-          description,
-          workspace: workspacePath
-        },
+        data: started,
         timestamp: new Date().toISOString()
       });
     } catch (error) {
@@ -1440,57 +1390,20 @@ class HttpApiServer {
   }
 
   async executeAgentWork(workId) {
-    const stored = this.agentWorkStore.get(workId);
-    if (!stored) return;
-    
-    try {
-      const results = await stored.orchestrator.executeOne(workId);
-      stored.result = results;
-      stored.completed = new Date().toISOString();
-    } catch (error) {
-      stored.error = error.message;
-      stored.completed = new Date().toISOString();
-    }
+    return this.agentWorkflow.wait(workId);
   }
 
   async handleAgentStatus(req, res) {
     try {
       const { id } = req.params;
       
-      const stored = this.agentWorkStore.get(id);
-      
-      if (stored) {
-        const summary = stored.item.getSummary();
-        
-        res.json({
-          success: true,
-          data: {
-            id,
-            description: summary.description,
-            status: summary.status,
-            priority: summary.priority,
-            started: stored.started,
-            completed: stored.completed || null,
-            plan: summary.plan,
-            output: stored.result?.output || null,
-            error: stored.error || summary.error || null,
-            active: true
-          },
-          timestamp: new Date().toISOString()
-        });
-        return;
-      }
-      
-      // Check for historical record
-      const record = await this.loadAgentWorkRecord(id);
-      
-      if (!record) {
+      const data = this.agentWorkflow.get(id);
+      if (!data) {
         return res.status(404).json({ error: 'Work item not found' });
       }
-      
       res.json({
         success: true,
-        data: record,
+        data,
         timestamp: new Date().toISOString()
       });
     } catch (error) {
@@ -1505,45 +1418,7 @@ class HttpApiServer {
   async handleAgentList(req, res) {
     try {
       const { status, limit = 50 } = req.query;
-      
-      const items = [];
-      
-      // Active work from memory
-      for (const [id, stored] of this.agentWorkStore.entries()) {
-        const summary = stored.item.getSummary();
-        if (!status || summary.status === status) {
-          items.push({
-            id,
-            description: summary.description,
-            status: summary.status,
-            priority: summary.priority,
-            started: stored.started,
-            active: true
-          });
-        }
-      }
-      
-      // Historical work
-      const historyPath = this.getAgentHistoryPath();
-      if (fs.existsSync && require('fs').existsSync(historyPath)) {
-        const files = require('fs').readdirSync(historyPath).filter(f => f.endsWith('.json'));
-        for (const file of files.slice(0, parseInt(limit))) {
-          try {
-            const record = JSON.parse(require('fs').readFileSync(path.join(historyPath, file), 'utf8'));
-            if (!status || record.status === status) {
-              items.push({
-                ...record,
-                active: false
-              });
-            }
-          } catch (e) {
-            // Skip invalid records
-          }
-        }
-      }
-      
-      // Sort by started date (newest first)
-      items.sort((a, b) => new Date(b.started) - new Date(a.started));
+      const items = this.agentWorkflow.list({ status, limit: parseInt(limit, 10) || 50 });
       
       res.json({
         success: true,
@@ -1563,21 +1438,13 @@ class HttpApiServer {
     try {
       const { id } = req.params;
       
-      const stored = this.agentWorkStore.get(id);
-      
-      if (!stored) {
+      const result = this.agentWorkflow.cancel(id);
+      if (!result.accepted) {
         return res.status(404).json({ error: 'Active work item not found' });
       }
-      
-      stored.orchestrator.cancel(id);
-      
       res.json({
         success: true,
-        data: {
-          id,
-          status: 'cancelled',
-          message: 'Work item cancelled successfully'
-        },
+        data: { id, ...result, message: 'Cancellation requested' },
         timestamp: new Date().toISOString()
       });
     } catch (error) {
@@ -1593,29 +1460,29 @@ class HttpApiServer {
     try {
       const { id } = req.params;
       
-      const stored = this.agentWorkStore.get(id);
-      
-      if (!stored) {
+      const data = this.agentWorkflow.get(id);
+      if (!data) {
         return res.status(404).json({ error: 'Work item not found' });
       }
-      
-      if (stored.item.status !== WorkItemStatus.AWAITING_APPROVAL) {
-        return res.status(400).json({ 
-          error: 'Work item is not awaiting approval',
-          currentStatus: stored.item.status
+      if (typeof req.body?.approved !== 'boolean' || typeof req.body?.planDigest !== 'string') {
+        return res.status(400).json({ error: 'approved and planDigest are required' });
+      }
+      const approved = req.body.approved;
+      const result = this.agentWorkflow.approve(id, {
+        approved,
+        planDigest: req.body?.planDigest,
+        actionDigest: req.body?.actionDigest,
+        reason: req.body?.reason
+      });
+      if (!result.accepted) {
+        return res.status(409).json({
+          error: result.reason,
+          currentStatus: result.status
         });
       }
-      
-      // Set approval flag
-      stored.approved = true;
-      
       res.json({
         success: true,
-        data: {
-          id,
-          status: 'approved',
-          message: 'Work approved, execution will continue'
-        },
+        data: { id, ...result },
         timestamp: new Date().toISOString()
       });
     } catch (error) {

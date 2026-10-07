@@ -79,6 +79,8 @@ class SharedAppServices {
     // Lazily instantiated sub-services
     this._disclosure = null;
     this._linterCli  = null;
+    this._agentWorkflow = null;
+    this._agentWorkflowOptions = config.agentWorkflowOptions || {};
   }
 
   /**
@@ -120,6 +122,23 @@ class SharedAppServices {
   async shutdown() {
     this._log('SharedAppServices shutting down');
     // Future: close DB connections, flush caches, etc.
+  }
+
+  /**
+   * Get the transport-independent supervised agent workflow service.
+   * @param {object} [options]
+   * @returns {import('../agent/workflow-service').AgentWorkflowService}
+   */
+  getAgentWorkflow(options = {}) {
+    if (!this._agentWorkflow) {
+      const { AgentWorkflowService } = require('../agent/workflow-service');
+      this._agentWorkflow = new AgentWorkflowService({
+        ...this._agentWorkflowOptions,
+        workspace: options.workspace || this.projectRoot,
+        orchestratorOptions: options.orchestratorOptions || this._agentWorkflowOptions.orchestratorOptions
+      });
+    }
+    return this._agentWorkflow;
   }
 
   // ─── Analysis Service ───────────────────────────────────────────────────────

@@ -209,19 +209,20 @@ const MCP_TOOLS = [
       required: []
     }
   },
-  // Agent System Tools (P11-T007)
+  // Supervised Agent Workflow (P12-T011)
   {
     name:        'aqt_agent_start',
-    description: 'Start autonomous agent work on a project. Returns work ID for tracking.',
+    description: 'Start supervised agent work. Returns a stable task/work ID; risky actions wait for explicit approval.',
     inputSchema: {
       type: 'object',
       properties: {
         description: { type: 'string', description: 'Description of work for the agent to perform.' },
         workspace:   { type: 'string', description: 'Workspace path (default: current directory).' },
+        files: { type: 'array', items: { type: 'string' }, description: 'Optional relative file paths to scope the work.' },
         priority:    { type: 'string', enum: ['critical', 'high', 'medium', 'low'], default: 'medium', description: 'Work priority level.' },
         maxFiles:    { type: 'number', default: 50, description: 'Maximum files the agent can modify.' },
-        maxIterations: { type: 'number', default: 10, description: 'Maximum iterations for agent.' },
-        autoApprove: { type: 'boolean', default: false, description: 'Automatically approve high-risk operations.' }
+        deliverables: { type: 'array', items: { type: 'string' }, description: 'Optional expected deliverables.' },
+        acceptanceCriteria: { type: 'array', items: { type: 'string' }, description: 'Optional conditions that define successful completion.' }
       },
       required: ['description']
     }
@@ -243,7 +244,7 @@ const MCP_TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        status: { type: 'string', enum: ['running', 'completed', 'failed', 'paused', 'all'], default: 'all', description: 'Filter by status.' },
+        status: { type: 'string', enum: ['queued', 'planning', 'awaiting_approval', 'working', 'verifying', 'completed', 'denied', 'failed', 'cancelled', 'blocked', 'paused', 'all'], default: 'all', description: 'Filter by status.' },
         limit:  { type: 'number', default: 50, description: 'Maximum number of results.' }
       },
       required: []
@@ -258,6 +259,21 @@ const MCP_TOOLS = [
         workId: { type: 'string', description: 'Work ID to cancel.' }
       },
       required: ['workId']
+    }
+  },
+  {
+    name:        'aqt_agent_approve',
+    description: 'Approve or deny a pending agent plan using its current plan digest.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workId: { type: 'string', description: 'Work ID returned from aqt_agent_start.' },
+        planDigest: { type: 'string', description: 'Exact plan digest returned by aqt_agent_status.' },
+        actionDigest: { type: 'string', description: 'Exact action digest returned by aqt_agent_status when approval is for an action.' },
+        approved: { type: 'boolean', description: 'Whether the human reviewer approves the plan.' },
+        reason: { type: 'string', description: 'Optional explanation when denying approval.' }
+      },
+      required: ['workId', 'planDigest', 'approved']
     }
   },
   // Pipeline System Tools (P11-T008)
@@ -756,30 +772,50 @@ class MCPServer extends InterfaceAdapter {
         break;
       // Agent System Tools (P11-T007)
       case 'aqt_agent_start':
-        serviceResult = await this.dispatch('agentStart', {
+        serviceResult = {
+          success: true,
+          data: this.services.getAgentWorkflow({ workspace: this.workspace }).start({
           description: args.description,
-          workspace: args.workspace || process.cwd(),
+          workspace: args.workspace || this.workspace,
           priority: args.priority || 'medium',
           maxFiles: args.maxFiles || 50,
-          maxIterations: args.maxIterations || 10,
-          autoApprove: args.autoApprove || false
-        });
+          files: args.files || [],
+          deliverables: args.deliverables || [],
+          acceptanceCriteria: args.acceptanceCriteria || []
+          }, { approvalChannel: true })
+        };
         break;
       case 'aqt_agent_status':
-        serviceResult = await this.dispatch('agentStatus', {
-          workId: args.workId
-        });
+        serviceResult = {
+          success: Boolean(this.services.getAgentWorkflow({ workspace: this.workspace }).get(args.workId)),
+          data: this.services.getAgentWorkflow({ workspace: this.workspace }).get(args.workId)
+        };
+        if (!serviceResult.success) serviceResult.error = 'Work item not found';
         break;
       case 'aqt_agent_list':
-        serviceResult = await this.dispatch('agentList', {
+        serviceResult = { success: true, data: this.services.getAgentWorkflow({ workspace: this.workspace }).list({
           status: args.status || 'all',
           limit: args.limit || 50
-        });
+        }) };
         break;
       case 'aqt_agent_cancel':
-        serviceResult = await this.dispatch('agentCancel', {
-          workId: args.workId
-        });
+        serviceResult = { success: true, data: this.services.getAgentWorkflow({ workspace: this.workspace }).cancel(args.workId) };
+        if (!serviceResult.data.accepted) {
+          serviceResult.success = false;
+          serviceResult.error = serviceResult.data.reason;
+        }
+        break;
+      case 'aqt_agent_approve':
+        serviceResult = { success: true, data: this.services.getAgentWorkflow({ workspace: this.workspace }).approve(args.workId, {
+          planDigest: args.planDigest,
+          actionDigest: args.actionDigest,
+          approved: args.approved,
+          reason: args.reason
+        }) };
+        if (!serviceResult.data.accepted) {
+          serviceResult.success = false;
+          serviceResult.error = serviceResult.data.reason;
+        }
         break;
       // Pipeline System Tools (P11-T008)
       case 'aqt_pipeline_list':

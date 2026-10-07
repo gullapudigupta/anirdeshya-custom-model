@@ -15,7 +15,7 @@ function createPlanner(overrides = {}) {
     plan: async () => ({
       steps: [{ id: 'step-1', description: 'Edit the requested file', files: ['target.txt'] }],
       affectedFiles: ['target.txt'],
-      expectedChecks: [],
+      expectedChecks: [{ type: 'test', required: true }],
       risks: [],
       metadata: { requiresApproval: false },
       ...overrides
@@ -43,6 +43,7 @@ function createEditOrchestrator(options = {}) {
     workspace: TEST_DIR,
     planner: createPlanner(options.plan),
     toolRegistry,
+    checkRunner: { run: async id => ({ id, status: 'passed', exitCode: 0 }) },
     stepExecutor: async input => {
       await input.tools('edit_file', options.args || {
         path: 'target.txt',
@@ -141,7 +142,8 @@ describe('WorkOrchestrator action permission gates (P12-T007)', () => {
 
     const result = await orchestrator.executeOne(item.id);
 
-    assert.strictEqual(result.status, 'completed');
+    assert.strictEqual(result.status, 'failed');
+    assert.match(result.verification.checks.patch_application.error, /No workspace patch was applied/);
     assert.strictEqual(approvalDetails.kind, 'plan');
     assert.strictEqual(approvalDetails.planDigest, item.approval.planDigest);
   });
@@ -258,7 +260,8 @@ describe('WorkOrchestrator action permission gates (P12-T007)', () => {
 
     const result = await orchestrator.executeOne(item.id);
 
-    assert.strictEqual(result.status, 'completed');
+    assert.strictEqual(result.status, 'failed');
+    assert.match(result.verification.checks.patch_application.error, /No workspace patch was applied/);
     assert.strictEqual(approvalDetails.kind, 'tool');
     assert.strictEqual(approvalDetails.tool, 'read_file');
   });

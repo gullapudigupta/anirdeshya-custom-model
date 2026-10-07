@@ -4,11 +4,11 @@
   "priority": "CRITICAL",
   "estimatedHours": 138,
   "status": "IN_PROGRESS",
-  "completionPercentage": "50.0%",
+  "completionPercentage": "91.7%",
   "statusSummary": {
-    "completed": 6,
-    "in_progress": 0,
-    "pending": 6
+    "completed": 11,
+    "in_progress": 1,
+    "pending": 0
   },
   "description": "Turn AQT's existing planning, generation, tool, approval, and verification components into a real bounded coding agent. The agent may implement scoped code changes and repair them through real checks, while risky or final changes remain reviewable and human-supervised.",
   "metadata": {
@@ -171,10 +171,11 @@
     {
       "id": "P12-T006",
       "name": "Generate and apply reviewable workspace patches",
-      "status": "PENDING",
+      "status": "COMPLETED",
       "priority": "CRITICAL",
       "estimatedHours": 14,
       "value": 100,
+      "completedOn": "2026-10-07",
       "dependencies": ["P12-T002", "P12-T003", "P12-T004", "P12-T005", "P12-T007"],
       "deliverables": [
         "Replace CodeGenerator scaffold patches with model-generated structured create, modify, and delete operations",
@@ -191,6 +192,7 @@
         "No patch is applied unless it belongs to an approved plan and passes the approval gate"
       ],
       "reuses": ["src/agent/code-generator.js", "src/agent/diff-review-system.js"],
+      "notes": "Structured create/modify/delete operations are validated against task scope and source hashes, reviewed as unified diffs, and applied through DiffReviewSystem only after plan/patch-bound approval. Application verifies intended workspace state. Scaffold and empty patches are rejected. Validation: 10 focused workspace-patch tests and related supervised execution tests pass.",
       "tags": ["agent", "code-generation", "patches", "level-2"]
     },
     {
@@ -219,10 +221,11 @@
     {
       "id": "P12-T008",
       "name": "Run real verification checks and report evidence",
-      "status": "PENDING",
+      "status": "COMPLETED",
       "priority": "CRITICAL",
       "estimatedHours": 16,
       "value": 100,
+      "completedOn": "2026-10-07",
       "dependencies": ["P12-T006"],
       "deliverables": [
         "Replace WorkOrchestrator._verifyWork stub with real configured test, lint, type-check, and build command execution",
@@ -237,15 +240,17 @@
         "Verification evidence is included in the final work result"
       ],
       "reuses": ["src/agent/verification-repair-loop.js"],
+      "notes": "WorkOrchestrator runs host-configured check IDs through ConfiguredCheckRunner/execFile with bounded time, output, workspace, and environment; output and command text are redacted. Missing checks, empty required-check sets, thrown checks, failures, and timeouts do not pass. Verification evidence and verified changed paths are included in results. Focused tests execute a real local Node check and cover timeout, redaction, unavailable checks, and completion gating.",
       "tags": ["agent", "verification", "tests", "level-2"]
     },
     {
       "id": "P12-T009",
       "name": "Add bounded verification-driven repair loop",
-      "status": "PENDING",
+      "status": "COMPLETED",
       "priority": "HIGH",
       "estimatedHours": 10,
       "value": 90,
+      "completedOn": "2026-10-07",
       "dependencies": ["P12-T007", "P12-T008"],
       "deliverables": [
         "Connect the existing verification-repair loop to agent patches and check failures",
@@ -259,12 +264,13 @@
         "Tests cover fixed-on-retry, persistent failure, regression, cancellation, and limit exhaustion"
       ],
       "reuses": ["src/agent/verification-repair-loop.js", "src/agent/privacy-cost-controls.js"],
+      "notes": "Required check failures feed bounded diagnostics to subsequent executor calls. Retries preserve tool/output budgets, require fresh patch approval, and are capped by retry count, elapsed time, cumulative changed files, input/output tokens, and model cost. Required-check regression stops repair. Focused tests cover repair success, persistent failure, regression, cancellation, and token-limit exhaustion.",
       "tags": ["agent", "repair-loop", "verification", "level-2"]
     },
     {
       "id": "P12-T010",
       "name": "Persist agent runs, checkpoints, and audit events",
-      "status": "PENDING",
+      "status": "COMPLETED",
       "priority": "HIGH",
       "estimatedHours": 9,
       "value": 85,
@@ -281,15 +287,17 @@
         "Persistence tests verify redaction and deterministic resume behavior"
       ],
       "reuses": ["src/agent/streaming-conversation.js", "src/agent/privacy-cost-controls.js", "src/agent/requirement-traceability.js"],
+      "notes": "RunStore is wired to orchestrator checkpoints and audit events; records are atomically replaced, integrity-checked, redacted, and workspace-contained. Incomplete, malformed, tampered, incompatible, and stale records produce explicit recovery states. WorkOrchestrator resumes only validated nonterminal checkpoints, rechecks workspace hashes, resets old plan approval, and preserves retry/token/cost/tool budgets. Persistence tests cover deterministic continuation, redaction, stale/tampered checkpoints, and refusal to treat resumed work as completed.",
       "tags": ["agent", "persistence", "audit", "level-2"]
     },
     {
       "id": "P12-T011",
       "name": "Expose supervised code-generation workflow consistently",
-      "status": "PENDING",
+      "status": "COMPLETED",
       "priority": "HIGH",
       "estimatedHours": 10,
       "value": 85,
+      "completedOn": "2026-10-07",
       "dependencies": ["P12-T003", "P12-T006", "P12-T007", "P12-T008", "P12-T010"],
       "deliverables": [
         "Expose start, plan review, approval, progress, cancellation, and result through CLI, HTTP API, and MCP",
@@ -302,12 +310,13 @@
         "Headless execution denies actions that require a human approver when no approval channel is configured",
         "Interface contract tests cover successful, denied, cancelled, and failed work"
       ],
+      "notes": "CLI, HTTP API, and MCP use the shared AgentWorkflowService for start, status/plan review, digest-bound approval, progress, cancellation, and results. Headless approval-required work denies safely. Operator usage and approval behavior are documented; the shared service tests pass and the MCP catalog exposes all five supervised actions.",
       "tags": ["agent", "cli", "api", "mcp", "level-2"]
     },
     {
       "id": "P12-T012",
       "name": "Prove Level 2 behavior with end-to-end acceptance suite",
-      "status": "PENDING",
+      "status": "IN_PROGRESS",
       "priority": "CRITICAL",
       "estimatedHours": 14,
       "value": 100,
@@ -325,6 +334,7 @@
         "Phase 12 exit requires all critical acceptance cases passing"
       ],
       "reuses": ["src/agent/acceptance-workflow.js", "src/agent/requirement-traceability.js"],
+      "notes": "Added focused offline tests and an operator guide/provider matrix, but the complete required feature/bug-fix/unsafe-request/missing-toolchain/failure/denial matrix with a real model-backed executor has not been proven. Existing focused execution tests use injected deterministic executors, so phase exit criteria are not met.",
       "tags": ["agent", "end-to-end", "acceptance", "level-2"]
     }
   ],
