@@ -12,6 +12,7 @@ A comprehensive, AI-powered code quality analysis and auto-fix platform with mul
 - **📊 UI Enhancements** - Multi-issue selection, batch fixing, search, filters, security scan button
 - **🔌 API & MCP** - Full REST API (30+ endpoints) and Model Context Protocol support
 - **🧩 Plugin System** - Extensible plugin architecture via `aqt plugin`
+- **🗂️ Capability Groups** - Discover related CLI commands, HTTP endpoints, and MCP tools with `aqt tools`
 - **📁 New CLI Commands** - `aqt analyze`, `aqt detect`, `aqt categorize`, `aqt config`, `aqt plugin`
 - **📋 Export** - Export issues to JSON, CSV, Markdown, and SARIF formats
 

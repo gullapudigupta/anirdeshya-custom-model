@@ -7,8 +7,18 @@ untrusted network.
 
 ## Main endpoints
 
+### Capability groups
+
+Capabilities are grouped consistently across the CLI, HTTP API, and MCP
+interfaces. Use `GET /api/capabilities` to list all groups or
+`GET /api/capabilities/:group` to retrieve one group (`quality`, `security`,
+`ai`, `agents`, `pipelines`, `workspace`, `insights`, or `extensions`). Each
+group lists its CLI commands, HTTP endpoints, and MCP tool names.
+
 | Method | Endpoint | Purpose |
 |---|---|---|
+| `GET` | `/api/capabilities` | List capability groups across all interfaces |
+| `GET` | `/api/capabilities/:group` | Read commands, endpoints, and MCP tools in a group |
 | `POST` | `/api/analyze` | Analyze a workspace |
 | `POST` | `/api/fix` | Apply requested fixes |
 | `GET` | `/api/status` | Read service status |

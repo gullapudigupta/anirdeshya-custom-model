@@ -47,6 +47,8 @@ servers:
 tags:
   - name: Health
     description: Health check endpoints
+  - name: Capabilities
+    description: Cross-interface tool and agent group discovery
   - name: Analysis
     description: Code analysis operations
   - name: Fixes
@@ -119,6 +121,56 @@ paths:
                     type: array
                     items:
                       type: string
+                  toolGroups:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ToolGroup'
+
+  /api/capabilities:
+    get:
+      tags: [Capabilities]
+      summary: List capability groups
+      description: Lists related CLI commands, API endpoints, and MCP tools by group.
+      responses:
+        '200':
+          description: Capability groups
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ToolGroup'
+
+  /api/capabilities/{group}:
+    get:
+      tags: [Capabilities]
+      summary: Get one capability group
+      parameters:
+        - name: group
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [quality, security, ai, agents, pipelines, workspace, insights, extensions]
+      responses:
+        '200':
+          description: Capability group details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/ToolGroup'
+        '404':
+          description: Unknown capability group
 
   # ============================================================================
   # Analysis Endpoints
@@ -1381,6 +1433,29 @@ paths:
 
 components:
   schemas:
+    ToolGroup:
+      type: object
+      required: [id, name, description, cliCommands, apiEndpoints, mcpTools]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        cliCommands:
+          type: array
+          items:
+            type: string
+        apiEndpoints:
+          type: array
+          items:
+            type: string
+        mcpTools:
+          type: array
+          items:
+            type: string
+
     # ---------------------------------------------------------------------------
     # Common Schemas
     # ---------------------------------------------------------------------------

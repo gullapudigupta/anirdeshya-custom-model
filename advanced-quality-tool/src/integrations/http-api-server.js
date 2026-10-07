@@ -22,6 +22,7 @@ const { PipelineExecutor } = require('../pipelines/pipeline-executor');
 const { ExecutionLedger, RunStatus } = require('../pipelines/execution-ledger');
 const { DashboardIntegration } = require('../dashboard/dashboard-integration');
 const { PluginManager } = require('../plugins/plugin-system');
+const { listToolGroups, getToolGroup } = require('../core/tool-groups');
 
 class HttpApiServer {
   constructor(config = {}) {
@@ -355,6 +356,7 @@ class HttpApiServer {
       res.json({
         name: 'Advanced Quality Tool API',
         version: require('../../package.json').version,
+        toolGroups: listToolGroups(),
         endpoints: [
           'GET /health',
           'GET /api/info', 
@@ -394,9 +396,26 @@ class HttpApiServer {
           'GET /api/plugins/:id',
           'DELETE /api/plugins/:id',
           'POST /api/plugins/:id/enable',
-          'POST /api/plugins/:id/disable'
+          'POST /api/plugins/:id/disable',
+          'GET /api/capabilities',
+          'GET /api/capabilities/:group'
         ]
       });
+    });
+
+    this.app.get('/api/capabilities', (req, res) => {
+      res.json({ success: true, data: listToolGroups() });
+    });
+    this.app.get('/api/capabilities/:group', (req, res) => {
+      const group = getToolGroup(req.params.group);
+      if (!group) {
+        return res.status(404).json({
+          success: false,
+          error: `Tool group '${req.params.group}' not found`,
+          availableGroups: listToolGroups().map(item => item.id)
+        });
+      }
+      return res.json({ success: true, data: group });
     });
 
     // Quality Analysis

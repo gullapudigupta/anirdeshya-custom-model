@@ -286,8 +286,11 @@ describe('Phase 11 CLI commands', () => {
       expect(routes).toContain('POST /api/dashboard/configure');
       expect(routes).toContain('GET /api/dashboard/metrics');
       expect(routes).toContain('POST /api/plugins/install');
+      expect(routes).toContain('GET /api/capabilities');
+      expect(routes).toContain('GET /api/capabilities/:group');
       expect(MCP_TOOLS.map(tool => tool.name)).toContain('aqt_dashboard_status');
       expect(MCP_TOOLS.map(tool => tool.name)).toContain('aqt_plugin_remove');
+      expect(MCP_TOOLS.map(tool => tool.name)).toContain('aqt_tools_list');
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

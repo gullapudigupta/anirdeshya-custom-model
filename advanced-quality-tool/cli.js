@@ -52,6 +52,9 @@ ${c.bold}Commands:${c.reset}
   ${c.green}dashboard${c.reset}           Configure local quality metrics history
   ${c.green}analytics${c.reset}           Manage opt-in local usage metrics
   ${c.green}ai${c.reset}                  AI generation and prompt templates
+  ${c.green}agent${c.reset}               Start and manage autonomous agent work
+  ${c.green}pipeline${c.reset}            List, run, and inspect quality pipelines
+  ${c.green}tools${c.reset}               Discover related tools grouped by capability
   ${c.green}help${c.reset}                Show this help message
 
 ${c.bold}Examples:${c.reset}
@@ -65,6 +68,8 @@ ${c.bold}Examples:${c.reset}
   ${c.cyan}aqt config list${c.reset}      # Show current configuration
   ${c.cyan}aqt config set severity high${c.reset}  # Update a config value
   ${c.cyan}aqt plugin list${c.reset}      # List installed plugins
+  ${c.cyan}aqt tools${c.reset}             # List capability groups across CLI, API, and MCP
+  ${c.cyan}aqt tools agents${c.reset}     # Show agent operations on each interface
 
 ${c.bold}Options:${c.reset}
   --help, -h          Show help for a command
@@ -173,6 +178,18 @@ async function runCommand(command, args) {
         if (!result.success) process.exitCode = 1;
         break;
       }
+
+      case 'agent':
+        await require('./src/commands/agent-command').run(args);
+        break;
+
+      case 'pipeline':
+        await require('./src/commands/pipeline-command').run(args);
+        break;
+
+      case 'tools':
+        await require('./src/commands/tools-command').run(args);
+        break;
 
       case 'help':
       case '--help':

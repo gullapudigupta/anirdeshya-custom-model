@@ -35,6 +35,7 @@ const { InterfaceAdapter } = require('../core/interface-adapter');
 const { DashboardIntegration } = require('../dashboard/dashboard-integration');
 const { loadDashboardConfig, saveDashboardConfig } = require('../commands/dashboard-command');
 const { PluginManager } = require('../plugins/plugin-system');
+const { listToolGroups, getToolGroup, getMcpToolGroups } = require('../core/tool-groups');
 
 // ─── Tool schema registry ─────────────────────────────────────────────────────
 
@@ -427,6 +428,24 @@ const MCP_TOOLS = [
   }
 ];
 
+MCP_TOOLS.forEach(tool => {
+  const groups = getMcpToolGroups(tool.name);
+  if (groups.length > 0) {
+    tool.description = `[${groups.map(group => group.name).join(', ')}] ${tool.description}`;
+  }
+});
+MCP_TOOLS.push({
+  name: 'aqt_tools_list',
+  description: '[Tool Groups] List AQT capabilities grouped consistently across the CLI, HTTP API, and MCP. Optionally filter by group ID.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      group: { type: 'string', description: 'Optional group ID: quality, security, ai, agents, pipelines, workspace, insights, or extensions.' }
+    },
+    required: []
+  }
+});
+
 // ─── MCP Adapter ─────────────────────────────────────────────────────────────
 
 class MCPServer extends InterfaceAdapter {
@@ -638,6 +657,19 @@ class MCPServer extends InterfaceAdapter {
     // Dispatch to shared services
     let serviceResult;
     switch (toolName) {
+      case 'aqt_tools_list': {
+        const group = args.group ? getToolGroup(args.group) : null;
+        if (args.group && !group) {
+          serviceResult = {
+            success: false,
+            error: `Unknown tool group '${args.group}'`,
+            data: { availableGroups: listToolGroups().map(item => item.id) }
+          };
+        } else {
+          serviceResult = { success: true, data: group || listToolGroups() };
+        }
+        break;
+      }
       case 'aqt_analyze':
         serviceResult = await this.dispatch('analyze', {
           files:      args.files,

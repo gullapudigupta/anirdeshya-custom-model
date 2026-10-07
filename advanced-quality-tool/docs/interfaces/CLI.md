@@ -33,6 +33,22 @@ After installation, the CLI is available as:
 aqt <command> [subcommand] [options] [arguments]
 ```
 
+### Capability groups
+
+The shared capability catalog makes related commands and integrations easier
+to discover:
+
+```bash
+aqt tools
+aqt tools agents
+aqt tools security --json
+```
+
+The same groups and their API endpoint/MCP tool mappings are available from
+`GET /api/capabilities` and the MCP tool `aqt_tools_list`. Agent and pipeline
+workflows are also available directly through `aqt agent ...` and
+`aqt pipeline ...`.
+
 ### Global Options
 
 All commands support these global options:

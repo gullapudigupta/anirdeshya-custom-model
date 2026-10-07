@@ -29,6 +29,21 @@ Advanced Quality Tool provides MCP (Model Context Protocol) tools for integratio
 - Manage plugins
 - Track metrics
 
+Use `aqt_tools_list` to discover available capabilities by group. Existing tools
+are labeled with their group in their descriptions for clients that display the
+standard MCP tool list.
+
+| Group ID | Capabilities |
+| --- | --- |
+| `quality` | Analysis, review, issue fixes, and reports |
+| `security` | Vulnerability, secret, and dependency scans |
+| `ai` | Code, test, documentation, fix, and refactoring assistance |
+| `agents` | Autonomous work lifecycle |
+| `pipelines` | Pipeline discovery, execution, and status |
+| `workspace` | Workspace settings, file access, and workspace-scoped analysis |
+| `insights` | Dashboard and local metrics |
+| `extensions` | Plugin management and hooks |
+
 ## Integration
 
 ### Claude Desktop Integration
