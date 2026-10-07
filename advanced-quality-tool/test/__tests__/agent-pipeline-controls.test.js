@@ -25,7 +25,20 @@ function stubPlanner(stepCount = 4) {
 }
 
 function createOrchestrator() {
-  return new WorkOrchestrator({ workspace: process.cwd(), planner: stubPlanner(), pausePollMs: 5 });
+  return new WorkOrchestrator({
+    workspace: process.cwd(),
+    planner: stubPlanner(),
+    pausePollMs: 5,
+    stepExecutor: ({ step, signal }) => new Promise((resolve, reject) => {
+      const timer = setTimeout(() => resolve({ success: true, stepId: step.id, output: {} }), 100);
+      signal.addEventListener('abort', () => {
+        clearTimeout(timer);
+        const error = new Error('Execution cancelled');
+        error.code = 'EXECUTION_CANCELLED';
+        reject(error);
+      }, { once: true });
+    })
+  });
 }
 
 async function waitForStatus(item, status, timeoutMs = 2000) {

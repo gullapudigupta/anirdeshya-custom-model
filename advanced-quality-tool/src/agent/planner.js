@@ -9,6 +9,8 @@
 
 'use strict';
 
+const path = require('path');
+
 /**
  * Execution Plan
  * @typedef {Object} ExecutionPlan
@@ -24,6 +26,19 @@ class AgentPlanner {
     this.workspace = options.workspace || process.cwd();
     this.contextProvider = options.contextProvider || null;
     this.guidanceProvider = options.guidanceProvider || null;
+    this.planExecutor = options.planExecutor || null;
+    this.maxSteps = options.maxSteps ?? 20;
+    this.maxFiles = options.maxFiles ?? 50;
+    this.maxFilesBeforeApproval = options.maxFilesBeforeApproval ?? 20;
+    for (const [name, value] of Object.entries({
+      maxSteps: this.maxSteps,
+      maxFiles: this.maxFiles,
+      maxFilesBeforeApproval: this.maxFilesBeforeApproval
+    })) {
+      if (!Number.isSafeInteger(value) || value <= 0) {
+        throw new Error(`${name} must be a positive safe integer`);
+      }
+    }
   }
 
   /**
@@ -32,6 +47,7 @@ class AgentPlanner {
    * @param {string} params.description - Task or request description
    * @param {Array<string>} [params.deliverables] - Expected deliverables
    * @param {Array<string>} [params.dependencies] - Task dependencies
+   * @param {Array<string>} [params.acceptanceCriteria] - Required task outcomes
    * @param {Object} [params.context] - Additional context
    * @returns {Promise<ExecutionPlan>}
    */
@@ -40,8 +56,35 @@ class AgentPlanner {
       description,
       deliverables = [],
       dependencies = [],
+      acceptanceCriteria = [],
       context = {}
     } = params;
+
+    const taskCriteria = acceptanceCriteria.length
+      ? acceptanceCriteria
+      : (deliverables.length ? deliverables : [description]);
+    if (this.planExecutor) {
+      const executor = typeof this.planExecutor === 'function'
+        ? this.planExecutor
+        : this.planExecutor.createPlan || this.planExecutor.plan || this.planExecutor.execute;
+      if (typeof executor !== 'function') {
+        throw new Error('Plan executor must be a function or expose createPlan(), plan(), or execute()');
+      }
+      const generated = await executor.call(this.planExecutor, {
+        task: { description, deliverables, dependencies, acceptanceCriteria: taskCriteria },
+        context,
+        workspace: this.workspace,
+        limits: { maxSteps: this.maxSteps, maxFiles: this.maxFiles }
+      });
+      if (!generated || typeof generated !== 'object' || Array.isArray(generated)) {
+        throw new Error('Plan executor returned no structured plan');
+      }
+      return {
+        ...generated,
+        planVersion: generated.planVersion ?? 1,
+        acceptanceCriteria: taskCriteria
+      };
+    }
 
     // 1. Analyze the request
     const analysis = this._analyzeRequest(description, deliverables);
@@ -63,6 +106,9 @@ class AgentPlanner {
       affectedFiles,
       expectedChecks,
       risks,
+      planVersion: 1,
+      acceptanceCriteria: taskCriteria,
+      verificationCommands: expectedChecks.map(check => ({ checkId: check.type })),
       metadata: {
         description,
         deliverables,
@@ -79,25 +125,116 @@ class AgentPlanner {
    * @param {ExecutionPlan} plan
    * @returns {Object} { valid: boolean, issues: string[] }
    */
-  validatePlan(plan) {
+  validatePlan(plan, options = {}) {
     const issues = [];
 
-    if (!plan.steps || plan.steps.length === 0) {
-      issues.push('Plan has no execution steps');
+    if (!plan || typeof plan !== 'object' || Array.isArray(plan)) {
+      return { valid: false, issues: ['Plan must be an object'] };
+    }
+    if (plan.planVersion !== 1) issues.push('Plan must have planVersion 1');
+    if (!Array.isArray(plan.steps) || plan.steps.length === 0 || plan.steps.length > this.maxSteps) {
+      issues.push(`Plan must contain between 1 and ${this.maxSteps} actionable steps`);
+    }
+    if (!Array.isArray(plan.affectedFiles) || plan.affectedFiles.length === 0 ||
+        plan.affectedFiles.length > this.maxFiles) {
+      issues.push(`Plan must contain between 1 and ${this.maxFiles} affected files`);
+    }
+    if (!Array.isArray(plan.acceptanceCriteria) || plan.acceptanceCriteria.length === 0 ||
+        plan.acceptanceCriteria.some(value => typeof value !== 'string' || !value.trim())) {
+      issues.push('Plan must include non-empty acceptance criteria');
+    }
+    if (!Array.isArray(plan.expectedChecks) || plan.expectedChecks.length === 0 ||
+        plan.expectedChecks.some(check =>
+          !check || typeof check !== 'object' || Array.isArray(check) ||
+          typeof (check.checkId || check.type) !== 'string' ||
+          !/^[a-z][a-z0-9_-]*$/.test(check.checkId || check.type) ||
+          Object.prototype.hasOwnProperty.call(check, 'command'))) {
+      issues.push('Plan must specify required verification checks');
+    }
+    if (!Array.isArray(plan.verificationCommands) || plan.verificationCommands.length === 0 ||
+        plan.verificationCommands.some(command =>
+          !command || typeof command.checkId !== 'string' ||
+          Object.keys(command).some(key => key !== 'checkId') ||
+          !/^[a-z][a-z0-9_-]*$/.test(command.checkId) ||
+          !Array.isArray(plan.expectedChecks) ||
+          !plan.expectedChecks.some(check => check &&
+            (check.checkId === command.checkId || check.type === command.checkId)))) {
+      issues.push('Plan must specify verification commands by registered check ID');
+    }
+    if (!Array.isArray(plan.risks) || !plan.metadata || typeof plan.metadata !== 'object' ||
+        typeof plan.metadata.requiresApproval !== 'boolean') {
+      issues.push('Plan must include risks and an explicit approval requirement');
     }
 
-    if (!plan.affectedFiles || plan.affectedFiles.length === 0) {
-      issues.push('Plan does not identify any affected files');
+    const affectedFiles = Array.isArray(plan.affectedFiles) ? plan.affectedFiles : [];
+    const normalizedFiles = new Set();
+    for (const file of affectedFiles) {
+      const normalized = normalizeWorkspacePath(file);
+      if (!normalized) {
+        issues.push(`Affected file is outside workspace scope: ${file}`);
+        continue;
+      }
+      if (normalizedFiles.has(normalized)) issues.push(`Duplicate affected file: ${file}`);
+      normalizedFiles.add(normalized);
+      if (Array.isArray(options.allowedFiles) &&
+          !options.allowedFiles.some(allowed => normalizeWorkspacePath(allowed) === normalized)) {
+        issues.push(`Affected file is outside the requested scope: ${file}`);
+      }
+    }
+    for (const check of Array.isArray(plan.expectedChecks) ? plan.expectedChecks : []) {
+      if (check && Array.isArray(check.files)) {
+        for (const file of check.files) {
+          if (!normalizedFiles.has(normalizeWorkspacePath(file))) {
+            issues.push(`Verification check references a file outside the affected-file set: ${file}`);
+          }
+        }
+      }
     }
 
-    // Check for circular step dependencies
-    if (this._hasCircularDependencies(plan.steps)) {
-      issues.push('Plan has circular step dependencies');
-    }
+    const steps = Array.isArray(plan.steps) ? plan.steps : [];
+    const stepIndexes = new Map();
+    steps.forEach((step, index) => {
+      if (!step || (typeof step.id !== 'string' && typeof step.id !== 'number') ||
+          typeof step.description !== 'string' || !step.description.trim()) {
+        issues.push('Every plan step must have an id and actionable description');
+        return;
+      }
+      const id = String(step.id);
+      if (stepIndexes.has(id)) issues.push(`Duplicate step id: ${step.id}`);
+      stepIndexes.set(id, index);
+      if (Array.isArray(step.files)) {
+        for (const file of step.files) {
+          if (!normalizedFiles.has(normalizeWorkspacePath(file))) {
+            issues.push(`Step ${step.id} references a file outside the affected-file set: ${file}`);
+          }
+        }
+      } else {
+        issues.push(`Step ${step.id} must declare its affected files`);
+      }
+    });
+    steps.forEach(step => {
+      if (!step || !Array.isArray(step.dependencies)) {
+        if (step) issues.push(`Step ${step.id} must declare dependencies`);
+        return;
+      }
+      for (const dependency of step.dependencies) {
+        const dependencyIndex = stepIndexes.get(String(dependency));
+        if (dependencyIndex === undefined) {
+          issues.push(`Unresolved step dependency: ${dependency}`);
+        } else if (dependencyIndex >= stepIndexes.get(String(step.id))) {
+          issues.push(`Step dependency must precede its dependent step: ${dependency}`);
+        }
+      }
+    });
 
-    // Check for high-risk operations without appropriate safeguards
-    const highRisks = plan.risks.filter(r => r.level === 'high' || r.level === 'critical');
-    if (highRisks.length > 0 && !plan.metadata.requiresApproval) {
+    const highRisks = Array.isArray(plan.risks)
+      ? plan.risks.filter(risk => risk && (risk.level === 'high' || risk.level === 'critical'))
+      : [];
+    const destructiveSteps = steps.some(step => step &&
+      ['delete', 'destructive'].includes(String(step.type || '').toLowerCase()));
+    const approvalRequired = highRisks.length > 0 || destructiveSteps ||
+      affectedFiles.length > this.maxFilesBeforeApproval;
+    if (approvalRequired && plan.metadata?.requiresApproval !== true) {
       issues.push('Plan has high-risk operations but does not require approval');
     }
 
@@ -178,10 +315,11 @@ class AgentPlanner {
     
     // For now, extract from context if provided
     if (context.files) {
-      files.push(...context.files);
+      files.push(...context.files.map(file => typeof file === 'string' ? file : file.path));
     }
+    if (context.scopeFiles) files.push(...context.scopeFiles);
     
-    return files;
+    return [...new Set(files.filter(file => typeof file === 'string'))];
   }
 
   _generateSteps(analysis, affectedFiles, deliverables) {
@@ -420,6 +558,14 @@ class AgentPlanner {
 
     return false;
   }
+}
+
+function normalizeWorkspacePath(file) {
+  if (typeof file !== 'string' || !file.trim() || file.includes('\0') ||
+      path.isAbsolute(file) || path.win32.isAbsolute(file)) return null;
+  const segments = file.replace(/\\/g, '/').split('/');
+  if (segments.some(segment => !segment || segment === '.' || segment === '..' || segment.includes(':'))) return null;
+  return segments.join('/');
 }
 
 module.exports = {

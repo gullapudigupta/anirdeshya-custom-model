@@ -10,14 +10,32 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+function hashContent(content) {
+  return crypto.createHash('sha256').update(content, 'utf8').digest('hex');
+}
+
+function isWithinPath(rootPath, targetPath) {
+  const relativePath = path.relative(rootPath, targetPath);
+  return relativePath === '' ||
+    (!path.isAbsolute(relativePath) &&
+      relativePath !== '..' &&
+      !relativePath.startsWith(`..${path.sep}`));
+}
+
 /**
  * Represents a single file diff
  */
 class FileDiff {
-  constructor(filePath, originalContent, modifiedContent) {
+  constructor(filePath, originalContent, modifiedContent, metadata = {}) {
     this.filePath = filePath;
     this.originalContent = originalContent;
     this.modifiedContent = modifiedContent;
+    this.type = metadata.type || 'modify';
+    this.expectedHash = metadata.expectedHash || hashContent(originalContent);
+    this.planDigest = metadata.planDigest || null;
+    this.patchDigest = metadata.patchDigest || null;
+    this.structuredPatch = metadata.structuredPatch === true;
+    this.reviewPath = metadata.reviewPath || filePath;
     this.hunks = this.computeHunks();
     this.status = 'pending'; // pending, applied, rejected, failed
     this.backupPath = null;
@@ -160,7 +178,7 @@ class FileDiff {
    */
   toUnifiedDiff() {
     const lines = [];
-    const displayPath = path.normalize(this.filePath)
+    const displayPath = path.normalize(this.reviewPath)
       .replace(/\\/g, '/')
       .replace(/^\/+/, '');
     lines.push(`--- a/${displayPath}`);
@@ -269,7 +287,13 @@ class BackupManager {
  */
 class DiffReviewSystem {
   constructor(options = {}) {
-    this.backupManager = new BackupManager(options.backupDir || '.aqt-backups');
+    this.workspace = options.workspace ? path.resolve(options.workspace) : null;
+    this.maxChangedFiles = options.maxChangedFiles === undefined ? 50 : options.maxChangedFiles;
+    if (!Number.isSafeInteger(this.maxChangedFiles) || this.maxChangedFiles <= 0) {
+      throw new Error('maxChangedFiles must be a positive safe integer');
+    }
+    this.backupManager = new BackupManager(options.backupDir ||
+      (this.workspace ? path.join(this.workspace, '.aqt-backups') : '.aqt-backups'));
     this.diffs = [];
     this.status = {
       pending: 0,
@@ -283,10 +307,129 @@ class DiffReviewSystem {
    * Add a file diff for review
    */
   addDiff(filePath, originalContent, modifiedContent) {
-    const diff = new FileDiff(filePath, originalContent, modifiedContent);
+    const createsFile = originalContent === '' && !fs.existsSync(filePath);
+    const diff = new FileDiff(filePath, originalContent, modifiedContent, {
+      type: createsFile ? 'create' : 'modify',
+      expectedHash: createsFile ? null : hashContent(originalContent)
+    });
     this.diffs.push(diff);
     this.status.pending++;
     return diff;
+  }
+
+  /**
+   * Add a validated structured operation. Paths are relative to the configured workspace.
+   */
+  addPatch(patch, options = {}) {
+    if (!this.workspace) throw new Error('A workspace is required for structured patches');
+    if (!/^[a-f0-9]{64}$/.test(options.planDigest || '') ||
+        !/^[a-f0-9]{64}$/.test(options.patchDigest || '')) {
+      throw new Error('Structured patches require plan and patch SHA-256 digests');
+    }
+    if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+      throw new Error('Patch must be an object');
+    }
+    if (!['create', 'modify', 'delete'].includes(patch.type)) {
+      throw new Error(`Unsupported patch operation: ${patch.type}`);
+    }
+    if (typeof patch.filePath !== 'string' || !patch.filePath.trim() ||
+        path.isAbsolute(patch.filePath) || patch.filePath.includes('\0')) {
+      throw new Error('Patch path must be a non-empty workspace-relative path');
+    }
+    if (typeof patch.originalContent !== 'string' && patch.originalContent !== null) {
+      throw new Error('Patch originalContent must be a string or null');
+    }
+    if (typeof patch.modifiedContent !== 'string') {
+      throw new Error('Patch modifiedContent must be a string');
+    }
+    if (patch.type === 'create' && patch.originalContent !== null) {
+      throw new Error('Create patch must not have original content');
+    }
+    if (patch.type !== 'create' && typeof patch.originalContent !== 'string') {
+      throw new Error(`${patch.type} patch requires expected original content`);
+    }
+    if (patch.type === 'delete' && patch.modifiedContent !== '') {
+      throw new Error('Delete patch must have empty modified content');
+    }
+    if (patch.type !== 'delete' && patch.modifiedContent.length === 0) {
+      throw new Error('Empty create or modify patches are not allowed');
+    }
+    if (patch.originalContent === patch.modifiedContent) {
+      throw new Error('No-op patches are not allowed');
+    }
+    if (this.diffs.length >= this.maxChangedFiles) {
+      throw new Error(`Changed-file limit (${this.maxChangedFiles}) exceeded`);
+    }
+
+    const absolutePath = this._resolveWorkspacePath(patch.filePath);
+    const current = this._readWorkspaceFile(absolutePath);
+    if (patch.type === 'create') {
+      if (current !== null) throw new Error(`Create target already exists: ${patch.filePath}`);
+    } else if (current === null) {
+      throw new Error(`Patch source does not exist: ${patch.filePath}`);
+    } else if (current !== patch.originalContent) {
+      throw new Error(`Expected original content does not match: ${patch.filePath}`);
+    }
+    const expectedHash = patch.expectedHash || (patch.originalContent === null
+      ? null
+      : hashContent(patch.originalContent));
+    if (expectedHash !== null && expectedHash !== hashContent(patch.originalContent)) {
+      throw new Error(`Expected content hash does not match original content: ${patch.filePath}`);
+    }
+
+    const diff = new FileDiff(absolutePath, patch.originalContent || '',
+      patch.modifiedContent, {
+        type: patch.type,
+        expectedHash,
+        planDigest: options.planDigest,
+        patchDigest: options.patchDigest,
+        structuredPatch: true,
+        reviewPath: path.relative(this.workspace, absolutePath).split(path.sep).join('/')
+      });
+    this.diffs.push(diff);
+    this.status.pending++;
+    return diff;
+  }
+
+  validatePatchPath(filePath) {
+    if (!this.workspace) throw new Error('A workspace is required for structured patches');
+    return this._resolveWorkspacePath(filePath);
+  }
+
+  _resolveWorkspacePath(filePath) {
+    const absolutePath = path.resolve(this.workspace, filePath);
+    if (!isWithinPath(this.workspace, absolutePath) || absolutePath === this.workspace) {
+      throw new Error(`Patch path is outside workspace boundaries: ${filePath}`);
+    }
+    const relativePath = path.relative(this.workspace, absolutePath);
+    let current = this.workspace;
+    for (const segment of relativePath.split(path.sep)) {
+      current = path.join(current, segment);
+      try {
+        const stat = fs.lstatSync(current);
+        if (stat.isSymbolicLink()) {
+          const realPath = fs.realpathSync(current);
+          if (!isWithinPath(fs.realpathSync(this.workspace), realPath)) {
+            throw new Error(`Patch path resolves outside workspace (symlink escape): ${filePath}`);
+          }
+          throw new Error(`Patch path traverses a symbolic link: ${filePath}`);
+        }
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+      }
+    }
+    return absolutePath;
+  }
+
+  _readWorkspaceFile(absolutePath) {
+    try {
+      const stat = fs.lstatSync(absolutePath);
+      if (!stat.isFile()) throw new Error(`Patch target is not a regular file: ${absolutePath}`);
+      return fs.readFileSync(absolutePath, 'utf8');
+    } catch (error) {
+      if (error.code === 'ENOENT') return null;
+      throw error;
+    }
   }
 
   /**
@@ -321,7 +464,8 @@ class DiffReviewSystem {
     
     for (const diff of this.diffs) {
       const fileInfo = {
-        path: diff.filePath,
+        path: diff.reviewPath,
+        operation: diff.type,
         status: diff.status,
         additions: diff.hunks.reduce((sum, h) => sum + h.additions, 0),
         deletions: diff.hunks.reduce((sum, h) => sum + h.deletions, 0),
@@ -343,19 +487,29 @@ class DiffReviewSystem {
    * Validate before applying changes
    */
   validateBeforeApply(diff) {
-    // Check if file exists
-    if (fs.existsSync(diff.filePath)) {
-      // Existing file - check for stale source
-      const currentContent = fs.readFileSync(diff.filePath, 'utf8');
-      if (currentContent !== diff.originalContent) {
-        return { 
-          valid: false, 
-          reason: 'Source file has changed since diff was created (stale source)',
-          currentContent
-        };
+    if (this.workspace) {
+      try {
+        this._resolveWorkspacePath(path.relative(this.workspace, diff.filePath));
+      } catch (error) {
+        return { valid: false, reason: error.message };
       }
     }
-    
+    const currentContent = this.workspace
+      ? this._readWorkspaceFile(diff.filePath)
+      : fs.existsSync(diff.filePath) ? fs.readFileSync(diff.filePath, 'utf8') : null;
+    if (diff.type === 'create') {
+      if (currentContent !== null) {
+        return { valid: false, reason: 'Create target already exists (stale patch conflict)' };
+      }
+    } else if (currentContent === null || currentContent !== diff.originalContent ||
+        hashContent(currentContent) !== diff.expectedHash) {
+      return {
+        valid: false,
+        code: 'PATCH_CONFLICT',
+        reason: 'Source file has changed since patch was created (stale source)',
+        currentContent
+      };
+    }
     return { valid: true };
   }
 
@@ -371,6 +525,16 @@ class DiffReviewSystem {
     if (diff.status !== 'pending') {
       throw new Error(`Diff already ${diff.status}`);
     }
+    if (diff.structuredPatch) {
+      const approval = options.approval;
+      if (!approval || approval.approved !== true ||
+          !/^[a-f0-9]{64}$/.test(diff.planDigest || '') ||
+          !/^[a-f0-9]{64}$/.test(diff.patchDigest || '') ||
+          approval.planDigest !== diff.planDigest ||
+          approval.patchDigest !== diff.patchDigest) {
+        throw new Error('Patch requires approval bound to its plan and patch digests');
+      }
+    }
     
     // Validate
     const validation = this.validateBeforeApply(diff);
@@ -379,12 +543,12 @@ class DiffReviewSystem {
       diff.error = validation.reason;
       this.status.pending--;
       this.status.failed++;
-      return { success: false, error: validation.reason };
+      return { success: false, code: validation.code || 'PATCH_CONFLICT', error: validation.reason };
     }
     
     try {
       // Create backup
-      if (fs.existsSync(diff.filePath)) {
+      if (diff.type !== 'create') {
         diff.backupPath = this.backupManager.createBackup(diff.filePath, diff.originalContent);
       }
       
@@ -394,10 +558,28 @@ class DiffReviewSystem {
         fs.mkdirSync(parentDir, { recursive: true });
       }
       
-      // Write new content atomically
-      const tempPath = `${diff.filePath}.tmp`;
-      fs.writeFileSync(tempPath, diff.modifiedContent, 'utf8');
-      await this._renameWithRetry(tempPath, diff.filePath);
+      if (diff.type === 'delete') {
+        const beforeDelete = this.validateBeforeApply(diff);
+        if (!beforeDelete.valid) {
+          throw Object.assign(new Error(beforeDelete.reason), { code: beforeDelete.code || 'PATCH_CONFLICT' });
+        }
+        fs.unlinkSync(diff.filePath);
+      } else {
+        const tempPath = `${diff.filePath}.${crypto.randomBytes(8).toString('hex')}.tmp`;
+        fs.writeFileSync(tempPath, diff.modifiedContent, 'utf8');
+        const beforeRename = this.validateBeforeApply(diff);
+        if (!beforeRename.valid) {
+          fs.unlinkSync(tempPath);
+          throw Object.assign(new Error(beforeRename.reason), { code: beforeRename.code || 'PATCH_CONFLICT' });
+        }
+        await this._renameWithRetry(tempPath, diff.filePath);
+      }
+      const intendedStatePresent = diff.type === 'delete'
+        ? !fs.existsSync(diff.filePath)
+        : fs.readFileSync(diff.filePath, 'utf8') === diff.modifiedContent;
+      if (!intendedStatePresent) {
+        throw new Error(`Applied patch content verification failed for ${diff.reviewPath}`);
+      }
       
       diff.status = 'applied';
       this.status.pending--;
@@ -409,8 +591,23 @@ class DiffReviewSystem {
       diff.error = error.message;
       this.status.pending--;
       this.status.failed++;
-      
-      return { success: false, error: error.message };
+      const currentContent = fs.existsSync(diff.filePath)
+        ? fs.readFileSync(diff.filePath, 'utf8')
+        : null;
+      const containsOurWrite = diff.type === 'delete'
+        ? currentContent === null
+        : currentContent === diff.modifiedContent;
+      if (diff.backupPath && containsOurWrite) {
+        try {
+          this.backupManager.restore(diff.filePath);
+        } catch (restoreError) {
+          diff.error = `${diff.error}; rollback failed: ${restoreError.message}`;
+        }
+      } else if (diff.type === 'create' && currentContent === diff.modifiedContent) {
+        fs.unlinkSync(diff.filePath);
+      }
+
+      return { success: false, code: error.code || 'PATCH_APPLICATION_FAILED', error: error.message };
     }
   }
 
@@ -573,7 +770,7 @@ class DiffReviewSystem {
         failed: this.status.failed
       },
       files: this.diffs.map(d => ({
-        path: d.filePath,
+        path: d.reviewPath,
         status: d.status,
         additions: d.hunks.reduce((sum, h) => sum + h.additions, 0),
         deletions: d.hunks.reduce((sum, h) => sum + h.deletions, 0),
@@ -587,5 +784,6 @@ class DiffReviewSystem {
 module.exports = {
   DiffReviewSystem,
   FileDiff,
-  BackupManager
+  BackupManager,
+  hashContent
 };

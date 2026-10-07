@@ -190,12 +190,12 @@
       "file": "./phase12-tasks.json",
       "name": "Level 2 Supervised Autonomous Code-Generation Agent",
       "priority": "CRITICAL",
-      "status": "PLANNED",
+      "status": "IN_PROGRESS",
       "estimatedHours": 138,
       "taskCount": 12,
-      "statusSummary": { "completed": 0, "in_progress": 0, "pending": 12 },
+      "statusSummary": { "completed": 7, "in_progress": 0, "pending": 5 },
       "reconciledOn": "2026-10-07",
-      "reconciliationNote": "Planned work to connect real model execution, workspace tools, validated patching, approval gates, real verification, bounded repair, persistence, and end-to-end evidence for supervised Level 2 autonomy."
+      "reconciliationNote": "Planned work to connect real model execution, workspace tools, validated patching, approval gates, real verification, bounded repair, persistence, and end-to-end evidence for supervised Level 2 autonomy. P12-T001 was corrected from PENDING to COMPLETED (tracking error; work was already done). P12-T002 (model-backed step execution) and P12-T003 (ToolRegistry wired into execution with budgets, allowlisted run_check, hash-guarded edit_file, and real get_diagnostics) are completed and tested. P12-T004 (bounded, hashed workspace context wired into task execution) and P12-T005 (structured, context-grounded versioned plans with deterministic scope/dependency/budget validation and exact-plan approval) are completed and tested. P12-T007 (PermissionManager-enforced plan and per-tool policies, digest-bound approvals, cancellation/denial/timeout fail-closed behavior, and auditable decisions) is completed and focused tests pass. P12-T006 now provides structured model-generated workspace patches through DiffReviewSystem, with path/hash/stale-content checks, changed-file limits, review diffs, PermissionManager policy enforcement, and plan/patch-digest-bound approval; isolated patch tests and adjacent regressions pass. P12-T008 and later tasks remain unchanged and unstarted."
     },
     {
       "phase": "phase13",
@@ -262,13 +262,13 @@
     "totalPhases": 13,
     "totalTasks": 259,
     "byStatus": {
-      "completed": 228,
+      "completed": 232,
       "archived": 1,
       "in_progress": 0,
-      "pending": 30
+      "pending": 26
     },
     "totalEstimatedHours": 3395,
-    "completionPercentage": "88.4%",
+    "completionPercentage": "89.6%",
     "calculatedOn": "2026-10-07",
     "note": "Computed from task records in all phase files. Phase 12 delivers supervised Level 2 autonomy; Phase 13 extends it to policy-bounded Level 3. Archived tasks are included in totalTasks but excluded from the completion percentage denominator."
   }

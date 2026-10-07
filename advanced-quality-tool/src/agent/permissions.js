@@ -47,6 +47,12 @@ class PermissionManager {
       allowDeletes: options.allowDeletes === true, // Default: false
       allowExternalNetwork: options.allowExternalNetwork === true, // Default: false
       maxFileSize: options.maxFileSize || 1024 * 1024, // 1MB
+      maxFilesPerTask: options.maxFilesPerTask || 50,
+      broadScopeFileThreshold: options.broadScopeFileThreshold || 10,
+      requireApprovalForHighRisk: options.requireApprovalForHighRisk !== false,
+      requireApprovalForDestructiveEdits: options.requireApprovalForDestructiveEdits !== false,
+      requireApprovalForDependencyChanges: options.requireApprovalForDependencyChanges !== false,
+      highRiskActions: options.highRiskActions || [],
       protectedPaths: options.protectedPaths || [
         '.git',
         'node_modules',
@@ -67,6 +73,7 @@ class PermissionManager {
     
     // Approval callback
     this.requestApproval = options.requestApproval || null;
+    this.auditLog = [];
     
     // Secret patterns
     this.secretPatterns = [
@@ -85,7 +92,7 @@ class PermissionManager {
    * @param {Object} operation
    * @returns {Promise<Object>} { allowed: boolean, requiresApproval: boolean, reason: string }
    */
-  async checkPermission(operation) {
+  async checkPermission(operation, options = {}) {
     const { type, params = {} } = operation;
     
     // Assess risk level
@@ -94,34 +101,86 @@ class PermissionManager {
     // Check policy
     const policyCheck = this._checkPolicy(operation);
     if (!policyCheck.allowed) {
-      return {
+      const decision = {
         allowed: false,
         requiresApproval: false,
         risk: risk.level,
         reason: policyCheck.reason
       };
+      this._recordDecision(operation, decision);
+      return decision;
     }
     
     // Determine if approval is needed
     const requiresApproval = this._requiresApproval(operation, risk);
     
-    if (requiresApproval && this.mode === ApprovalMode.APPROVAL_REQUIRED) {
+    if (requiresApproval && this.mode === ApprovalMode.APPROVAL_REQUIRED && !options.deferApproval) {
       // Request approval
-      const approved = await this._requestUserApproval(operation, risk);
-      return {
+      let approved;
+      try {
+        approved = await this._requestUserApproval(operation, risk);
+      } catch (error) {
+        const decision = {
+          allowed: false,
+          requiresApproval: true,
+          risk: risk.level,
+          reason: `Approval request failed: ${error.message}`
+        };
+        this._recordDecision(operation, decision);
+        return decision;
+      }
+      const decision = {
         allowed: approved,
         requiresApproval: true,
         risk: risk.level,
         reason: approved ? null : 'User denied approval'
       };
+      this._recordDecision(operation, decision);
+      return decision;
     }
     
-    return {
+    const decision = {
       allowed: true,
-      requiresApproval: false,
+      requiresApproval: requiresApproval && this.mode === ApprovalMode.APPROVAL_REQUIRED,
       risk: risk.level,
       reason: null
     };
+    this._recordDecision(operation, decision);
+    return decision;
+  }
+
+  recordApproval(operation, approval) {
+    this._recordDecision(operation, {
+      allowed: approval.approved === true,
+      requiresApproval: true,
+      risk: approval.risk || this._assessRisk(operation).level,
+      reason: approval.reason || null,
+      approval: {
+        planDigest: approval.planDigest || null,
+        actionDigest: approval.actionDigest || null,
+        outcome: approval.outcome || (approval.approved ? 'approved' : 'denied')
+      }
+    });
+  }
+
+  _recordDecision(operation, decision) {
+    const entry = {
+      timestamp: new Date().toISOString(),
+      type: operation.type,
+      path: operation.params && operation.params.path ? operation.params.path : null,
+      digest: operation.digest || null,
+      allowed: decision.allowed,
+      requiresApproval: decision.requiresApproval,
+      risk: decision.risk,
+      reason: decision.reason || null,
+      approval: decision.approval || null
+    };
+    this.auditLog.push(entry);
+    return entry;
+  }
+
+  getAuditLog(limit = this.auditLog.length) {
+    return this.auditLog.slice(-limit);
   }
 
   /**
@@ -132,14 +191,13 @@ class PermissionManager {
   validatePath(filePath) {
     try {
       const normalized = path.normalize(filePath);
-      const absolutePath = path.isAbsolute(normalized) 
-        ? normalized 
-        : path.resolve(this.workspace, normalized);
-      
-      const workspaceNormalized = path.normalize(this.workspace);
+      const workspaceNormalized = path.resolve(this.workspace);
+      const absolutePath = path.isAbsolute(normalized)
+        ? path.resolve(normalized)
+        : path.resolve(workspaceNormalized, normalized);
       
       // Check workspace containment
-      if (!absolutePath.startsWith(workspaceNormalized)) {
+      if (!isWithinPath(workspaceNormalized, absolutePath)) {
         return {
           valid: false,
           reason: 'Path is outside workspace boundaries'
@@ -149,7 +207,10 @@ class PermissionManager {
       // Check for symlink escape attempts
       if (fs.existsSync(absolutePath)) {
         const realPath = fs.realpathSync(absolutePath);
-        if (!realPath.startsWith(workspaceNormalized)) {
+        const realWorkspacePath = fs.existsSync(workspaceNormalized)
+          ? fs.realpathSync(workspaceNormalized)
+          : workspaceNormalized;
+        if (!isWithinPath(realWorkspacePath, realPath)) {
           return {
             valid: false,
             reason: 'Path resolves to location outside workspace (symlink escape attempt)'
@@ -158,12 +219,17 @@ class PermissionManager {
       }
       
       // Check protected paths
-      const relativePath = path.relative(this.workspace, absolutePath);
-      for (const protected of this.policy.protectedPaths) {
-        if (relativePath.startsWith(protected)) {
+      const relativePath = path.relative(workspaceNormalized, absolutePath)
+        .split(path.sep)
+        .join('/')
+        .toLowerCase();
+      for (const protectedPath of this.policy.protectedPaths) {
+        const normalizedProtectedPath = protectedPath.replace(/\\/g, '/').toLowerCase();
+        if (relativePath === normalizedProtectedPath ||
+            relativePath.startsWith(`${normalizedProtectedPath}/`)) {
           return {
             valid: false,
-            reason: `Path '${protected}' is protected and cannot be accessed`
+            reason: `Path '${protectedPath}' is protected and cannot be accessed`
           };
         }
       }
@@ -272,6 +338,28 @@ class PermissionManager {
     const { type, params = {} } = operation;
     let level = RiskLevel.SAFE;
     const factors = [];
+
+    if (type === 'plan') {
+      const files = Array.isArray(params.affectedFiles) ? params.affectedFiles : [];
+      const risks = Array.isArray(params.risks) ? params.risks : [];
+      if (files.length > this.policy.broadScopeFileThreshold) {
+        level = RiskLevel.HIGH;
+        factors.push('Broad workspace scope');
+      }
+      if (risks.some(risk => ['high', 'critical'].includes(String(risk.level).toLowerCase()))) {
+        level = RiskLevel.HIGH;
+        factors.push('Plan contains high-risk actions');
+      }
+      if (params.requiresApproval) {
+        level = RiskLevel.HIGH;
+        factors.push('Plan explicitly requires approval');
+      }
+    }
+
+    if (this.policy.highRiskActions.includes(type)) {
+      level = RiskLevel.HIGH;
+      factors.push('Configured high-risk action');
+    }
     
     // Terminal commands
     if (type === 'execute_command') {
@@ -293,16 +381,25 @@ class PermissionManager {
     }
     
     // File operations
-    if (type === 'write_file' || type === 'delete_file') {
+    if (type === 'write_file' || type === 'edit_file' || type === 'delete_file') {
       level = RiskLevel.LOW;
       factors.push('File modification');
       
       if (params.path) {
-        for (const protected of this.policy.protectedPaths) {
-          if (params.path.includes(protected)) {
+        for (const protectedPath of this.policy.protectedPaths) {
+          if (params.path.includes(protectedPath)) {
             level = RiskLevel.HIGH;
-            factors.push(`Protected path: ${protected}`);
+            factors.push(`Protected path: ${protectedPath}`);
           }
+        }
+
+        if (type === 'edit_file' && params.expectedHash) {
+          level = RiskLevel.HIGH;
+          factors.push('Destructive edit of an existing file');
+        }
+        if (params.dependencyChange) {
+          level = RiskLevel.HIGH;
+          factors.push('Dependency change');
         }
       }
     }
@@ -334,10 +431,25 @@ class PermissionManager {
 
   _checkPolicy(operation) {
     const { type, params = {} } = operation;
+
+    if (type === 'plan') {
+      const files = Array.isArray(params.affectedFiles) ? params.affectedFiles : [];
+      if (files.length > this.policy.maxFilesPerTask) {
+        return {
+          allowed: false,
+          reason: `Too many affected files (${files.length} > ${this.policy.maxFilesPerTask})`
+        };
+      }
+      for (const file of files) {
+        const pathCheck = this.validatePath(file);
+        if (!pathCheck.valid) return { allowed: false, reason: pathCheck.reason };
+      }
+      return { allowed: true, reason: null };
+    }
     
     // Read-only mode
     if (this.mode === ApprovalMode.READ_ONLY) {
-      const writingOps = ['write_file', 'delete_file', 'execute_command', 'delete_directory'];
+      const writingOps = ['write_file', 'edit_file', 'delete_file', 'execute_command', 'delete_directory'];
       if (writingOps.includes(type)) {
         return {
           allowed: false,
@@ -355,7 +467,7 @@ class PermissionManager {
     }
     
     // File write policy
-    if ((type === 'write_file' || type === 'create_file') && !this.policy.allowFileWrites) {
+    if ((type === 'write_file' || type === 'edit_file' || type === 'create_file') && !this.policy.allowFileWrites) {
       return {
         allowed: false,
         reason: 'File writes are disabled by policy'
@@ -379,7 +491,8 @@ class PermissionManager {
     }
     
     // File size limits
-    if (type === 'write_file' && params.content) {
+    if (['write_file', 'edit_file', 'create_file'].includes(type) &&
+        typeof params.content === 'string') {
       const size = Buffer.byteLength(params.content, 'utf8');
       if (size > this.policy.maxFileSize) {
         return {
@@ -393,8 +506,30 @@ class PermissionManager {
   }
 
   _requiresApproval(operation, risk) {
+    if (operation.type === 'plan') {
+      const params = operation.params || {};
+      const files = Array.isArray(params.affectedFiles) ? params.affectedFiles : [];
+      const risks = Array.isArray(params.risks) ? params.risks : [];
+      return (this.policy.requireApprovalForHighRisk &&
+          (risk.level === RiskLevel.HIGH || risk.level === RiskLevel.CRITICAL)) ||
+        (files.length > this.policy.broadScopeFileThreshold) ||
+        risks.some(item => item && item.requiresApproval === true) ||
+        params.requiresApproval === true;
+    }
+
+    if (operation.type === 'edit_file' && operation.params && operation.params.expectedHash &&
+        this.policy.requireApprovalForDestructiveEdits) {
+      return true;
+    }
+    if (operation.params && operation.params.dependencyChange &&
+        this.policy.requireApprovalForDependencyChanges) {
+      return true;
+    }
+    if (this.policy.highRiskActions.includes(operation.type)) return true;
+
     // Always require approval for high and critical risk
-    if (risk.level === RiskLevel.HIGH || risk.level === RiskLevel.CRITICAL) {
+    if (this.policy.requireApprovalForHighRisk &&
+        (risk.level === RiskLevel.HIGH || risk.level === RiskLevel.CRITICAL)) {
       return true;
     }
     
@@ -413,21 +548,24 @@ class PermissionManager {
 
   async _requestUserApproval(operation, risk) {
     if (typeof this.requestApproval === 'function') {
-      try {
-        return await this.requestApproval({
-          operation,
-          risk,
-          workspace: this.workspace
-        });
-      } catch (error) {
-        // Deny on callback error
-        return false;
-      }
+      return this.requestApproval({
+        operation,
+        risk,
+        workspace: this.workspace
+      });
     }
     
     // No approval handler = deny
     return false;
   }
+}
+
+function isWithinPath(rootPath, targetPath) {
+  const relativePath = path.relative(rootPath, targetPath);
+  return relativePath === '' ||
+    (!path.isAbsolute(relativePath) &&
+      relativePath !== '..' &&
+      !relativePath.startsWith(`..${path.sep}`));
 }
 
 module.exports = {
