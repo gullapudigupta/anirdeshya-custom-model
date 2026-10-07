@@ -14,10 +14,12 @@ const crypto = require('crypto');
  * Represents a single file diff
  */
 class FileDiff {
-  constructor(filePath, originalContent, modifiedContent) {
+  constructor(filePath, originalContent, modifiedContent, options = {}) {
     this.filePath = filePath;
     this.originalContent = originalContent;
     this.modifiedContent = modifiedContent;
+    this.operation = options.operation || 'modify';
+    this.expectedHash = options.expectedHash || null;
     this.hunks = this.computeHunks();
     this.status = 'pending'; // pending, applied, rejected, failed
     this.backupPath = null;
@@ -29,7 +31,7 @@ class FileDiff {
    */
   computeHunks() {
     const originalLines = this.originalContent.split('\n');
-    const modifiedLines = this.modifiedContent.split('\n');
+    const modifiedLines = (this.modifiedContent || '').split('\n');
     const hunks = [];
     
     let originalLine = 1;
@@ -270,6 +272,9 @@ class BackupManager {
 class DiffReviewSystem {
   constructor(options = {}) {
     this.backupManager = new BackupManager(options.backupDir || '.aqt-backups');
+    this.workspace = options.workspace
+      ? (fs.existsSync(options.workspace) ? fs.realpathSync(options.workspace) : path.resolve(options.workspace))
+      : null;
     this.diffs = [];
     this.status = {
       pending: 0,
@@ -282,8 +287,9 @@ class DiffReviewSystem {
   /**
    * Add a file diff for review
    */
-  addDiff(filePath, originalContent, modifiedContent) {
-    const diff = new FileDiff(filePath, originalContent, modifiedContent);
+  addDiff(filePath, originalContent, modifiedContent, options = {}) {
+    const operation = options.operation || (fs.existsSync(filePath) ? 'modify' : 'create');
+    const diff = new FileDiff(filePath, originalContent, modifiedContent, { ...options, operation });
     this.diffs.push(diff);
     this.status.pending++;
     return diff;
@@ -297,7 +303,8 @@ class DiffReviewSystem {
       pending: [],
       applied: [],
       rejected: [],
-      failed: []
+      failed: [],
+      'rolled-back': []
     };
     
     for (const diff of this.diffs) {
@@ -343,10 +350,40 @@ class DiffReviewSystem {
    * Validate before applying changes
    */
   validateBeforeApply(diff) {
+    const absolutePath = path.resolve(diff.filePath);
+    if (this.workspace) {
+      const relative = path.relative(this.workspace, absolutePath);
+      if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+        return { valid: false, reason: 'Patch path is outside the workspace' };
+      }
+      let parent = path.dirname(absolutePath);
+      while (!fs.existsSync(parent)) {
+        const next = path.dirname(parent);
+        if (next === parent) break;
+        parent = next;
+      }
+      try {
+        const realParent = fs.realpathSync(parent);
+        const realRelative = path.relative(this.workspace, realParent);
+        if (realRelative === '..' || realRelative.startsWith(`..${path.sep}`) || path.isAbsolute(realRelative)) {
+          return { valid: false, reason: 'Patch path resolves outside the workspace' };
+        }
+      } catch (error) {
+        return { valid: false, reason: `Patch parent cannot be validated: ${error.message}` };
+      }
+    }
+
+    const exists = fs.existsSync(absolutePath);
+    if (diff.operation === 'create' && exists) {
+      return { valid: false, reason: 'Create target already exists' };
+    }
+    if (diff.operation !== 'create' && !exists) {
+      return { valid: false, reason: 'Source file is missing' };
+    }
     // Check if file exists
-    if (fs.existsSync(diff.filePath)) {
+    if (exists) {
       // Existing file - check for stale source
-      const currentContent = fs.readFileSync(diff.filePath, 'utf8');
+      const currentContent = fs.readFileSync(absolutePath, 'utf8');
       if (currentContent !== diff.originalContent) {
         return { 
           valid: false, 
@@ -354,6 +391,14 @@ class DiffReviewSystem {
           currentContent
         };
       }
+      if (diff.expectedHash) {
+        const currentHash = crypto.createHash('sha256').update(currentContent).digest('hex');
+        if (currentHash !== diff.expectedHash) {
+          return { valid: false, reason: 'Source file hash does not match the expected hash' };
+        }
+      }
+    } else if (diff.expectedHash) {
+      return { valid: false, reason: 'A new file cannot have an expected source hash' };
     }
     
     return { valid: true };
@@ -388,16 +433,21 @@ class DiffReviewSystem {
         diff.backupPath = this.backupManager.createBackup(diff.filePath, diff.originalContent);
       }
       
-      // Ensure parent directory exists
-      const parentDir = path.dirname(diff.filePath);
-      if (!fs.existsSync(parentDir)) {
-        fs.mkdirSync(parentDir, { recursive: true });
+      if (diff.operation === 'delete') {
+        fs.unlinkSync(diff.filePath);
+      } else {
+        const parentDir = path.dirname(diff.filePath);
+        if (!fs.existsSync(parentDir)) {
+          fs.mkdirSync(parentDir, { recursive: true });
+        }
+        const tempPath = `${diff.filePath}.${crypto.randomBytes(8).toString('hex')}.tmp`;
+        try {
+          fs.writeFileSync(tempPath, diff.modifiedContent, { encoding: 'utf8', flag: 'wx' });
+          await this._renameWithRetry(tempPath, diff.filePath);
+        } finally {
+          if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+        }
       }
-      
-      // Write new content atomically
-      const tempPath = `${diff.filePath}.tmp`;
-      fs.writeFileSync(tempPath, diff.modifiedContent, 'utf8');
-      await this._renameWithRetry(tempPath, diff.filePath);
       
       diff.status = 'applied';
       this.status.pending--;

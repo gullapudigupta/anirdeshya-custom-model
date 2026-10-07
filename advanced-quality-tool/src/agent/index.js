@@ -16,6 +16,10 @@ const { ToolRegistry } = require('./tool-registry');
 const { PermissionManager, ApprovalMode, RiskLevel } = require('./permissions');
 const { TaskScopeAnalyzer, ScopeType, ScopeIssue } = require('./scope-analyzer');
 const { CodeGenerator } = require('./code-generator');
+const { ConfiguredCheckRunner } = require('./check-runner');
+const { WorkspaceContext } = require('./workspace-context');
+const { AgentRunStore } = require('./run-store');
+const contracts = require('./contracts');
 
 module.exports = {
   // Work items
@@ -42,5 +46,13 @@ module.exports = {
   ScopeIssue,
   
   // Code Generation
-  CodeGenerator
+  CodeGenerator,
+
+  // Bounded context and verification
+  WorkspaceContext,
+  ConfiguredCheckRunner,
+  AgentRunStore,
+
+  // Versioned execution contracts
+  ...contracts
 };

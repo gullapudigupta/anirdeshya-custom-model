@@ -37,7 +37,8 @@ const RiskLevel = {
  */
 class PermissionManager {
   constructor(options = {}) {
-    this.workspace = options.workspace || process.cwd();
+    const workspacePath = path.resolve(options.workspace || process.cwd());
+    this.workspace = fs.existsSync(workspacePath) ? fs.realpathSync(workspacePath) : workspacePath;
     this.mode = options.mode || ApprovalMode.APPROVAL_REQUIRED;
     
     // Policy configuration
@@ -132,14 +133,9 @@ class PermissionManager {
   validatePath(filePath) {
     try {
       const normalized = path.normalize(filePath);
-      const absolutePath = path.isAbsolute(normalized) 
-        ? normalized 
-        : path.resolve(this.workspace, normalized);
-      
-      const workspaceNormalized = path.normalize(this.workspace);
-      
-      // Check workspace containment
-      if (!absolutePath.startsWith(workspaceNormalized)) {
+      const absolutePath = path.resolve(this.workspace, normalized);
+      const relativePath = path.relative(this.workspace, absolutePath);
+      if (relativePath === '..' || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath)) {
         return {
           valid: false,
           reason: 'Path is outside workspace boundaries'
@@ -149,7 +145,8 @@ class PermissionManager {
       // Check for symlink escape attempts
       if (fs.existsSync(absolutePath)) {
         const realPath = fs.realpathSync(absolutePath);
-        if (!realPath.startsWith(workspaceNormalized)) {
+        const realRelative = path.relative(this.workspace, realPath);
+        if (realRelative === '..' || realRelative.startsWith(`..${path.sep}`) || path.isAbsolute(realRelative)) {
           return {
             valid: false,
             reason: 'Path resolves to location outside workspace (symlink escape attempt)'
@@ -158,12 +155,12 @@ class PermissionManager {
       }
       
       // Check protected paths
-      const relativePath = path.relative(this.workspace, absolutePath);
-      for (const protected of this.policy.protectedPaths) {
-        if (relativePath.startsWith(protected)) {
+      const relativeParts = relativePath.split(path.sep);
+      for (const protectedPath of this.policy.protectedPaths) {
+        if (relativeParts.includes(protectedPath)) {
           return {
             valid: false,
-            reason: `Path '${protected}' is protected and cannot be accessed`
+            reason: `Path '${protectedPath}' is protected and cannot be accessed`
           };
         }
       }
@@ -210,6 +207,7 @@ class PermissionManager {
     if (!text || typeof text !== 'string') return false;
     
     for (const pattern of this.secretPatterns) {
+      pattern.lastIndex = 0;
       if (pattern.test(text)) {
         return true;
       }
@@ -298,10 +296,10 @@ class PermissionManager {
       factors.push('File modification');
       
       if (params.path) {
-        for (const protected of this.policy.protectedPaths) {
-          if (params.path.includes(protected)) {
+        for (const protectedPath of this.policy.protectedPaths) {
+          if (params.path.includes(protectedPath)) {
             level = RiskLevel.HIGH;
-            factors.push(`Protected path: ${protected}`);
+            factors.push(`Protected path: ${protectedPath}`);
           }
         }
       }

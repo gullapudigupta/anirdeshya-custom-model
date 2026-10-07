@@ -19,6 +19,7 @@ const WorkItemStatus = {
   WORKING: 'working',
   VERIFYING: 'verifying',
   COMPLETED: 'completed',
+  DENIED: 'denied',
   FAILED: 'failed',
   CANCELLED: 'cancelled',
   BLOCKED: 'blocked',
@@ -33,6 +34,12 @@ class WorkItem {
     this.id = params.id || this._generateId();
     this.taskId = params.taskId || null;
     this.description = params.description || '';
+    this.schemaVersion = params.schemaVersion || 1;
+    this.acceptanceCriteria = Array.isArray(params.acceptanceCriteria) ? [...params.acceptanceCriteria] : [];
+    this.files = Array.isArray(params.files) ? [...params.files] : [];
+    this.deliverables = Array.isArray(params.deliverables)
+      ? [...params.deliverables]
+      : (Array.isArray(params.plan?.deliverables) ? [...params.plan.deliverables] : []);
     this.status = params.status || WorkItemStatus.QUEUED;
     this.priority = params.priority || 'MEDIUM';
     
@@ -58,6 +65,8 @@ class WorkItem {
     this.error = null;
     this.changedFiles = [];
     this.verificationResults = {};
+    this.approval = null;
+    this.contextHashes = {};
     
     // Timing
     this.createdAt = new Date().toISOString();
@@ -90,7 +99,7 @@ class WorkItem {
     if (newStatus === WorkItemStatus.WORKING && !this.startedAt) {
       this.startedAt = new Date().toISOString();
     }
-    if ([WorkItemStatus.COMPLETED, WorkItemStatus.FAILED, WorkItemStatus.CANCELLED].includes(newStatus)) {
+    if ([WorkItemStatus.COMPLETED, WorkItemStatus.DENIED, WorkItemStatus.FAILED, WorkItemStatus.CANCELLED].includes(newStatus)) {
       this.completedAt = new Date().toISOString();
       if (this.startedAt) {
         this.elapsedMs = new Date(this.completedAt) - new Date(this.startedAt);
@@ -242,6 +251,10 @@ class WorkItem {
       id: this.id,
       taskId: this.taskId,
       description: this.description,
+      schemaVersion: this.schemaVersion,
+      acceptanceCriteria: this.acceptanceCriteria,
+      files: this.files,
+      deliverables: this.deliverables,
       status: this.status,
       priority: this.priority,
       assignedAgent: this.assignedAgent,
@@ -281,6 +294,8 @@ class WorkItem {
       error: this.error,
       changedFiles: this.changedFiles,
       verificationResults: this.verificationResults,
+      approval: this.approval,
+      contextHashes: this.contextHashes,
       createdAt: this.createdAt,
       startedAt: this.startedAt,
       completedAt: this.completedAt,

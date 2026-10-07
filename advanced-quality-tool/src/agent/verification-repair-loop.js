@@ -9,16 +9,18 @@
 
 const EventEmitter = require('events');
 const path = require('path');
+const { CONTRACT_VERSION } = require('./contracts');
 
 /**
  * Verification result states
  */
 const VerificationStates = {
-  PASS: 'pass',
-  FAIL: 'fail',
+  PASS: 'passed',
+  FAIL: 'failed',
   SKIPPED: 'skipped',
   UNAVAILABLE: 'unavailable',
-  ERROR: 'error'
+  ERROR: 'errored',
+  TIMEOUT: 'timed-out'
 };
 
 /**
@@ -27,7 +29,8 @@ const VerificationStates = {
 class VerificationResult {
   constructor(checkType, options = {}) {
     this.checkType = checkType; // 'lint', 'test', 'build', 'type-check'
-    this.state = VerificationStates.SKIPPED;
+    this.status = VerificationStates.SKIPPED;
+    this.required = options.required !== false;
     this.errors = [];
     this.warnings = [];
     this.duration = 0;
@@ -35,6 +38,14 @@ class VerificationResult {
     this.output = null;
     this.exitCode = null;
     this.timestamp = Date.now();
+  }
+
+  get state() {
+    return this.status;
+  }
+
+  set state(status) {
+    this.status = status;
   }
 
   addError(error) {
@@ -60,7 +71,9 @@ class VerificationResult {
   toJSON() {
     return {
       checkType: this.checkType,
-      state: this.state,
+      status: this.status,
+      state: this.status,
+      required: this.required,
       errors: this.errors,
       warnings: this.warnings,
       duration: this.duration,
@@ -131,6 +144,7 @@ class VerificationRepairLoop extends EventEmitter {
    */
   async verify(editContext, checks = ['lint', 'test']) {
     const results = {
+      schemaVersion: CONTRACT_VERSION,
       overall: VerificationStates.PASS,
       checks: {},
       canRepair: false,
@@ -148,17 +162,19 @@ class VerificationRepairLoop extends EventEmitter {
     }
     
     // Run each verification check
-    for (const checkType of checks) {
-      const result = await this.runCheck(checkType, editContext);
+    for (const check of checks) {
+      const checkType = typeof check === 'string' ? check : check.type;
+      const required = typeof check === 'string' || check.required !== false;
+      const result = await this.runCheck(checkType, editContext, { required });
       results.checks[checkType] = result;
       
-      // Update overall state (fail takes precedence)
+      // A required check that did not run successfully can never produce a pass.
       if (result.state === VerificationStates.FAIL) {
         results.overall = VerificationStates.FAIL;
         results.canRepair = this.repairEnabled && result.errors.length > 0;
-      } else if (result.state === VerificationStates.ERROR && 
-                 results.overall !== VerificationStates.FAIL) {
-        results.overall = VerificationStates.ERROR;
+      } else if (required && result.state !== VerificationStates.PASS &&
+                 results.overall === VerificationStates.PASS) {
+        results.overall = result.state;
       }
     }
     
@@ -171,8 +187,8 @@ class VerificationRepairLoop extends EventEmitter {
   /**
    * Run a specific verification check
    */
-  async runCheck(checkType, context) {
-    const result = new VerificationResult(checkType);
+  async runCheck(checkType, context, options = {}) {
+    const result = new VerificationResult(checkType, options);
     const startTime = Date.now();
     
     try {
@@ -194,7 +210,9 @@ class VerificationRepairLoop extends EventEmitter {
           result.addWarning({ message: `Unknown check type: ${checkType}` });
       }
     } catch (error) {
-      result.state = VerificationStates.ERROR;
+      result.state = error.code === 'ETIMEDOUT' || error.killed
+        ? VerificationStates.TIMEOUT
+        : VerificationStates.ERROR;
       result.addError({
         message: `Verification check failed: ${error.message}`,
         severity: 'error'

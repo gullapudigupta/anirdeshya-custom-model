@@ -3,12 +3,12 @@
   "name": "Level 2 Supervised Autonomous Code-Generation Agent",
   "priority": "CRITICAL",
   "estimatedHours": 138,
-  "status": "PLANNED",
-  "completionPercentage": "0%",
+  "status": "IN_PROGRESS",
+  "completionPercentage": "17%",
   "statusSummary": {
-    "completed": 0,
+    "completed": 2,
     "in_progress": 0,
-    "pending": 12
+    "pending": 10
   },
   "description": "Turn AQT's existing planning, generation, tool, approval, and verification components into a real bounded coding agent. The agent may implement scoped code changes and repair them through real checks, while risky or final changes remain reviewable and human-supervised.",
   "metadata": {
@@ -46,7 +46,7 @@
     {
       "id": "P12-T001",
       "name": "Define Level 2 task and execution contracts",
-      "status": "PENDING",
+      "status": "COMPLETED",
       "priority": "CRITICAL",
       "estimatedHours": 6,
       "value": 100,
@@ -71,7 +71,7 @@
     {
       "id": "P12-T002",
       "name": "Implement real model-backed agent step execution",
-      "status": "PENDING",
+      "status": "COMPLETED",
       "priority": "CRITICAL",
       "estimatedHours": 15,
       "value": 100,

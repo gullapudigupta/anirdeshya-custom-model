@@ -9,6 +9,8 @@
 
 'use strict';
 
+const { CONTRACT_VERSION } = require('./contracts');
+
 /**
  * Execution Plan
  * @typedef {Object} ExecutionPlan
@@ -24,6 +26,7 @@ class AgentPlanner {
     this.workspace = options.workspace || process.cwd();
     this.contextProvider = options.contextProvider || null;
     this.guidanceProvider = options.guidanceProvider || null;
+    this.planExecutor = options.planExecutor || null;
   }
 
   /**
@@ -36,6 +39,17 @@ class AgentPlanner {
    * @returns {Promise<ExecutionPlan>}
    */
   async plan(params) {
+    if (this.planExecutor) {
+      const plan = typeof this.planExecutor === 'function'
+        ? await this.planExecutor(params)
+        : await this.planExecutor.createPlan(params);
+      const validation = validatePlan(plan);
+      if (!validation.valid) {
+        throw new Error(`Plan executor returned an invalid plan: ${validation.issues.join(', ')}`);
+      }
+      return plan;
+    }
+
     const {
       description,
       deliverables = [],
@@ -59,6 +73,7 @@ class AgentPlanner {
     const risks = this._assessRisks(analysis, affectedFiles, steps);
 
     return {
+      schemaVersion: CONTRACT_VERSION,
       steps,
       affectedFiles,
       expectedChecks,

@@ -16,6 +16,10 @@ integration; see [API documentation](../../docs/API.md) and
 |------|-------------|
 | `index.js` | Agent exports and initialization |
 | `work-orchestrator.js` | Orchestrates agent work items |
+| `contracts.js` | Versioned task, plan, patch, approval, verification, and result contracts |
+| `workspace-context.js` | Workspace-contained, hashed, byte- and token-bounded context |
+| `check-runner.js` | Runs host-configured verification IDs without accepting model shell text |
+| `run-store.js` | Persists redacted run records and validates recovery checkpoints |
 | `work-item.js` | Represents a unit of agent work |
 | `planner.js` | Plans agent execution steps |
 | `scope-analyzer.js` | Analyzes scope of agent tasks |
@@ -30,6 +34,34 @@ integration; see [API documentation](../../docs/API.md) and
 | `privacy-cost-controls.js` | Privacy and cost management |
 | `requirement-traceability.js` | Traces requirements to implementation |
 | `task-importer.js` | Imports tasks from specifications |
+
+## Level 2 execution boundary
+
+The supervised coding path is opt-in: construct `WorkOrchestrator` with an
+explicit `executor`, bounded `files`, non-empty `acceptanceCriteria`, and
+registered verification checks. No model provider is selected or called by
+default. Executors return versioned structured patches; the orchestrator
+validates scope and source hashes, produces a unified diff, and requires an
+approval decision bound to the plan and patch digests before writing. Writes
+use `DiffReviewSystem`, and completion requires changed files verified in the
+workspace plus passing required checks.
+
+The executor is called once per plan step with the task, full plan, current
+step, bounded context, and an `AbortSignal`. Its result must identify the step
+and contain a success flag and versioned patches; malformed patches fail
+before a step is recorded as complete. `executorTimeoutMs` bounds each
+executor call, and work cancellation aborts the active step. Provider,
+timeout, cancellation, and malformed-output failures remain explicit failures.
+
+`ToolRegistry.getModelTools()` exposes only registered read/search/edit/check
+tools. It does not expose arbitrary command execution or direct file writes.
+Check commands are supplied by host configuration as `{ command, args, cwd }`
+under a stable check ID and run without a shell. Missing executors or checks
+fail explicitly; they are never treated as simulated success.
+
+This autonomy level does not merge, release, deploy, or resume an incomplete
+checkpoint automatically. The caller remains responsible for configuring a
+human approval channel and trusted check commands.
 
 ## Architecture
 
