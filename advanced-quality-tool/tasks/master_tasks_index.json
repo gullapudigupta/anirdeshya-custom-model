@@ -25,6 +25,8 @@
     "phase9": "./phase9-tasks.json",
     "phase10": "./phase10-documentation.json",
     "phase11": "./phase11-tasks.json",
+    "phase12": "./phase12-tasks.json",
+    "phase13": "./phase13-tasks.json",
     "meta": "./meta.json",
     "bugs": "./maintenance/bugs.json",
     "changeRequests": "./maintenance/crs.json"
@@ -35,7 +37,7 @@
     "changeRequestsIndex": "./maintenance/crs.json",
     "changeRequestRecords": "./maintenance/cr-tasks.json",
     "workflow": [
-      "Before recording a bug or CR/tweak, find the exact task in phase1-tasks.json through phase9-tasks.json. If no matching task exists, add the planned task to the appropriate phase file first.",
+      "Before recording a bug or CR/tweak, find the exact task in the phase task files. If no matching task exists, add the planned task to the appropriate phase file first.",
       "Every record must include phaseTaskId and phaseTaskFile pointing to that exact task; do not guess or leave the link unresolved.",
       "Append bug records to bugs-tasks.json and CR/tweak records to cr-tasks.json. Each shard holds at most 100 records.",
       "When the current shard reaches 100 records, create the next numbered shard (for example, bugs-tasks-002.json or cr-tasks-002.json) and add its relative path to the matching index (bugs.json or crs.json). Keep each index's shard counts and ID boundaries current."
@@ -182,6 +184,30 @@
       "reconciledOn": "2026-10-07",
       "reconciliationNote": "Task records show 72 completed and six pending. Release, UAT, hosting, and community tasks require operator access or decisions; test stabilization and task-data reconciliation are tracked separately.",
       "completedIds": ["P11-T001", "P11-T002", "P11-T003", "P11-T004", "P11-T005", "P11-T006", "P11-T007", "P11-T008", "P11-T009", "P11-T010", "P11-T011", "P11-T012", "P11-T013", "P11-T014", "P11-T015", "P11-T016", "P11-T017", "P11-T018", "P11-T019", "P11-T020", "P11-T021", "P11-T022", "P11-T023", "P11-T024", "P11-T025", "P11-T026", "P11-T027", "P11-T028", "P11-T029", "P11-T030", "P11-T031", "P11-T032", "P11-T033", "P11-T034", "P11-T035", "P11-T036", "P11-T037", "P11-T038", "P11-T039", "P11-T040", "P11-T041", "P11-T048", "P11-T049", "P11-T050", "P11-T051", "P11-T052", "P11-T053", "P11-T054", "P11-T055", "P11-T056", "P11-T057", "P11-T058", "P11-T059", "P11-T060", "P11-T061", "P11-T062", "P11-T063", "P11-T064", "P11-T065", "P11-T066", "P11-T067", "P11-T068", "P11-T069", "P11-T070", "P11-T071", "P11-T072", "P11-T073", "P11-T074", "P11-T075", "P11-T076", "P11-T077", "P11-T078"]
+    },
+    {
+      "phase": "phase12",
+      "file": "./phase12-tasks.json",
+      "name": "Level 2 Supervised Autonomous Code-Generation Agent",
+      "priority": "CRITICAL",
+      "status": "PLANNED",
+      "estimatedHours": 188,
+      "taskCount": 12,
+      "statusSummary": { "completed": 0, "in_progress": 0, "pending": 12 },
+      "reconciledOn": "2026-10-07",
+      "reconciliationNote": "Planned work to connect real model execution, workspace tools, validated patching, approval gates, real verification, bounded repair, persistence, and end-to-end evidence for supervised Level 2 autonomy."
+    },
+    {
+      "phase": "phase13",
+      "file": "./phase13-tasks.json",
+      "name": "Level 3 Policy-Bounded Autonomous Code-Generation Agent",
+      "priority": "CRITICAL",
+      "status": "PLANNED",
+      "estimatedHours": 198,
+      "taskCount": 12,
+      "statusSummary": { "completed": 0, "in_progress": 0, "pending": 12 },
+      "reconciledOn": "2026-10-07",
+      "reconciliationNote": "Planned extension of Phase 12 with policy-bounded long-horizon planning, durable recovery, repository-level context, isolated transactional changes, adaptive verification, escalation, benchmarks, and gated rollout. Autonomous merge/release/deploy remain out of scope."
     }
   ],
   "supportingFeatures": {
@@ -229,20 +255,21 @@
   "statusLegend": {
     "COMPLETED": "Implemented / done",
     "PENDING": "Not started",
-    "IN_PROGRESS": "Currently being worked on"
+    "IN_PROGRESS": "Currently being worked on",
+    "PLANNED": "Defined and ready to begin"
   },
   "rollup": {
-    "totalPhases": 11,
-    "totalTasks": 235,
+    "totalPhases": 13,
+    "totalTasks": 259,
     "byStatus": {
       "completed": 228,
       "archived": 1,
       "in_progress": 0,
-      "pending": 6
+      "pending": 30
     },
-    "totalEstimatedHours": 3059,
-    "completionPercentage": "97.4%",
+    "totalEstimatedHours": 3445,
+    "completionPercentage": "88.4%",
     "calculatedOn": "2026-10-07",
-    "note": "Computed from task records in all phase files; archived tasks are included in totalTasks but excluded from the completion percentage denominator."
+    "note": "Computed from task records in all phase files. Phase 12 delivers supervised Level 2 autonomy; Phase 13 extends it to policy-bounded Level 3. Archived tasks are included in totalTasks but excluded from the completion percentage denominator."
   }
 }

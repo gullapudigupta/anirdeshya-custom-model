@@ -4,12 +4,13 @@
   "lastUpdated": "2026-10-07",
   "progressTrackingNote": "Current task counts are derived from per-phase task files and reconciled in master_tasks_index.json. The completion percentage excludes archived tasks.",
   "progressTracking": {
-    "totalTasks": 235,
+    "totalTasks": 259,
     "completedTasks": 228,
     "archivedTasks": 1,
     "inProgressTasks": 0,
-    "pendingTasks": 6,
-    "completionPercentage": "97.4%",
+    "pendingTasks": 30,
+    "totalEstimatedHours": 3445,
+    "completionPercentage": "88.4%",
     "phase6Tasks": 16,
     "phase6EstimatedHours": 160,
     "phase7Tasks": 9,
@@ -22,6 +23,10 @@
     "phase10EstimatedHours": 79,
     "phase11Tasks": 78,
     "phase11EstimatedHours": 562,
+    "phase12Tasks": 12,
+    "phase12EstimatedHours": 188,
+    "phase13Tasks": 12,
+    "phase13EstimatedHours": 198,
     "supportingFeaturesRequired": {
       "codeAnalyzer": 5,
       "advancedQualityTool": 6
@@ -38,7 +43,9 @@
     "phase8": "./phase8-tasks.json",
     "phase9": "./phase9-tasks.json",
     "phase10": "./phase10-documentation.json",
-    "phase11": "./phase11-tasks.json"
+    "phase11": "./phase11-tasks.json",
+    "phase12": "./phase12-tasks.json",
+    "phase13": "./phase13-tasks.json"
   },
   "valueMap": {
     "description": "Task value scoring system (0-100)",

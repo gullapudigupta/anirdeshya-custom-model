@@ -1,0 +1,289 @@
+{
+  "phase": "phase12",
+  "name": "Level 2 Supervised Autonomous Code-Generation Agent",
+  "priority": "CRITICAL",
+  "estimatedHours": 188,
+  "status": "PLANNED",
+  "completionPercentage": "0%",
+  "statusSummary": {
+    "completed": 0,
+    "in_progress": 0,
+    "pending": 12
+  },
+  "description": "Turn AQT's existing planning, generation, tool, approval, and verification components into a real bounded coding agent. The agent may implement scoped code changes and repair them through real checks, while risky or final changes remain reviewable and human-supervised.",
+  "metadata": {
+    "createdOn": "2026-10-07",
+    "autonomyLevel": 2,
+    "autonomyDefinition": "The agent plans and implements a bounded task, executes configured tools and checks, performs limited repairs, records evidence, and requests approval before consequential actions.",
+    "nonGoals": [
+      "No autonomous merge, release, deployment, or production changes",
+      "No reporting scaffold output or simulated verification as a successful implementation",
+      "No execution of commands or tools outside configured workspace and policy limits"
+    ],
+    "prerequisiteAssessment": "Builds on the existing WorkOrchestrator, AgentPlanner, ToolRegistry, CodeGenerator, verification-repair loop, API, CLI, and MCP integrations; replace current stubbed execution and verification paths with tested behavior."
+  },
+  "tasks": [
+    {
+      "id": "P12-T001",
+      "name": "Define Level 2 task and execution contracts",
+      "status": "PENDING",
+      "priority": "CRITICAL",
+      "estimatedHours": 12,
+      "value": 100,
+      "dependencies": [],
+      "deliverables": [
+        "Define versioned task input, acceptance-criteria, plan, patch, verification, approval, and final-result schemas",
+        "Define terminal statuses that distinguish completed, incomplete, blocked, denied, and failed work",
+        "Specify fail-closed behavior for missing context, invalid plans, unavailable checks, and malformed model output",
+        "Document the Level 2 boundary: scoped implementation with human review, not autonomous merge or deployment"
+      ],
+      "acceptanceCriteria": [
+        "Schemas reject missing task descriptions and invalid acceptance criteria",
+        "Result states cannot mark unverified or scaffold-only output as completed",
+        "Contract fixtures cover valid, invalid, blocked, and failed cases"
+      ],
+      "tags": ["agent", "level-2", "contracts", "safety"]
+    },
+    {
+      "id": "P12-T002",
+      "name": "Implement real model-backed agent step execution",
+      "status": "PENDING",
+      "priority": "CRITICAL",
+      "estimatedHours": 20,
+      "value": 100,
+      "dependencies": ["P12-T001"],
+      "deliverables": [
+        "Replace WorkOrchestrator._executeStep stub with an injected executor interface",
+        "Pass the approved plan step, task contract, bounded context, and cancellation signal to the executor",
+        "Validate structured model output before accepting step results",
+        "Return explicit provider, timeout, cancellation, and malformed-output failures"
+      ],
+      "acceptanceCriteria": [
+        "A deterministic fake executor can run the orchestrator end-to-end without network access",
+        "No model provider is invoked unless explicitly configured",
+        "Execution failures never produce success-shaped step results"
+      ],
+      "tags": ["agent", "execution", "model", "level-2"]
+    },
+    {
+      "id": "P12-T003",
+      "name": "Connect ToolRegistry to agent execution",
+      "status": "PENDING",
+      "priority": "CRITICAL",
+      "estimatedHours": 16,
+      "value": 95,
+      "dependencies": ["P12-T002"],
+      "deliverables": [
+        "Inject ToolRegistry into the execution context and expose only registered tools",
+        "Make tool schemas and outputs available to the model executor",
+        "Record tool name, validated arguments, result status, duration, and bounded output in the work log",
+        "Enforce per-task tool-call and output budgets"
+      ],
+      "acceptanceCriteria": [
+        "Agent execution can perform read/search/edit/check operations only through registered tools",
+        "Unknown tools, invalid arguments, budget exhaustion, and tool failures are explicit",
+        "Tool execution logs are correlated with task and plan-step IDs"
+      ],
+      "tags": ["agent", "tools", "tool-registry", "level-2"]
+    },
+    {
+      "id": "P12-T004",
+      "name": "Build bounded repository context for coding tasks",
+      "status": "PENDING",
+      "priority": "HIGH",
+      "estimatedHours": 16,
+      "value": 90,
+      "dependencies": ["P12-T001"],
+      "deliverables": [
+        "Use workspace search, file inspection, language detection, and available symbol analysis to gather relevant context",
+        "Honor explicit file scope, ignore rules, file-size caps, and token budgets",
+        "Track each context item by workspace-relative path and content hash",
+        "Report when requested files are missing, excluded, or truncated"
+      ],
+      "acceptanceCriteria": [
+        "Context collection stays within configured file-count and token limits",
+        "Absolute paths outside the workspace are rejected",
+        "Context provenance is available in the task result"
+      ],
+      "tags": ["agent", "context", "workspace", "level-2"]
+    },
+    {
+      "id": "P12-T005",
+      "name": "Generate and validate actionable execution plans",
+      "status": "PENDING",
+      "priority": "HIGH",
+      "estimatedHours": 12,
+      "value": 90,
+      "dependencies": ["P12-T004"],
+      "deliverables": [
+        "Replace keyword-only plan steps with executor-produced structured plans grounded in gathered context",
+        "Require a bounded affected-file set, ordered steps, acceptance criteria, verification commands, and risks",
+        "Validate dependencies, workspace scope, step budgets, and approval requirements before execution",
+        "Persist the exact approved plan and its version with the work item"
+      ],
+      "acceptanceCriteria": [
+        "Plans with no actionable steps, unresolved dependencies, or unbounded scope are rejected",
+        "Plan validation is deterministic and covered by positive and negative tests",
+        "The approval view represents the exact plan that will execute"
+      ],
+      "tags": ["agent", "planning", "validation", "level-2"]
+    },
+    {
+      "id": "P12-T006",
+      "name": "Generate and apply reviewable workspace patches",
+      "status": "PENDING",
+      "priority": "CRITICAL",
+      "estimatedHours": 20,
+      "value": 100,
+      "dependencies": ["P12-T002", "P12-T003", "P12-T004"],
+      "deliverables": [
+        "Replace CodeGenerator scaffold patches with model-generated structured create, modify, and delete operations",
+        "Validate patch paths, content hashes, expected original content, and changed-file limits before applying",
+        "Produce a unified diff and per-file summary before approval or application",
+        "Reject empty, scaffold-only, malformed, conflicting, or stale patches"
+      ],
+      "acceptanceCriteria": [
+        "Patch application is workspace-contained and rejects traversal and symlink escape attempts",
+        "A stale source file causes a conflict result without overwriting user edits",
+        "No patch is reported as implemented until the intended content is actually present",
+        "Patch generation and application have isolated temporary-workspace tests"
+      ],
+      "tags": ["agent", "code-generation", "patches", "level-2"]
+    },
+    {
+      "id": "P12-T007",
+      "name": "Enforce action-level permissions and approval gates",
+      "status": "PENDING",
+      "priority": "CRITICAL",
+      "estimatedHours": 16,
+      "value": 100,
+      "dependencies": ["P12-T005"],
+      "deliverables": [
+        "Apply permission policy to each tool call and patch operation, not only to the initial plan",
+        "Require explicit approval for destructive edits, dependency changes, broad scope, and configured high-risk actions",
+        "Bind approval to the plan and patch digest and invalidate it if either changes",
+        "Ensure cancellation, denial, or approval timeout prevents subsequent writes"
+      ],
+      "acceptanceCriteria": [
+        "Denied and expired approvals result in zero workspace mutations",
+        "Any change to an approved plan or patch requires renewed approval",
+        "Policy decisions are auditable and tested against adversarial requests"
+      ],
+      "tags": ["agent", "permissions", "approval", "level-2"]
+    },
+    {
+      "id": "P12-T008",
+      "name": "Run real verification checks and report evidence",
+      "status": "PENDING",
+      "priority": "CRITICAL",
+      "estimatedHours": 20,
+      "value": 100,
+      "dependencies": ["P12-T006"],
+      "deliverables": [
+        "Replace WorkOrchestrator._verifyWork stub with real configured test, lint, type-check, and build command execution",
+        "Run commands with bounded timeout, output size, environment, and workspace scope",
+        "Capture command, exit code, duration, and sanitized bounded output for each check",
+        "Distinguish passed, failed, skipped, unavailable, and timed-out checks"
+      ],
+      "acceptanceCriteria": [
+        "A failed required check prevents task completion",
+        "A missing required check is not represented as passing",
+        "No check executes an implicit shell command supplied by model text",
+        "Verification evidence is included in the final work result"
+      ],
+      "tags": ["agent", "verification", "tests", "level-2"]
+    },
+    {
+      "id": "P12-T009",
+      "name": "Add bounded verification-driven repair loop",
+      "status": "PENDING",
+      "priority": "HIGH",
+      "estimatedHours": 16,
+      "value": 90,
+      "dependencies": ["P12-T008"],
+      "deliverables": [
+        "Connect the existing verification-repair loop to agent patches and check failures",
+        "Feed only relevant, bounded diagnostics back to the executor",
+        "Cap repair iterations, changed files, tokens, elapsed time, and model/tool cost",
+        "Stop and return a reviewable partial result when limits are reached or checks regress"
+      ],
+      "acceptanceCriteria": [
+        "Repair stops at configured limits and cannot silently reset its budgets",
+        "A repair cannot bypass the original permissions or approval digest",
+        "Tests cover fixed-on-retry, persistent failure, regression, cancellation, and limit exhaustion"
+      ],
+      "tags": ["agent", "repair-loop", "verification", "level-2"]
+    },
+    {
+      "id": "P12-T010",
+      "name": "Persist agent runs, checkpoints, and audit events",
+      "status": "PENDING",
+      "priority": "HIGH",
+      "estimatedHours": 12,
+      "value": 85,
+      "dependencies": ["P12-T002"],
+      "deliverables": [
+        "Persist task contract, plan, approval, tool events, patch digests, verification evidence, and final status",
+        "Resume only from validated checkpoints and re-check workspace hashes before continuation",
+        "Redact credentials and sensitive file contents from persisted records",
+        "Expose stable history and status data to existing agent interfaces"
+      ],
+      "acceptanceCriteria": [
+        "A process restart does not convert incomplete work to completed",
+        "Tampered, incompatible, or stale checkpoints fail with an explicit recovery state",
+        "Persistence tests verify redaction and deterministic resume behavior"
+      ],
+      "tags": ["agent", "persistence", "audit", "level-2"]
+    },
+    {
+      "id": "P12-T011",
+      "name": "Expose supervised code-generation workflow consistently",
+      "status": "PENDING",
+      "priority": "HIGH",
+      "estimatedHours": 12,
+      "value": 85,
+      "dependencies": ["P12-T003", "P12-T006", "P12-T007", "P12-T008", "P12-T010"],
+      "deliverables": [
+        "Expose start, plan review, approval, progress, cancellation, and result through CLI, HTTP API, and MCP",
+        "Return the same task ID, autonomy profile, approval state, patch summary, and verification evidence on each surface",
+        "Register Level 2 agent actions in the shared capability groups",
+        "Document non-interactive approval requirements and safe headless defaults"
+      ],
+      "acceptanceCriteria": [
+        "CLI, API, and MCP invoke the same application service and produce equivalent state transitions",
+        "Headless execution denies actions that require a human approver when no approval channel is configured",
+        "Interface contract tests cover successful, denied, cancelled, and failed work"
+      ],
+      "tags": ["agent", "cli", "api", "mcp", "level-2"]
+    },
+    {
+      "id": "P12-T012",
+      "name": "Prove Level 2 behavior with end-to-end acceptance suite",
+      "status": "PENDING",
+      "priority": "CRITICAL",
+      "estimatedHours": 16,
+      "value": 100,
+      "dependencies": ["P12-T005", "P12-T006", "P12-T007", "P12-T008", "P12-T009", "P12-T010", "P12-T011"],
+      "deliverables": [
+        "Create offline end-to-end tasks that modify a disposable repository and verify intended behavior",
+        "Cover new feature, bug fix, regression test, unsafe request, missing toolchain, failed check, and human denial",
+        "Assert resulting diffs, real check invocations, approval binding, persistence, and failure states",
+        "Publish operator guide, supported-provider matrix, known limitations, and Level 2 acceptance evidence"
+      ],
+      "acceptanceCriteria": [
+        "No fake executor, stub verifier, scaffold patch, or network dependency is used by core acceptance tests",
+        "Every success case proves the workspace changed as intended and all required checks passed",
+        "Every blocked or failed case proves unsafe changes were not left behind",
+        "Phase 12 exit requires all critical acceptance cases passing"
+      ],
+      "tags": ["agent", "end-to-end", "acceptance", "level-2"]
+    }
+  ],
+  "exitCriteria": [
+    "The agent can implement bounded tasks using real tools and apply validated, reviewable patches",
+    "Required checks execute for real and failures cannot be reported as successful work",
+    "Risky actions require plan- and patch-bound human approval",
+    "Changes, tool calls, and verification evidence are auditable and resumable",
+    "Level 2 end-to-end acceptance suite passes on supported operating systems"
+  ]
+}

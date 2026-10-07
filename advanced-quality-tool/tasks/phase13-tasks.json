@@ -1,0 +1,288 @@
+{
+  "phase": "phase13",
+  "name": "Level 3 Policy-Bounded Autonomous Code-Generation Agent",
+  "priority": "CRITICAL",
+  "estimatedHours": 198,
+  "status": "PLANNED",
+  "completionPercentage": "0%",
+  "statusSummary": {
+    "completed": 0,
+    "in_progress": 0,
+    "pending": 12
+  },
+  "description": "Extend the proven Level 2 supervised coding agent to complete longer, multi-step engineering tasks autonomously inside explicit policy and resource boundaries. Level 3 autonomy is conditional and auditable; it does not grant blanket authority to merge, release, deploy, or perform irreversible production actions.",
+  "metadata": {
+    "createdOn": "2026-10-07",
+    "autonomyLevel": 3,
+    "autonomyDefinition": "The agent can decompose and carry out eligible multi-step engineering tasks, adapt using repository and verification feedback, and deliver an evidence-backed candidate change without per-step approval when policy permits.",
+    "prerequisitePhase": "phase12",
+    "prerequisiteExitCriteria": "All Phase 12 Level 2 exit criteria pass, including real editing, real checks, approval controls, persistence, and cross-interface acceptance.",
+    "nonGoals": [
+      "No unrestricted network, shell, filesystem, or credential access",
+      "No autonomous production deployment, protected-branch merge, release publication, or secrets rotation",
+      "No claiming autonomous competence beyond measured task and repository classes"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "P13-T001",
+      "name": "Define Level 3 autonomy profiles and policy boundaries",
+      "status": "PENDING",
+      "priority": "CRITICAL",
+      "estimatedHours": 12,
+      "value": 100,
+      "dependencies": ["P12-T012"],
+      "deliverables": [
+        "Define disabled, supervised, and policy-bounded autonomy profiles with explicit allowed actions",
+        "Create a risk matrix for file edits, dependency changes, generated code, tests, network access, and Git operations",
+        "Set hard maximums for task duration, changed files, repair attempts, model cost, and tool calls",
+        "Specify mandatory escalation and human-approval conditions"
+      ],
+      "acceptanceCriteria": [
+        "Unknown or missing policy settings resolve to the least autonomous behavior",
+        "Protected, irreversible, or production actions cannot be enabled by a task prompt",
+        "Policy decisions have machine-readable reasons and audit records"
+      ],
+      "tags": ["agent", "level-3", "policy", "risk"]
+    },
+    {
+      "id": "P13-T002",
+      "name": "Plan long-horizon engineering work as a dependency graph",
+      "status": "PENDING",
+      "priority": "HIGH",
+      "estimatedHours": 18,
+      "value": 95,
+      "dependencies": ["P13-T001"],
+      "deliverables": [
+        "Decompose eligible requests into bounded tasks with explicit dependencies, outcomes, and per-task budgets",
+        "Execute ready tasks in dependency order with configurable, workspace-safe concurrency",
+        "Replan only from recorded evidence and require approval when scope or risk materially increases",
+        "Expose graph progress, blocked tasks, and remaining budget"
+      ],
+      "acceptanceCriteria": [
+        "Cycles, missing prerequisites, and unbounded decomposition are rejected",
+        "A failed prerequisite prevents dependent changes from being reported complete",
+        "Replanning preserves completed evidence and never silently broadens approved scope"
+      ],
+      "tags": ["agent", "planning", "orchestration", "level-3"]
+    },
+    {
+      "id": "P13-T003",
+      "name": "Add durable resumable autonomous-run state",
+      "status": "PENDING",
+      "priority": "HIGH",
+      "estimatedHours": 16,
+      "value": 90,
+      "dependencies": ["P13-T001"],
+      "deliverables": [
+        "Persist dependency graph state, budgets, policy version, context provenance, decisions, and verification evidence",
+        "Resume eligible runs after process interruption with lease and duplicate-execution protection",
+        "Revalidate workspace state, approvals, tool availability, and remaining budgets before resuming",
+        "Support explicit pause, resume, cancel, and operator takeover"
+      ],
+      "acceptanceCriteria": [
+        "Restart and duplicate-request tests do not repeat completed writes or exceed task budgets",
+        "Policy changes invalidate incompatible checkpoints and require explicit reconciliation",
+        "Operator takeover prevents background work from mutating files afterward"
+      ],
+      "tags": ["agent", "state", "recovery", "level-3"]
+    },
+    {
+      "id": "P13-T004",
+      "name": "Build repository-level architecture and dependency context",
+      "status": "PENDING",
+      "priority": "HIGH",
+      "estimatedHours": 18,
+      "value": 90,
+      "dependencies": ["P13-T002"],
+      "deliverables": [
+        "Build an incremental repository map of modules, entry points, tests, configurations, and dependency boundaries",
+        "Use available language analyzers and symbol references to support impact analysis",
+        "Track map freshness and invalidate affected context after edits",
+        "Explain file-selection rationale and uncertainty to the planner and reviewer"
+      ],
+      "acceptanceCriteria": [
+        "Stale or incomplete maps are detected and trigger refresh or a conservative scope",
+        "Impact analysis is tested against representative multi-module dependency fixtures",
+        "No private repository content is transmitted to a provider unless configured by the workspace policy"
+      ],
+      "tags": ["agent", "repository-understanding", "context", "level-3"]
+    },
+    {
+      "id": "P13-T005",
+      "name": "Select and expand verification based on change impact",
+      "status": "PENDING",
+      "priority": "CRITICAL",
+      "estimatedHours": 16,
+      "value": 95,
+      "dependencies": ["P13-T004"],
+      "deliverables": [
+        "Map changed files and dependency impact to targeted tests, static checks, builds, and broader suites",
+        "Use changed-file tests for iteration and require configured final gates before completion",
+        "Detect when checks are skipped, flaky, unavailable, or provide insufficient evidence",
+        "Allow policy to require full suites or independent review for high-impact changes"
+      ],
+      "acceptanceCriteria": [
+        "The agent cannot equate a targeted test pass with all required final gates passing",
+        "Verification selection is reproducible from recorded change and policy inputs",
+        "Fixtures prove that dependency-impact changes expand verification scope"
+      ],
+      "tags": ["agent", "testing", "verification", "level-3"]
+    },
+    {
+      "id": "P13-T006",
+      "name": "Isolate autonomous changes in transactional workspaces",
+      "status": "PENDING",
+      "priority": "CRITICAL",
+      "estimatedHours": 20,
+      "value": 100,
+      "dependencies": ["P13-T001", "P13-T003"],
+      "deliverables": [
+        "Run autonomous modifications in an isolated workspace or Git worktree without overwriting active user edits",
+        "Create checkpoints before each accepted patch batch and maintain a complete changed-file manifest",
+        "Provide rollback and discard operations with explicit confirmation and recovery logging",
+        "Compare the final candidate against the original base and detect unexpected files or generated artifacts"
+      ],
+      "acceptanceCriteria": [
+        "Concurrent user edits to the source workspace are preserved",
+        "Cancellation, failed verification, and policy violation can safely discard or restore the isolated candidate",
+        "Isolation and recovery are tested on Windows, Linux, and macOS"
+      ],
+      "tags": ["agent", "isolation", "rollback", "level-3"]
+    },
+    {
+      "id": "P13-T007",
+      "name": "Implement multi-stage self-repair with stop conditions",
+      "status": "PENDING",
+      "priority": "CRITICAL",
+      "estimatedHours": 20,
+      "value": 100,
+      "dependencies": ["P13-T002", "P13-T005", "P13-T006"],
+      "deliverables": [
+        "Iterate plan, implement, test, inspect diff, and repair across dependent tasks",
+        "Track regressions and compare each repair against previous verification results",
+        "Stop on repeated failures, oscillating changes, security-sensitive behavior, uncertain requirements, or budget exhaustion",
+        "Produce a concise unresolved-issues report and candidate diff on early stop"
+      ],
+      "acceptanceCriteria": [
+        "Loop termination is deterministic under configured limits",
+        "Repeated or regressive patches cannot be accepted as progress",
+        "Stop and escalation conditions are covered by adversarial and fault-injection tests"
+      ],
+      "tags": ["agent", "repair", "autonomy", "level-3"]
+    },
+    {
+      "id": "P13-T008",
+      "name": "Add policy-gated external quality and security checks",
+      "status": "PENDING",
+      "priority": "HIGH",
+      "estimatedHours": 18,
+      "value": 90,
+      "dependencies": ["P13-T005", "P13-T006"],
+      "deliverables": [
+        "Integrate configured CI, security scan, dependency, license, and performance checks as evidence providers",
+        "Define which checks can run automatically and which require credentialed or external-service access",
+        "Prevent secret-bearing output from being sent to models or attached to shared logs",
+        "Create evidence adapters that retain source, revision, timestamp, status, and check configuration"
+      ],
+      "acceptanceCriteria": [
+        "Unavailable or unauthorized checks are reported as incomplete, never passed",
+        "External-service operations require explicit workspace configuration and scoped credentials",
+        "Sensitive-output tests demonstrate redaction before persistence or model submission"
+      ],
+      "tags": ["agent", "ci", "security", "level-3"]
+    },
+    {
+      "id": "P13-T009",
+      "name": "Provide reproducible audit trail and autonomy telemetry",
+      "status": "PENDING",
+      "priority": "HIGH",
+      "estimatedHours": 14,
+      "value": 85,
+      "dependencies": ["P13-T003", "P13-T007"],
+      "deliverables": [
+        "Record policy version, task graph, context references, model/provider metadata, tool calls, approvals, diffs, checks, and stop reasons",
+        "Support deterministic export of an agent run for review without exporting secret values",
+        "Add local-first, privacy-controlled metrics for completion, regressions, escalations, and resource use",
+        "Make records queryable through existing CLI, API, and MCP group surfaces"
+      ],
+      "acceptanceCriteria": [
+        "An exported run can be reviewed to reconstruct the basis for every file mutation",
+        "Telemetry is opt-in where it leaves the workspace and remains local by default",
+        "Audit integrity and redaction have regression tests"
+      ],
+      "tags": ["agent", "audit", "observability", "level-3"]
+    },
+    {
+      "id": "P13-T010",
+      "name": "Add escalation, takeover, and final human decision gates",
+      "status": "PENDING",
+      "priority": "CRITICAL",
+      "estimatedHours": 12,
+      "value": 100,
+      "dependencies": ["P13-T001", "P13-T003", "P13-T007"],
+      "deliverables": [
+        "Escalate ambiguous requirements, policy conflicts, elevated risks, repeated failures, and scope changes to an operator",
+        "Provide pause and takeover controls across CLI, API, and MCP",
+        "Require human approval before publishing patches, merging protected branches, releases, or deployments",
+        "Ensure pending decisions expire safely without applying further changes"
+      ],
+      "acceptanceCriteria": [
+        "No prompt or generated plan can disable mandatory approval gates",
+        "Pause, takeover, timeout, and denied-approval tests prove no subsequent mutations",
+        "Every escalation includes evidence, options, and the exact pending action"
+      ],
+      "tags": ["agent", "human-in-the-loop", "governance", "level-3"]
+    },
+    {
+      "id": "P13-T011",
+      "name": "Create autonomy quality, safety, and benchmark suite",
+      "status": "PENDING",
+      "priority": "CRITICAL",
+      "estimatedHours": 18,
+      "value": 100,
+      "dependencies": ["P13-T005", "P13-T007", "P13-T008", "P13-T010"],
+      "deliverables": [
+        "Build a versioned benchmark set of representative repository tasks with hidden acceptance checks",
+        "Measure task success, test regressions, unsafe actions, human escalations, resource use, and reproducibility",
+        "Add prompt-injection, malicious repository content, tool misuse, budget bypass, and checkpoint tampering scenarios",
+        "Set release thresholds and publish known capability limits by language and task class"
+      ],
+      "acceptanceCriteria": [
+        "Safety regressions block release regardless of aggregate task-success score",
+        "Benchmark results include exact agent, policy, model, and toolchain versions",
+        "No Level 3 capability is enabled by default without passing its documented thresholds"
+      ],
+      "tags": ["agent", "evaluation", "security", "level-3"]
+    },
+    {
+      "id": "P13-T012",
+      "name": "Validate Level 3 rollout and operational readiness",
+      "status": "PENDING",
+      "priority": "HIGH",
+      "estimatedHours": 16,
+      "value": 95,
+      "dependencies": ["P13-T009", "P13-T010", "P13-T011"],
+      "deliverables": [
+        "Run staged pilot evaluations on disposable and opt-in repositories before broad availability",
+        "Document autonomy profiles, supported task classes, prerequisites, rollback, and incident response",
+        "Add feature flags and safe downgrade path to Level 2 supervised behavior",
+        "Require maintainer approval of benchmark evidence and operational go/no-go"
+      ],
+      "acceptanceCriteria": [
+        "Level 3 remains disabled unless explicitly enabled by workspace policy",
+        "Pilot users can stop, inspect, and discard an agent candidate at any time",
+        "Rollout is blocked by unmet safety thresholds, unresolved critical UAT issues, or absent maintainer approval"
+      ],
+      "tags": ["agent", "rollout", "readiness", "level-3"]
+    }
+  ],
+  "exitCriteria": [
+    "All Level 2 capabilities and safety gates from Phase 12 remain passing",
+    "Eligible multi-step tasks can be completed within explicitly configured policy and resource budgets",
+    "All changes are isolated, reviewable, recoverable, and supported by real verification evidence",
+    "Mandatory escalation and human approval remain in force for protected and consequential actions",
+    "Versioned quality and safety benchmarks meet approved release thresholds",
+    "Level 3 rollout receives explicit maintainer go/no-go approval"
+  ]
+}
